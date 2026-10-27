@@ -6,8 +6,9 @@ import type { Task } from '../types.ts';
 import { applyBatch, commit, PlanEditError, type Batch } from './actions.ts';
 import { recordChange, type Change } from './changes.ts';
 import type { PlanChange } from './incidents.ts';
+import { ownerOf } from './prompts.ts';
 
-// Applying plan changes as one: a fix Daniel accepts or Helix applies, a batch action on Home, an answer sent to a
+// Applying plan changes as one: a fix the owner accepts or Helix applies, a batch action on Home, an answer sent to a
 // group of tasks. Each becomes one validated commit and one entry in the undo list.
 
 export const BATCH_FIELDS = ['status', 'notes', 'blocked_by'] as const;
@@ -74,12 +75,12 @@ export async function applyChanges(root: string, changes: PlanChange[], opts: { 
 // the spec with its changelog row. Never the spec's own sections.
 export async function addClarification(root: string, about: string, text: string, tasks: string[]): Promise<string> {
   const file = paths(root).clarifications;
-  const existing = existsSync(file) ? readFileSync(file, 'utf8') : '# Clarifications\n\nAnswers Daniel sent from Helix Loop, numbered per requirement. The loop engineer folds each into the spec with an Appendix B row, then deletes it here.\n';
+  const existing = existsSync(file) ? readFileSync(file, 'utf8') : `# Clarifications\n\nAnswers ${ownerOf(root)} sent from Helix Loop, numbered per requirement. The loop engineer folds each into the spec with an Appendix B row, then deletes it here.\n`;
   const n = (existing.match(new RegExp(`^## ${about.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.(\\d+)`, 'gm')) ?? []).length + 1;
   const id = `${about}.${n}`;
   mkdirSync(dirname(file), { recursive: true });
   if (!existsSync(file)) writeFileSync(file, existing);
   appendFileSync(file, `\n## ${id}\n\n${text.trim().split(/(?<=[.!?])\s+/).join('\n')}\n\nAsked by ${tasks.join(', ')}; answered ${new Date().toISOString().slice(0, 10)}.\n`);
-  if (existsSync(`${root}/.git`)) await commit(root, [relative(root, file)], `Spec: clarification ${id} (Daniel, in Helix Loop)`).catch(() => false);
+  if (existsSync(`${root}/.git`)) await commit(root, [relative(root, file)], `Spec: clarification ${id} (${ownerOf(root)}, in Helix Loop)`).catch(() => false);
   return id;
 }

@@ -1,19 +1,30 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { CONTROL_PLANE } from '../config.ts';
+import { asset, loadConfig, paths, projectInfo } from '../config.ts';
 import { atomicWrite } from '../plan/store.ts';
 import { columnOf } from './hitl.ts';
 import type { PilotConfig } from '../config.ts';
 import { commit } from './actions.ts';
 
-// Helix's prompts (spec §9.3): a preset per role and level in harness/helix/prompts/, shipped with the app. An
-// edit is saved beside its preset as <name>.local.md and wins until it is reset; both are in git. The prompts
-// carry judgment only: what Helix may do is the tools' and the floors' business, so an edit can't widen it.
+// Helix's prompts (spec §9.3): a preset per role and level, shipped with the tool (presets/helix/). A project's
+// edit is saved in .helix/helix/prompts/<name>.local.md and wins until it is reset. The prompts carry judgment
+// only: what Helix may do is the tools' and the floors' business, so an edit can't widen it. {{owner}} and
+// {{product}} in a prompt read as the project's owner and product.
 
-export const promptsDir = (root: string) => join(root, 'harness', 'helix', 'prompts');
-// The presets ship with the app's code; a loop's own edits live in its control plane. They are the same folder
-// once the app runs from the control plane it serves.
-const presetsDir = () => join(CONTROL_PLANE, 'harness', 'helix', 'prompts');
+export const promptsDir = (root: string) => join(paths(root).helix, 'prompts');
+const presetsDir = () => asset('presets', 'helix');
+
+// The project's names in a prompt; a project whose config can't be read keeps the placeholders' plain words.
+export function fillPrompt(root: string, text: string): string {
+  let info = { owner: 'the owner', name: 'the product' };
+  try {
+    info = projectInfo(loadConfig(root));
+  } catch {
+    // a config being rewritten
+  }
+  return text.replace(/\{\{owner\}\}/g, info.owner).replace(/\{\{product\}\}/g, info.name);
+}
+export const ownerOf = (root: string) => fillPrompt(root, '{{owner}}');
 
 export interface PromptInfo {
   name: string; // assistant, monitor.auto-intrepid
@@ -65,7 +76,7 @@ export async function savePrompt(root: string, name: string, text: string): Prom
     mkdirSync(promptsDir(root), { recursive: true });
     atomicWrite(local, `${t}\n`);
   }
-  if (existsSync(join(root, '.git'))) await commit(root, [relative(root, local)], `Helix: ${name} prompt edited (Daniel, in Helix Loop)`).catch(() => false);
+  if (existsSync(join(root, '.git'))) await commit(root, [relative(root, local)], `Helix: ${name} prompt edited (${ownerOf(root)}, in Helix Loop)`).catch(() => false);
   return readPrompt(root, name)!;
 }
 
@@ -75,7 +86,7 @@ export async function resetPrompt(root: string, name: string): Promise<PromptInf
   const local = join(promptsDir(root), `${name}.local.md`);
   if (existsSync(local)) {
     rmSync(local);
-    if (existsSync(join(root, '.git'))) await commit(root, [relative(root, local)], `Helix: ${name} prompt reset to its preset (Daniel, in Helix Loop)`).catch(() => false);
+    if (existsSync(join(root, '.git'))) await commit(root, [relative(root, local)], `Helix: ${name} prompt reset to its preset (${ownerOf(root)}, in Helix Loop)`).catch(() => false);
   }
   return readPrompt(root, name)!;
 }

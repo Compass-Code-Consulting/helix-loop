@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // Settings › Agents (spec §12): whether each CLI is installed, signed in with its subscription, holding a Helix
-// API key, and working, with the fixes Daniel can run from the page. Builders need a subscription; Helix may
+// API key, and working, with the fixes the owner can run from the page. Builders need a subscription; Helix may
 // use either. Keys live only in the macOS keychain, never in a file or a log.
 
 export type Light = 'green' | 'amber' | 'red' | 'off';
@@ -30,12 +30,14 @@ export const KEY_SERVICE: Record<AgentName, string> = {
   claude: 'Helix Loop: Helix Anthropic API key',
   codex: 'Helix Loop: Helix OpenAI API key',
 };
-// The keychain items from before Helix was named, still read until a key is saved under the new name.
-const OLD_KEY_SERVICE: Record<AgentName, string> = {
-  claude: 'Mushy loop: steward Anthropic API key',
-  codex: 'Mushy loop: steward OpenAI API key',
-};
-const KEY_ACCOUNT = 'mushy-loop';
+const KEY_ACCOUNT = 'helix-loop';
+// Where a key is looked for, first to last: the tool's own item, then the items Helix Loop kept under the name
+// of the first product it built (mushy-loop), still read until a key is saved under the new name.
+const KEY_ITEMS = (agent: AgentName): [string, string][] => [
+  [KEY_SERVICE[agent], KEY_ACCOUNT],
+  [KEY_SERVICE[agent], 'mushy-loop'],
+  [{ claude: 'Mushy loop: steward Anthropic API key', codex: 'Mushy loop: steward OpenAI API key' }[agent], 'mushy-loop'],
+];
 // The variable each CLI takes a key from in a headless run, set only in Helix's own process.
 export const KEY_ENV: Record<AgentName, string> = { claude: 'ANTHROPIC_API_KEY', codex: 'CODEX_API_KEY' };
 
@@ -50,8 +52,8 @@ export const SIGN_IN: Record<AgentName, string[]> = {
 
 export async function hasKey(agent: AgentName): Promise<boolean> {
   if (process.platform !== 'darwin') return false;
-  for (const service of [KEY_SERVICE[agent], OLD_KEY_SERVICE[agent]]) {
-    const r = await run('security', ['find-generic-password', '-s', service, '-a', KEY_ACCOUNT], { cwd: tmpdir(), timeoutMs: 10_000 }).catch(() => undefined);
+  for (const [service, account] of KEY_ITEMS(agent)) {
+    const r = await run('security', ['find-generic-password', '-s', service, '-a', account], { cwd: tmpdir(), timeoutMs: 10_000 }).catch(() => undefined);
     if (r?.code === 0) return true;
   }
   return false;
@@ -59,8 +61,8 @@ export async function hasKey(agent: AgentName): Promise<boolean> {
 
 export async function readKey(agent: AgentName): Promise<string | undefined> {
   if (process.platform !== 'darwin') return undefined;
-  for (const service of [KEY_SERVICE[agent], OLD_KEY_SERVICE[agent]]) {
-    const r = await run('security', ['find-generic-password', '-s', service, '-a', KEY_ACCOUNT, '-w'], { cwd: tmpdir(), timeoutMs: 10_000 }).catch(() => undefined);
+  for (const [service, account] of KEY_ITEMS(agent)) {
+    const r = await run('security', ['find-generic-password', '-s', service, '-a', account, '-w'], { cwd: tmpdir(), timeoutMs: 10_000 }).catch(() => undefined);
     if (r?.code === 0 && r.stdout.trim()) return r.stdout.trim();
   }
   return undefined;
@@ -81,7 +83,7 @@ export async function saveKey(agent: AgentName, key: string): Promise<void> {
 }
 
 export async function deleteKey(agent: AgentName): Promise<void> {
-  for (const service of [KEY_SERVICE[agent], OLD_KEY_SERVICE[agent]]) await run('security', ['delete-generic-password', '-s', service, '-a', KEY_ACCOUNT], { cwd: tmpdir(), timeoutMs: 10_000 }).catch(() => undefined);
+  for (const [service, account] of KEY_ITEMS(agent)) await run('security', ['delete-generic-password', '-s', service, '-a', account], { cwd: tmpdir(), timeoutMs: 10_000 }).catch(() => undefined);
 }
 
 const TTL_MS = 10 * 60_000;
@@ -125,7 +127,7 @@ async function agentHealth(config: Config, agent: AgentName, refresh = false): P
 
 async function probe(config: Config, agent: AgentName, extraEnv: Record<string, string>): Promise<AgentHealth['working']> {
   const adapter = agent === 'claude' ? claudeAdapter(config.agents.claude, config) : codexAdapter(config.agents.codex, config);
-  const dir = mkdtempSync(join(tmpdir(), 'mushy-probe-'));
+  const dir = mkdtempSync(join(tmpdir(), 'helix-probe-'));
   const inv = adapter.probe(dir);
   const res = await run(inv.cmd, inv.args, { cwd: dir, stdin: inv.stdin, env: { ...builderEnv(process.env), ...inv.env, ...extraEnv }, timeoutMs: 120_000 }).catch((e: Error) => ({ code: -1, stdout: '', stderr: e.message }));
   const r = await adapter.interpret(res.stdout, res.stderr, res.code, Date.now());

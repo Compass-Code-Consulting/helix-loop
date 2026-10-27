@@ -53,7 +53,7 @@ export type LedgerEvent =
   | { kind: 'warning'; at: string; task?: string; detail: string }
   | { kind: 'release'; at: string; repo: string; tag: string; tasks: string[]; reason: string; pushed: boolean | 'skipped' }
   // A release that was due but not tagged; its tasks go out with the first release after the hold lifts.
-  // `tag` and `approval` are set when it waits for Daniel to approve a change under the review paths.
+  // `tag` and `approval` are set when it waits for the owner to approve a change under the review paths.
   | { kind: 'release_held'; at: string; repo: string; reason: string; tasks: string[]; detail: string; tag?: string; approval?: string }
   // Release tags origin lacked because their push had failed, pushed again (`pushed`: whether it worked).
   | { kind: 'release_retry'; at: string; repo: string; tags: string[]; pushed: boolean };

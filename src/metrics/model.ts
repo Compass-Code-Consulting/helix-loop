@@ -118,6 +118,7 @@ export interface MetricsModel {
   startedAt?: number;
   windowHours: number;
   timeZone: string;
+  product: string;
   categories: { key: Category; label: string }[];
   agents: string[];
   done: [number, number][]; // [time, tasks done] at each merge
@@ -239,13 +240,14 @@ export interface MetricsInput {
   history?: [number, number][]; // [time, tasks in the plan], from the plan's git history
   windowHours?: number;
   timeZone?: string;
+  product?: string; // the product's name, for the page's title
   targets?: Record<string, number | undefined>; // each agent's weekly_target, for the pace lines
 }
 
 export function buildMetrics(input: MetricsInput): MetricsModel {
   const { events, plan, now } = input;
   const windowHours = input.windowHours ?? 6;
-  const timeZone = input.timeZone ?? 'America/Chicago';
+  const timeZone = input.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const passes = events.filter((e): e is Pass => e.kind === 'pass').sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const agents = [...new Set(passes.map((p) => p.agent))].sort();
   const noteOf: NoteOf = (p) => {
@@ -425,6 +427,7 @@ export function buildMetrics(input: MetricsInput): MetricsModel {
     startedAt,
     windowHours,
     timeZone,
+    product: input.product ?? 'The',
     categories: CATEGORIES.map((key) => ({ key, label: CATEGORY_LABEL[key] })),
     agents,
     done,

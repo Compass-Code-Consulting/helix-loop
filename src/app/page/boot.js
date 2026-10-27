@@ -24,7 +24,7 @@
     async update(what) {
       if (!what.has('ledger') && !what.has('plan') && !what.has('all')) return;
       const w = this.frame?.contentWindow;
-      if (w?.mushyMetrics) w.mushyMetrics.update(await HX.api('/api/metrics'));
+      if (w?.helixMetrics) w.helixMetrics.update(await HX.api('/api/metrics'));
     },
   };
 

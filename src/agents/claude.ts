@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { AgentConfig, Config, Role } from '../config.ts';
-import { paths } from '../config.ts';
+import { script } from '../config.ts';
 import { BUILDER_TOOLS, clipText, outputTail, summarise, type Activity, type Adapter, type AgentResult, type FeedStep, type Invocation, type Usage, type UsageWindow } from './adapter.ts';
 import { parseResetTime } from './resets.ts';
 
@@ -15,9 +15,6 @@ const ALLOWED = [
     'printf', 'pwd', 'test', 'grep', 'rg', 'find', 'sed', 'awk', 'head', 'tail', 'wc', 'sort', 'uniq', 'cut', 'tr',
     'diff', 'xargs', 'jq', 'curl', 'lsof', 'kill', 'psql', 'createdb', 'dropdb', 'pg_isready', 'docker',
   ].map((c) => `Bash(${c}:*)`),
-  // The gate's all-on integration run (scripts/gate/76-integration-all-on.ts). A rule matches a command's first
-  // word, so without this one the variable in front is denied and Claude can't reproduce that run (T-0063).
-  'Bash(MUSHY_FLAGS=all-on pnpm:*)',
 ];
 
 const DENIED = [
@@ -28,8 +25,11 @@ const DENIED = [
 ];
 
 export function claudeAdapter(agent: AgentConfig, config: Config): Adapter {
-  const hook = join(paths(config.root).hooks, 'claude-pretooluse.ts');
+  const hook = script('hooks', 'claude-pretooluse');
   const quoted = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+  // The project's own rules on top (agents.claude.allow): a rule matches a command's first word, so a command
+  // a repo's gate runs with a variable in front (`FLAGS=all-on pnpm ...`) needs one to be allowed.
+  const allowed = [...ALLOWED, ...(agent.allow ?? [])];
   const settings = JSON.stringify({
     hooks: {
       PreToolUse: [{ matcher: 'Bash|Write|Edit|MultiEdit|NotebookEdit', hooks: [{ type: 'command', command: `node ${quoted(hook)}` }] }],
@@ -66,7 +66,7 @@ export function claudeAdapter(agent: AgentConfig, config: Config): Adapter {
           ...base(role),
           ...server,
           '--permission-mode', 'acceptEdits', '--permission-prompts', 'none',
-          '--allowedTools', ...ALLOWED, ...tools, '--disallowedTools', ...DENIED,
+          '--allowedTools', ...allowed, ...tools, '--disallowedTools', ...DENIED,
         ],
         stdin: prompt,
       };

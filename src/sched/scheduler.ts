@@ -14,7 +14,7 @@ export interface PickInput {
 
 // A stage opens when every task of every earlier stage is settled: done, waiting on a person
 // (§21: each day closes green), or mascot design work. A review that takes weeks must not freeze the
-// rest of the build, and neither must Codex's quota while it draws Mushy: no other work may depend on a
+// rest of the build, and neither must an agent's quota while it draws the art: no other work may depend on a
 // design-role task (plan validation), so those finish alongside later stages. Fix-first work doesn't hold a
 // stage either: it is ranked ahead of everything in every stage reached, and on 2026-10-25 one fix whose last
 // attempt was the paused agent's held 472 tasks back for hours.

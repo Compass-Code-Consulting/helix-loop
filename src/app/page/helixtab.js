@@ -1,4 +1,4 @@
-// The Helix tab (spec §6.6): where Daniel reviews Helix's work. What it resolved on his behalf, the fixes waiting
+// The Helix tab (spec §6.6): where the owner reviews Helix's work. What it resolved on their behalf, the fixes waiting
 // for him, the incidents and every change that can still be undone, and his conversations with it.
 (() => {
   'use strict';
@@ -169,8 +169,8 @@
       cs.length ? [...by].map(([target, list]) => h('div', { class: 'stack', style: { gap: '4px' } },
         h('h6', { class: 'cap' }, /^(T|HT)-/.test(target) ? HX.taskLink(target.split('~')[0], 'mono') : null, ' ', label(target)),
         list.map((c) => h('a', { class: 'glass row', href: `#helix/conversations/${encodeURIComponent(c.key)}`, style: { padding: '10px 14px', color: 'inherit' }, 'data-jk': '' },
-          h('span', { class: `dot ${c.waitingOn === 'daniel' ? 'warn' : c.busy ? 'on' : ''}` }), h('span', { class: 'grow ell' }, c.first),
-          h('span', { class: 'small muted' }, c.state === 'resolved' ? 'resolved' : c.busy ? 'answering' : c.waitingOn === 'daniel' ? 'your turn' : 'open'), h('span', { class: 'small muted' }, F.when(c.at))))))
+          h('span', { class: `dot ${c.waitingOn === 'owner' ? 'warn' : c.busy ? 'on' : ''}` }), h('span', { class: 'grow ell' }, c.first),
+          h('span', { class: 'small muted' }, c.state === 'resolved' ? 'resolved' : c.busy ? 'answering' : c.waitingOn === 'owner' ? 'your turn' : 'open'), h('span', { class: 'small muted' }, F.when(c.at))))))
         : h('div', { class: 'glass pad muted' }, 'No conversation yet. Comment on a task on the Map, or ask Helix anything from here.'));
   }
 
@@ -205,9 +205,9 @@
     return h('div', { class: 'page stack lg', style: { maxWidth: '860px' } },
       h('div', { class: 'crumb' }, h('a', { href: '#helix/conversations' }, HX.icon('arrow-left'), 'Conversations'), h('span', { class: 'sep' }, '/'), h('span', null, label(t.target)), HX.tag(t.state, t.state === 'resolved' ? 'tag-ok' : 'tag-accent'), /^(T|HT)-/.test(t.target) ? h('a', { href: `#map/${t.target.split('~')[0]}`, class: 'small' }, 'Open on the Map') : null),
       h('div', { class: 'thread stack' },
-        h('div', { class: 'msg daniel' }, h('div', { class: 'small muted' }, `Daniel · ${F.when(t.root.at)}`), h('div', { style: { whiteSpace: 'pre-wrap' } }, t.root.text)),
+        h('div', { class: 'msg owner' }, h('div', { class: 'small muted' }, `${HX.owner()} · ${F.when(t.root.at)}`), h('div', { style: { whiteSpace: 'pre-wrap' } }, t.root.text)),
         t.messages.map((m) => {
-          if (m.kind === 'decision') return h('div', { class: 'small muted' }, `Daniel ${m.decision} the proposal${m.text ? `: ${m.text}` : '.'}`);
+          if (m.kind === 'decision') return h('div', { class: 'small muted' }, `${HX.owner()} ${m.decision} the proposal${m.text ? `: ${m.text}` : '.'}`);
           if (m.kind === 'proposal') {
             const decided = t.messages.some((x) => x.kind === 'decision' && x.proposal === m.id);
             const task = m.task ?? {};
@@ -215,7 +215,7 @@
               h('details', null, h('summary', { class: 'small' }, 'The task as proposed'), h('pre', { class: 'codebox' }, JSON.stringify(task, null, 2))),
               decided ? null : h('div', { class: 'row' }, HX.btn('Accept and create', HX.act(async () => { await HX.post('/api/proposal', { key: t.key, proposal: m.id, decision: 'accepted' }); loadThread(); }), 'btn-primary'), HX.btn('Decline', HX.act(async () => { await HX.post('/api/proposal', { key: t.key, proposal: m.id, decision: 'declined' }); loadThread(); }))));
           }
-          return h('div', { class: `msg ${m.author}` }, h('div', { class: 'small muted' }, `${m.author === 'daniel' ? 'Daniel' : 'Helix'} · ${F.when(m.at)}`), h('div', { style: { whiteSpace: 'pre-wrap' } }, m.text));
+          return h('div', { class: `msg ${m.author}` }, h('div', { class: 'small muted' }, `${m.author === 'owner' ? HX.owner() : 'Helix'} · ${F.when(m.at)}`), h('div', { style: { whiteSpace: 'pre-wrap' } }, m.text));
         }),
         busy ? h('div', { class: 'muted row' }, h('span', { class: 'dot on' }), 'Helix is answering…') : null,
         t.state === 'resolved' && summary ? h('div', { class: 'glass pad' }, h('h6', { class: 'cap' }, 'Resolution'), summary.text) : null),
@@ -258,10 +258,10 @@
     return h('div', { class: 'stack' },
       h('h6', { class: 'cap' }, `Comments${all.length ? ` · ${all.length}` : ''}`),
       all.map((th) => h('div', { class: 'boxed stack', style: { gap: '4px' } },
-        h('div', { class: 'small muted' }, `Daniel${th.target.includes('~') ? ` on the dependency on ${th.target.split('~')[1]}` : ''} · ${F.when(th.root.at)}`),
+        h('div', { class: 'small muted' }, `${HX.owner()}${th.target.includes('~') ? ` on the dependency on ${th.target.split('~')[1]}` : ''} · ${F.when(th.root.at)}`),
         h('div', { style: { whiteSpace: 'pre-wrap' } }, th.root.text),
-        th.replies.map((r) => h('div', { class: `small ${r.kind === 'summary' ? 't-acc' : 'soft'}`, style: { paddingLeft: '10px', boxShadow: 'inset 2px 0 0 var(--color-divider)' } }, `${r.author === 'daniel' ? 'Daniel' : 'Helix'}: ${r.text}`)),
-        h('a', { class: 'small', href: `#helix/conversations/${encodeURIComponent(th.key)}` }, `Full conversation → ${th.state === 'resolved' ? '(resolved)' : th.waitingOn === 'daniel' ? '(your turn)' : ''}`))),
+        th.replies.map((r) => h('div', { class: `small ${r.kind === 'summary' ? 't-acc' : 'soft'}`, style: { paddingLeft: '10px', boxShadow: 'inset 2px 0 0 var(--color-divider)' } }, `${r.author === 'owner' ? HX.owner() : 'Helix'}: ${r.text}`)),
+        h('a', { class: 'small', href: `#helix/conversations/${encodeURIComponent(th.key)}` }, `Full conversation → ${th.state === 'resolved' ? '(resolved)' : th.waitingOn === 'owner' ? '(your turn)' : ''}`))),
       h('div', { class: 'stack', style: { gap: '4px' }, 'data-send': '' }, ta, h('div', { class: 'row' }, deps?.length ? target : null, h('span', { class: 'grow' }), send)));
   };
 })();

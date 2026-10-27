@@ -86,8 +86,8 @@ function setup(
   seedRepos(p.repos, Object.keys(loadConfig().repos));
   const scenarioFile = join(root, 'scenario.json');
   writeFileSync(scenarioFile, JSON.stringify(scenario));
-  process.env.MUSHY_FAKE_SCENARIO = scenarioFile;
-  process.env.MUSHY_FAKE_STATE = join(root, 'fake-state');
+  process.env.HELIX_FAKE_SCENARIO = scenarioFile;
+  process.env.HELIX_FAKE_STATE = join(root, 'fake-state');
 
   const config = fakeConfig(loadConfig(), root);
   // No loop app in a scenario unless it starts one: a builder never reports to an app Daniel has open.
@@ -288,7 +288,7 @@ scenario('every pass records where its time went, what failed and what it starte
   assert.match(versions[0]!.file, /^Mushy\.LoopEngineering\.Metrics\.2026-10-24\.0001\.html$/);
   const model = (file: string) => JSON.parse(/<script type="application\/json" id="data">(.*?)<\/script>/s.exec(readFileSync(join(dir, file), 'utf8'))![1]!);
   assert.deepEqual(model(versions[0]!.file).versions.map((v: { passes: number }) => v.passes), [1], 'the first version knew only itself');
-  assert.match(readFileSync(join(dir, 'versions.js'), 'utf8'), /^window\.MUSHY_METRICS_VERSIONS = \[.*"passes":1.*"passes":2.*\];\n$/s);
+  assert.match(readFileSync(join(dir, 'versions.js'), 'utf8'), /^window\.HELIX_METRICS_VERSIONS = \[.*"passes":1.*"passes":2.*\];\n$/s);
   const index = readFileSync(join(dir, 'index.html'), 'utf8');
   assert.ok(index.indexOf(versions[1]!.file) < index.lastIndexOf(versions[0]!.file), 'the index lists the newest first');
   assert.match(lastLog.join('\n'), /metrics: wrote Mushy\.LoopEngineering\.Metrics\.2026-10-24\.0002\.html, after 2 passes/);
@@ -947,7 +947,7 @@ scenario('builders inherit nothing from a parent Claude Code or Codex session: o
       const names = seen(agent);
       const leaked = names.filter((n) => n in parent || (/^(CLAUDE|CODEX|ANTHROPIC_|OPENAI_|MCP_|VSCODE_)/.test(n) && n !== 'CODEX_HOME'));
       assert.deepEqual(leaked, [], agent);
-      for (const kept of ['PATH', 'HOME', 'MUSHY_LOOP_NOW', 'MUSHY_FAKE_STATE']) assert.ok(names.includes(kept), `${agent} keeps ${kept}`);
+      for (const kept of ['PATH', 'HOME', 'HELIX_LOOP_NOW', 'HELIX_FAKE_STATE']) assert.ok(names.includes(kept), `${agent} keeps ${kept}`);
     }
     assert.ok(seen('codex').includes('CODEX_HOME'), 'the codex adapter sets its home on purpose');
   } finally {
@@ -1040,11 +1040,11 @@ scenario('with the loop app up, builders report over MCP; their issues go into t
 
 scenario('a CLI signed in with an API key builds nothing: the loop says so once, and the other agent builds everything', async () => {
   const s = setup([{}, {}, {}], {});
-  process.env.MUSHY_FAKE_AUTH_CLAUDE = 'apikey';
+  process.env.HELIX_FAKE_AUTH_CLAUDE = 'apikey';
   try {
     assert.equal(await s.run(), EXIT.allDone);
   } finally {
-    delete process.env.MUSHY_FAKE_AUTH_CLAUDE;
+    delete process.env.HELIX_FAKE_AUTH_CLAUDE;
   }
   assert.deepEqual([...new Set(s.passes().map((p) => p.agent))], ['codex']);
   const warnings = s.ledger().filter((e) => e.kind === 'warning' && /claude is not signed in with its subscription \(API key\)/.test(e.detail));

@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 export interface Job {
   id: string;
   title: string;
-  command: string; // as shown to Daniel before he confirmed it
+  command: string; // as shown to the owner before they confirmed it
   status: 'running' | 'done' | 'failed';
   code?: number | null;
   output: string;

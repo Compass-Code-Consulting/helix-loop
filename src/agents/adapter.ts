@@ -124,7 +124,7 @@ export type AdapterFactory = (name: AgentName, agent: AgentConfig, config: Confi
 // passes on its own identity and settings (CLAUDECODE, CLAUDE_CODE_SESSION_ID, CLAUDE_EFFORT, CODEX_SANDBOX,
 // AI_AGENT, MCP_*), and its editor host a way into the editor (VSCODE_*, ELECTRON_RUN_AS_NODE); an
 // API key or endpoint in the shell (ANTHROPIC_*, OPENAI_*) would move a builder off its subscription.
-// The adapter's own settings (CODEX_HOME) and the loop's (MUSHY_*) are added afterwards, on purpose.
+// The adapter's own settings (CODEX_HOME) and the loop's (HELIX_* and the project's prefix) are added afterwards, on purpose.
 const INHERITED = /^(CLAUDE|CODEX|ANTHROPIC_|OPENAI_|MCP_|VSCODE_|AI_AGENT$|ELECTRON_RUN_AS_NODE$)/;
 
 export function builderEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {

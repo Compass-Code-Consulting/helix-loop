@@ -11,10 +11,13 @@
   --ground: color-mix(in srgb, var(--color-bg) 82%, transparent);
   --rule: color-mix(in srgb, var(--color-text) 8%, transparent);
   --top-h: 52px;
-  --lane-social: oklch(0.74 0.1 330);
-  --lane-website: var(--color-accent);
-  --lane-docs: oklch(0.74 0.1 190);
-  --lane-support: oklch(0.76 0.09 250);
+  /* The lanes' colours, given to the project's repos in order (core.js HX.laneColor). */
+  --lane-0: oklch(0.74 0.1 330);
+  --lane-1: var(--color-accent);
+  --lane-2: oklch(0.74 0.1 190);
+  --lane-3: oklch(0.76 0.09 250);
+  --lane-4: oklch(0.78 0.1 70);
+  --lane-5: oklch(0.76 0.1 150);
   --lane-human: var(--warn);
 }
 html, body { height: 100%; }
@@ -440,7 +443,7 @@ main { position: relative; z-index: 1; height: calc(100% - var(--top-h)); overfl
 .stat5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 .stat5 .v { font-size: 20px; font-weight: 500; }
 .thread .msg { padding: 10px 12px; border-radius: var(--radius-md); }
-.thread .msg.daniel { background: color-mix(in srgb, var(--color-surface) 80%, transparent); }
+.thread .msg.owner { background: color-mix(in srgb, var(--color-surface) 80%, transparent); }
 .thread .msg.helix { background: var(--color-accent-900); box-shadow: inset 0 0 0 1px var(--color-accent-800); }
 .metricsframe { flex: 1; border: 0; width: 100%; height: 100%; background: transparent; }
 

@@ -85,7 +85,7 @@ export interface HumanTask {
   secrets?: { name: string; stored_in: string }[]; // never values
   blocked_by: string[];
   status: HumanStatus;
-  notes?: string; // what Daniel recorded: the evidence a step is done, or why it waits
+  notes?: string; // what the owner recorded: the evidence a step is done, or why it waits
 }
 
 export interface Plan {
@@ -145,6 +145,7 @@ export interface MapModel {
   nodes: MapNode[];
   lanes?: RepoName[]; // the project's repos, in the TaskSet's order; else the order nodes name them
   owner?: string; // who does the human tasks, for the lane's label
+  product?: string; // the product's name, for the page's title
   criticalPath: string[]; // ids in order
   agents: MapAgent[];
   mode: LoopMode;

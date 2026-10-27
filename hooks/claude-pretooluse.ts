@@ -27,7 +27,7 @@ function real(p: string): string {
 }
 
 const event = JSON.parse(readFileSync(0, 'utf8')) as HookEvent;
-const root = process.env.MUSHY_WORKTREE ?? event.cwd;
+const root = process.env.HELIX_WORKTREE ?? event.cwd;
 
 if (event.tool_name === 'Bash' && event.tool_input.run_in_background) {
   deny('Background commands are disabled in the loop. Run the command in the foreground with a long enough timeout and wait for it.');

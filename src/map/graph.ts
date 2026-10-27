@@ -172,7 +172,7 @@ function topoOrder(nodes: Map<string, MapNode>): string[] {
       if (left === 0) queue.push(d);
     }
   }
-  if (out.length !== nodes.size) throw new Error('dependency map: the plan has a cycle; run `mushy-loop validate`');
+  if (out.length !== nodes.size) throw new Error('dependency map: the plan has a cycle; run `helix-loop validate`');
   return out;
 }
 

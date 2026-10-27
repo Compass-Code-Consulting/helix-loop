@@ -6,7 +6,7 @@ import { UNCOUNTED_OUTCOMES, type AgentName } from '../types.ts';
 import type { Report } from './state.ts';
 
 // When Helix's monitor takes a turn (spec §9.1), by its level, and what each level would cost at the loop's
-// recent pace. Daniel's own asks (a human task done, "Ask Helix to revise", "Run a turn now") always run; the
+// recent pace. the owner's own asks (a human task done, "Ask Helix to revise", "Run a turn now") always run; the
 // heartbeat is a schedule, set by the level's every_minutes.
 
 const DAY = 86_400_000;
@@ -15,7 +15,7 @@ const DAY = 86_400_000;
 export type MonitorChange =
   | { kind: 'pass'; failed: boolean; repeat: boolean } // a pass ended; repeat: a failure seen before
   | { kind: 'report'; issue: boolean } // a builder's report: an issue, or progress
-  | { kind: 'asked' }; // Daniel asked for a turn
+  | { kind: 'asked' }; // the owner asked for a turn
 
 export function monitorShouldRun(level: MonitorLevel, change: MonitorChange): boolean {
   if (change.kind === 'asked' || level === 'thorough') return true;

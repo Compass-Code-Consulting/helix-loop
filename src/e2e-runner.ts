@@ -10,12 +10,12 @@ import { Semaphore } from './semaphore.ts';
 // sandbox, to run the worktree's own `e2e:direct` script. The gate already runs agent-written
 // tests outside the sandbox; this lets the agent run them before the gate does.
 //
-// Protocol: POST /run with header `x-mushy-pass: <pass id>` and body {"args": [...]}. The pass ID
+// Protocol: POST /run with header `x-helix-pass: <pass id>` and body {"args": [...]}. The pass ID
 // names one worktree, registered by the loop for the pass and dropped when it ends. The response
-// streams the output and ends with a line `__MUSHY_E2E_EXIT__=<code>`. A run never outlives its pass
+// streams the output and ends with a line `__HELIX_E2E_EXIT__=<code>`. A run never outlives its pass
 // or the loop: ending either stops it, so no browser test keeps the loop's process alive.
 
-export const EXIT_MARKER = '__MUSHY_E2E_EXIT__=';
+export const EXIT_MARKER = '__HELIX_E2E_EXIT__=';
 
 // What a pass asked of the runner, for its metrics: runs, the time they took, and how many failed.
 export interface E2EUse {
@@ -79,7 +79,7 @@ export class E2ERunner {
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (req.method !== 'POST' || req.url !== '/run') return void res.writeHead(404).end();
-    const id = req.headers['x-mushy-pass'];
+    const id = req.headers['x-helix-pass'];
     const entry = typeof id === 'string' ? this.passes.get(id) : undefined;
     if (!entry) return void res.writeHead(401).end('unknown or expired pass\n');
     if (entry.busy) return void res.writeHead(409).end('a browser test run is already in progress for this pass\n');
@@ -109,13 +109,13 @@ export class E2ERunner {
       cancelled ??= 'the client went away';
     };
     res.once('close', gone);
-    if (this.slots.busy >= this.slots.limit) res.write(`mushy e2e runner: waiting for a free slot (${this.slots.busy} runs in progress, ${this.slots.queued} waiting)\n`);
+    if (this.slots.busy >= this.slots.limit) res.write(`helix e2e runner: waiting for a free slot (${this.slots.busy} runs in progress, ${this.slots.queued} waiting)\n`);
     await this.slots.run(() => new Promise<void>((released) => {
       res.off('close', gone);
       if (cancelled || res.destroyed) {
         entry.busy = false;
         entry.stop = undefined;
-        if (!res.writableEnded && !res.destroyed) res.end(`\nmushy e2e runner: ${cancelled ?? 'the client went away'}\n${EXIT_MARKER}1\n`);
+        if (!res.writableEnded && !res.destroyed) res.end(`\nhelix e2e runner: ${cancelled ?? 'the client went away'}\n${EXIT_MARKER}1\n`);
         return released();
       }
       this.launch(entry, args, res, released);
@@ -155,7 +155,7 @@ export class E2ERunner {
       child.stderr.destroy();
       entry.busy = false;
       entry.stop = undefined;
-      if (!res.writableEnded && !res.destroyed) res.end(`\n${why ? `mushy e2e runner: ${why}\n` : ''}${EXIT_MARKER}${code}\n`);
+      if (!res.writableEnded && !res.destroyed) res.end(`\n${why ? `helix e2e runner: ${why}\n` : ''}${EXIT_MARKER}${code}\n`);
       released();
     };
     entry.stop = (why) => finish(1, why);
@@ -166,7 +166,7 @@ export class E2ERunner {
     });
     child.stdout.on('data', (d: Buffer) => res.write(d));
     child.stderr.on('data', (d: Buffer) => res.write(d));
-    child.on('error', (e) => res.write(`\nmushy e2e runner: ${e.message}\n`));
+    child.on('error', (e) => res.write(`\nhelix e2e runner: ${e.message}\n`));
     child.on('close', (code) => finish(code ?? 1));
   }
 }

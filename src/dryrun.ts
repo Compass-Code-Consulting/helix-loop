@@ -1,28 +1,26 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { CONTROL_PLANE, loadConfig, paths, type Config } from './config.ts';
+import { asset, configPath, loadConfig, paths, type Config } from './config.ts';
 import type { Task } from './types.ts';
 
 // The dry run: the real loop, the real adapters and real git repositories, with scripted fake `claude` and
-// `codex` executables (harness/fakes) in place of the CLIs. The harness tests run it at a thousand times real
-// speed; `mushy-loop run --dry-run` runs it at real speed on a copy of the plan, in runs/dry-run/, so the loop
-// app can be watched and tried without touching the real loop, its repos or its ledger.
+// `codex` executables (fakes/) in place of the CLIs. The tool's tests run it at a thousand times real speed;
+// `helix-loop run --dry-run` runs it at real speed on a copy of the plan, in .helix/runs/dry-run/, so the app
+// can be watched and tried without touching the real loop, its repos or its ledger.
 
-export const FAKES = join(CONTROL_PLANE, 'harness', 'fakes');
+export const FAKES = asset('fakes');
 
-// The parts of a control plane a loop reads but never writes: the plan schema, the spec index and the prompts.
-export function seedControlPlane(root: string, from = CONTROL_PLANE): void {
+// The parts of a project a loop reads but never writes: the spec index, the prompts and the TaskSet's file.
+export function seedControlPlane(root: string, from: string): void {
   const src = paths(from);
   const p = paths(root);
-  for (const d of ['plan/schema', 'spec/sections', 'prompts']) mkdirSync(join(root, d), { recursive: true });
-  cpSync(src.schema, p.schema, { recursive: true });
+  for (const d of [p.specSections, p.prompts, p.tasks, p.human]) mkdirSync(d, { recursive: true });
   cpSync(src.specSections, p.specSections, { recursive: true });
   cpSync(src.specIndex, p.specIndex);
   cpSync(src.prompts, p.prompts, { recursive: true });
-  mkdirSync(p.tasks, { recursive: true });
-  mkdirSync(p.human, { recursive: true });
+  if (existsSync(src.taskset)) cpSync(src.taskset, p.taskset);
 }
 
 // One throwaway repository per product repo, each with a skeleton commit on main.
@@ -58,7 +56,7 @@ export function fakeConfig(base: Config, root: string): Config {
   config.json_merge = { 'manifest.json': '' };
   config.push = false;
   config.notify.macos = false;
-  // The real config holds mushy-website's releases until HT-25, which a dry-run plan may not have.
+  // The real config may hold a repo's releases until a human task the dry-run plan doesn't have.
   config.release.hold_until = {};
   if (config.e2e_runner) config.e2e_runner.port = 0;
   return config;
@@ -84,7 +82,7 @@ export interface DryRun {
 
 // A fresh dry run in runs/dry-run/ of `controlPlane`: a copy of its plan as it stands (claims dropped), fresh
 // repos, and the fakes. Whatever an earlier dry run left there is removed first.
-export function prepareDryRun(controlPlane = CONTROL_PLANE): DryRun {
+export function prepareDryRun(controlPlane: string): DryRun {
   const root = paths(controlPlane).dryRun;
   rmSync(root, { recursive: true, force: true });
   seedControlPlane(root, controlPlane);
@@ -100,10 +98,9 @@ export function prepareDryRun(controlPlane = CONTROL_PLANE): DryRun {
   cpSync(src.human, p.human, { recursive: true });
   const config = fakeConfig(loadConfig(controlPlane), root);
   seedRepos(p.repos, Object.keys(config.repos));
-  mkdirSync(join(root, 'harness'), { recursive: true });
-  writeFileSync(join(root, 'harness', 'config.yaml'), stringify({ ...config, root: undefined }));
+  writeFileSync(configPath(root), stringify({ ...config, root: undefined }));
   mkdirSync(p.runs, { recursive: true });
   const scenarioFile = join(root, 'scenario.json');
   writeFileSync(scenarioFile, JSON.stringify(watchedScenario(ready.sort())));
-  return { root, config, codexHome: join(root, 'codex-home'), env: { MUSHY_FAKE_SCENARIO: scenarioFile, MUSHY_FAKE_STATE: join(root, 'fake-state') } };
+  return { root, config, codexHome: join(root, 'codex-home'), env: { HELIX_FAKE_SCENARIO: scenarioFile, HELIX_FAKE_STATE: join(root, 'fake-state') } };
 }

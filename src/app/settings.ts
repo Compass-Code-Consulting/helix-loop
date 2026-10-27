@@ -5,11 +5,11 @@ import { atomicWrite } from '../plan/store.ts';
 import { AGENTS, type AgentName } from '../types.ts';
 
 // runs/app.yaml: this machine's Helix Loop settings. Not in git, like the rest of runs/: which CLI runs Helix
-// depends on what is installed and signed in here, and the rest is where Daniel left the page.
+// depends on what is installed and signed in here, and the rest is where the owner left the page.
 
 export interface AppSettings {
   helix?: { assistant?: AgentName; monitor?: AgentName };
-  dismissed?: string[]; // items Daniel dismissed on Home
+  dismissed?: string[]; // items the owner dismissed on Home
   lastHome?: { at: string; finish?: number; mode?: 'active' | 'auto' }; // the last time he looked at Home
   ui?: Record<string, string | number | boolean>; // panel widths and toggles: the task column, Wrap, folds
 }

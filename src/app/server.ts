@@ -6,7 +6,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { extname, join, normalize, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { gunzipSync } from 'node:zlib';
-import { CONTROL_PLANE, FEEDBACK_KINDS, loadConfig, MONITOR_LEVELS, monitorOf, paths, type Config, type FeedbackKind } from '../config.ts';
+import { ownerOf } from './prompts.ts';
+import { asset, BIN, configPath, logFile, FEEDBACK_KINDS, HELIX_DIR, loadConfig, MONITOR_LEVELS, monitorOf, PACKAGE_ROOT, paths, projectInfo, type Config, type FeedbackKind } from '../config.ts';
 import { git } from '../git.ts';
 import { renderDependencyMap } from '../map/render.ts';
 import { renderMetrics } from '../metrics/render.ts';
@@ -43,8 +44,7 @@ import { builderHistory, buildView, helixSummary, mergeBuckets, pilotView, resol
 // something carries the launch token the page was served with, and no foreign Origin.
 
 const exec = promisify(execFile);
-const BIN = join(CONTROL_PLANE, 'harness', 'bin', 'helix-loop.ts');
-const PAGE = join(CONTROL_PLANE, 'harness', 'src', 'app', 'page');
+const PAGE = asset('src', 'app', 'page');
 const TYPES: Record<string, string> = { '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.txt': 'text/plain' };
 
 type Which = 'real' | 'dry';
@@ -65,6 +65,8 @@ class HttpError extends Error {
 export async function startApp(opts: { root: string; port: number; open?: boolean }): Promise<App> {
   const roots: Record<Which, string> = { real: opts.root, dry: paths(opts.root).dryRun };
   const settingsFile = paths(opts.root).appSettings;
+  // Who the app acts for, in commit messages and records: the project's owner.
+  const OWNER = () => ownerOf(roots.real);
   const launchToken = randomBytes(24).toString('base64url');
   let port = opts.port;
 
@@ -136,7 +138,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   });
 
   // The monitor (spec §9.1): after the passes and reports its level looks at (monitor.ts), at most once a minute,
-  // and on the level's heartbeat while the loop runs; only when Daniel turned it on and its own daily cap isn't
+  // and on the level's heartbeat while the loop runs; only when the owner turned it on and its own daily cap isn't
   // spent.
   let monitorTimer: NodeJS.Timeout | undefined;
   let monitorAt = 0;
@@ -195,7 +197,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   const feedSent = new Map<ServerResponse, string>();
   function pushFeed(res: ServerResponse, sub: { which: Which; log: string }): void {
     const root = roots[sub.which];
-    const file = [join(root, sub.log), join(root, `${sub.log}.gz`)].find((f) => existsSync(f));
+    const file = [logFile(root, sub.log), logFile(root, `${sub.log}.gz`)].find((f) => existsSync(f));
     const agent = /-(claude|codex)-\d+\.log/.exec(sub.log)?.[1] as AgentName | undefined;
     if (!file || !agent) return;
     const feed = readFeed(file, agent, root, 400);
@@ -206,18 +208,21 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     res.write(`event: feed\ndata: ${JSON.stringify({ ...feed, finished: file.endsWith('.gz') })}\n\n`);
   }
 
-  // ---- watching the control plane: plan/, runs/, the config and Helix's files ----
+  // ---- watching the project: .helix/'s plan, runs, config and Helix's files ----
+  // Each folder on its own: the product repos and the passes' worktrees in .helix/ change too often to watch.
   const watchers: FSWatcher[] = [];
+  const DRY = join('runs', 'dry-run', HELIX_DIR);
   const classify = (rel: string): [Which, string] | undefined => {
-    const parts = rel.split(sep);
     let w: Which = 'real';
-    if (parts[0] === 'runs' && parts[1] === 'dry-run') {
+    if (rel.startsWith(DRY + sep)) {
       w = 'dry';
-      parts.splice(0, 2);
+      rel = rel.slice(DRY.length + 1);
     }
+    const parts = rel.split(sep);
     const [a, b] = parts;
     if (a === 'plan' && (b === 'tasks' || b === 'human' || b === 'taskset.yaml')) return [w, 'plan'];
-    if (a === 'harness' && (b === 'config.yaml' || b === 'helix')) return [w, 'config'];
+    if (a === 'config.yaml' || a === 'helix') return [w, 'config'];
+    if (a === 'app.yaml') return w === 'real' ? [w, 'settings'] : undefined;
     if (a !== 'runs') return undefined;
     const name = parts.at(-1)!;
     if (b === 'threads') return [w, 'threads'];
@@ -233,17 +238,16 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     if (name === 'changes.jsonl') return [w, 'changes'];
     if (name === 'steward.jsonl' || name === 'helix.jsonl') return [w, 'agents'];
     if (name === 'loop.lock' || name === 'STOP' || name === 'PAUSE') return [w, 'loop'];
-    if (name === 'app.yaml' && w === 'real') return [w, 'settings'];
     return undefined;
   };
-  for (const dir of ['plan', 'runs', 'harness']) {
-    mkdirSync(join(opts.root, dir), { recursive: true });
-    const w = watch(join(opts.root, dir), { recursive: true }, (_e, file) => {
+  const home = paths(opts.root).home;
+  for (const dir of ['plan', 'runs', 'helix', '']) {
+    mkdirSync(join(home, dir), { recursive: true });
+    const w = watch(join(home, dir), { recursive: dir !== '' }, (_e, file) => {
       if (!file) return;
       const rel = join(dir, file.toString());
-      if (dir === 'harness' && !/^harness\/(config\.yaml|helix\/)/.test(rel)) return;
       const c = classify(rel);
-      if (c?.[1] === 'logs') logsChanged(c[0], c[0] === 'dry' ? relative(join('runs', 'dry-run'), rel) : rel);
+      if (c?.[1] === 'logs') logsChanged(c[0], c[0] === 'dry' ? relative(DRY, rel) : rel);
       else if (c) changed(...c);
     });
     w.on('error', () => undefined);
@@ -359,7 +363,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         const agent = /-(claude|codex)-\d+\.log(\.gz)?$/.exec(rel)?.[1] as AgentName | undefined;
         if (!agent) throw new HttpError(400, 'not a pass log');
         // A pass that just ended has had its log compressed.
-        const file = [join(root, rel), join(root, `${rel}.gz`)].find((f) => existsSync(f));
+        const file = [logFile(root, rel), logFile(root, `${rel}.gz`)].find((f) => existsSync(f));
         const feed = file && readFeed(file, agent, root, Number(q.get('limit')) || 400);
         if (!feed) throw new HttpError(404, 'that log is gone');
         return reply(res, 200, { ...feed, finished: file!.endsWith('.gz') });
@@ -384,7 +388,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
       if (path === '/api/skill/file') {
         const name = q.get('name') ?? '';
         if (!/^[\w-]+(\/[\w.-]+)*\.md$/.test(name)) throw new HttpError(400, 'a Markdown file of the skill');
-        const f = join(CONTROL_PLANE, 'skill', name);
+        const f = asset('skill', name);
         if (!existsSync(f)) throw new HttpError(404, 'not in the skill');
         return text(res, readFileSync(f, 'utf8'));
       }
@@ -412,7 +416,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
       }
       case '/api/loop/pause': {
         mkdirSync(paths(root).runs, { recursive: true });
-        if (body.paused) writeFileSync(paths(root).pause, 'paused by Daniel, in Helix Loop\n');
+        if (body.paused) writeFileSync(paths(root).pause, `paused by ${OWNER()}, in Helix Loop\n`);
         else rmSync(paths(root).pause, { force: true });
         changed(which, 'loop');
         return reply(res, 200, { paused: !!body.paused });
@@ -421,7 +425,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         const task = String(body.task ?? '');
         if (!runningTasks(root, snap(which).plan).has(task)) throw new HttpError(409, `${task} has no pass in flight`);
         const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 2000) : undefined;
-        writeStopRequest(root, task, { to: body.to === 'needs_human' ? 'needs_human' : 'ready', ...(note ? { note } : {}), why: 'stopped by Daniel in Live' });
+        writeStopRequest(root, task, { to: body.to === 'needs_human' ? 'needs_human' : 'ready', ...(note ? { note } : {}), why: `stopped by ${OWNER()} in Live` });
         return reply(res, 200, { stopping: task });
       }
 
@@ -432,11 +436,11 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim() : undefined;
         if (body.action === 'hand_back' || body.action === 'park') {
           const patch = { status: body.action === 'hand_back' ? ('ready' as const) : ('parked' as const), ...(note ? { notes: withNote(t, note) } : {}) };
-          return reply(res, 200, await updateTask(root, id, patch, { fields: ['status', 'notes'], message: `Plan: ${id} ${body.action === 'hand_back' ? 'handed back to the loop' : 'parked'} (Daniel, in Helix Loop)` }));
+          return reply(res, 200, await updateTask(root, id, patch, { fields: ['status', 'notes'], message: `Plan: ${id} ${body.action === 'hand_back' ? 'handed back to the loop' : 'parked'} (${OWNER()}, in Helix Loop)` }));
         }
         if (body.action === 'add_dep' || body.action === 'remove_dep') {
           const on = String(body.on ?? '');
-          return reply(res, 200, await applyChanges(root, [{ op: body.action, task: id, on }], { what: `${id} ${body.action === 'add_dep' ? 'waits on' : 'no longer waits on'} ${on}`, by: 'Daniel' }));
+          return reply(res, 200, await applyChanges(root, [{ op: body.action, task: id, on }], { what: `${id} ${body.action === 'add_dep' ? 'waits on' : 'no longer waits on'} ${on}`, by: OWNER() }));
         }
         throw new HttpError(400, 'action is hand_back, park, add_dep or remove_dep');
       }
@@ -447,7 +451,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         const op = body.action === 'park' ? 'park' : body.action === 'hand_back' ? 'hand_back' : undefined;
         if (!op) throw new HttpError(400, 'action is hand_back or park');
         const changes: PlanChange[] = ids.filter((id) => snap(which).plan.tasks.has(id)).map((task) => ({ op, task, note }));
-        return reply(res, 200, await applyChanges(root, changes, { what: `${op === 'park' ? 'park' : 'hand back'} ${changes.length} task${changes.length === 1 ? '' : 's'}`, by: 'Daniel', source: typeof body.group === 'string' ? `group ${body.group.slice(0, 80)}` : undefined }));
+        return reply(res, 200, await applyChanges(root, changes, { what: `${op === 'park' ? 'park' : 'hand back'} ${changes.length} task${changes.length === 1 ? '' : 's'}`, by: OWNER(), source: typeof body.group === 'string' ? `group ${body.group.slice(0, 80)}` : undefined }));
       }
       case '/api/undo':
         return reply(res, 200, await undoChange(root, String(body.id ?? '')));
@@ -464,14 +468,14 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
           appendFileSync(pendingNotes(root), `${JSON.stringify({ at: new Date().toISOString(), task, note })}\n`);
           return reply(res, 200, { pending: true });
         }
-        return reply(res, 200, await updateTask(root, task, { notes: withNote(plan.tasks.get(task), note) }, { fields: ['notes'], message: `Plan: ${task} note for its next attempt (Daniel, in Helix Loop)` }));
+        return reply(res, 200, await updateTask(root, task, { notes: withNote(plan.tasks.get(task), note) }, { fields: ['notes'], message: `Plan: ${task} note for its next attempt (${OWNER()}, in Helix Loop)` }));
       }
       case '/api/notes': {
         // A task's notes (its next builder reads them in its prompt) or a human task's, edited in place.
         const id = String(body.id ?? '');
         const notes = typeof body.notes === 'string' ? body.notes.trim() : '';
         if (notes.length > 6000) throw new HttpError(400, 'notes are at most 6,000 characters');
-        const message = `Plan: ${id} notes ${notes ? 'updated' : 'cleared'} (Daniel, in Helix Loop)`;
+        const message = `Plan: ${id} notes ${notes ? 'updated' : 'cleared'} (${OWNER()}, in Helix Loop)`;
         const r = id.startsWith('HT-') ? await updateHuman(root, id, { notes }, { fields: ['notes'], message }) : await updateTask(root, id, { notes }, { fields: ['notes'], message });
         return reply(res, 200, r);
       }
@@ -495,7 +499,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
           helix.watch(root, key);
           return reply(res, 200, { revising: key });
         }
-        const r = await applyChanges(root, inc.fix.changes, { what: inc.fix.summary, by: 'Daniel', source: `fix ${inc.fix.id}` });
+        const r = await applyChanges(root, inc.fix.changes, { what: inc.fix.summary, by: OWNER(), source: `fix ${inc.fix.id}` });
         appendStored(paths(root).incidents, { type: 'decided', key, at: new Date().toISOString(), fix: inc.fix.id, decision: 'accepted', change: r.change?.id });
         changed(which, 'incidents');
         return reply(res, 200, r);
@@ -509,7 +513,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         if (r.answered) throw new HttpError(409, `${id} was decided already`);
         const option = r.options[Number(body.option)];
         if (!option) throw new HttpError(400, 'pick one of its options');
-        const applied = await applyChanges(root, option.changes, { what: `${option.label}: ${r.question.slice(0, 80)}`, by: 'Daniel', source: id });
+        const applied = await applyChanges(root, option.changes, { what: `${option.label}: ${r.question.slice(0, 80)}`, by: OWNER(), source: id });
         appendHitl(paths(root).hitl, { type: 'answered', id, at: new Date().toISOString(), option: Number(body.option) });
         changed(which, 'hitl');
         return reply(res, 200, applied);
@@ -526,7 +530,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         const rules = readRules(roots.real);
         const next = rules.filter((r) => r.id !== body.id);
         if (next.length === rules.length) throw new HttpError(404, 'no such rule');
-        await commitFile(roots.real, writeRules(roots.real, next), `Helix: rule ${body.id} removed (Daniel, in Helix Loop)`);
+        await commitFile(roots.real, writeRules(roots.real, next), `Helix: rule ${body.id} removed (${OWNER()}, in Helix Loop)`);
         changed('real', 'config');
         return reply(res, 200, { rules: next });
       }
@@ -600,12 +604,12 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         return reply(res, 200, t);
       }
       case '/api/message': {
-        const t = addMessage(dir, String(body.key ?? ''), 'daniel', String(body.text ?? ''));
+        const t = addMessage(dir, String(body.key ?? ''), 'owner', String(body.text ?? ''));
         helix.ask(root, t.key);
         return reply(res, 200, t);
       }
       case '/api/resolve': {
-        const t = addMessage(dir, String(body.key ?? ''), 'daniel', RESOLVE_REQUEST);
+        const t = addMessage(dir, String(body.key ?? ''), 'owner', RESOLVE_REQUEST);
         helix.ask(root, t.key);
         return reply(res, 200, t);
       }
@@ -615,7 +619,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         const p = t?.messages.find((m) => m.kind === 'proposal' && m.id === body.proposal);
         if (!t || !p) throw new HttpError(404, 'no such proposal');
         if (body.decision === 'accepted') {
-          const r = await createTask(root, p.task ?? {}, `Plan: {id}: ${p.task?.title ?? 'new task'} (Helix proposal ${p.id}, thread ${key}, accepted by Daniel)`);
+          const r = await createTask(root, p.task ?? {}, `Plan: {id}: ${p.task?.title ?? 'new task'} (Helix proposal ${p.id}, thread ${key}, accepted by ${OWNER()})`);
           decide(dir, key, p.id, 'accepted', `Created ${r.value.id}.`);
         } else decide(dir, key, p.id, 'declined', typeof body.why === 'string' ? body.why : '');
         helix.ask(root, key);
@@ -718,11 +722,11 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         return reply(res, 200, cliJob('real', `Check a TaskSet against the running plan`, ['taskset', 'import', from, ...(body.apply ? ['--apply'] : []), ...(body.dry ? ['--dry-run'] : [])]));
       }
       case '/api/skill/pack':
-        return reply(res, 200, await packSkill(CONTROL_PLANE, join(paths(roots.real).runs, 'helix-skill.zip')));
+        return reply(res, 200, await packSkill(PACKAGE_ROOT, join(paths(roots.real).runs, 'helix-skill.zip')));
       case '/api/skill/install': {
         const to = String(body.dir ?? '').replace(/^~(?=\/)/, process.env.HOME ?? '~');
         if (!/^\/[\w ./-]+$/.test(to) || to.includes('..')) throw new HttpError(400, 'an absolute folder, like ~/.claude/skills/helix');
-        return reply(res, 200, installSkill(CONTROL_PLANE, to));
+        return reply(res, 200, installSkill(PACKAGE_ROOT, to));
       }
       default:
         throw new HttpError(404, 'not found');
@@ -747,7 +751,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
       writeFileSync(file, left.map((n) => `${JSON.stringify(n)}\n`).join(''));
       for (const n of ready) {
         const t = loadPlanFresh(roots[w]).tasks.get(n.task);
-        if (t) await updateTask(roots[w], n.task, { notes: withNote(t, n.note) }, { fields: ['notes'], message: `Plan: ${n.task} note for its next attempt (Daniel, in Helix Loop)` }).catch((e) => console.error(`note for ${n.task}: ${(e as Error).message}`));
+        if (t) await updateTask(roots[w], n.task, { notes: withNote(t, n.note) }, { fields: ['notes'], message: `Plan: ${n.task} note for its next attempt (${OWNER()}, in Helix Loop)` }).catch((e) => console.error(`note for ${n.task}: ${(e as Error).message}`));
       }
     } catch (e) {
       console.error(`pending notes: ${(e as Error).message}`);
@@ -770,9 +774,11 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     const { inbox: _inbox, threads: _threads, ...rest } = base;
     return {
       ...rest,
-      name: 'Mushy',
+      name: projectInfo(loadConfig(roots.real)).name,
+      project: projectInfo(loadConfig(roots.real)),
+      lanes: Object.keys(loadConfig(roots.real).repos),
       paused: existsSync(paths(root).pause),
-      dryRunExists: existsSync(join(roots.dry, 'harness', 'config.yaml')),
+      dryRunExists: existsSync(configPath(roots.dry)),
       finish: v.board.finish,
       codeFinish: v.board.codeFinish,
       timelines: v.board.timelines,
@@ -920,7 +926,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
       reviewPaths: config.release.review_paths,
       releaseEvery: config.release.every_merged_tasks,
       taskset: tasksetSummary(),
-      skill: skillInfo(CONTROL_PLANE),
+      skill: skillInfo(PACKAGE_ROOT),
     };
   }
 
@@ -980,7 +986,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     if (notes !== (h.notes ?? '')) patch.notes = notes;
     if (!Object.keys(patch).length) return { value: h, committed: false };
     const what = patch.status ? patch.status.replace('_', ' ') : body.snooze !== undefined ? (body.snooze ? `snoozed until ${body.snooze.slice(0, 10)}` : 'unsnoozed') : 'checklist updated';
-    const r = await updateHuman(root, id, patch, { fields: ['status', 'notes'], message: `Plan: ${id} ${what} (Daniel, in Helix Loop)` });
+    const r = await updateHuman(root, id, patch, { fields: ['status', 'notes'], message: `Plan: ${id} ${what} (${OWNER()}, in Helix Loop)` });
     // Done: Helix's monitor adds what builders need from it (an ID, never a secret) to the tasks waiting on it.
     if (patch.status === 'done' && monitorOn()) helix.watch(root, `human:${id}`);
     return r;
@@ -1001,7 +1007,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
       const plan = loadPlan(paths(root).tasks, paths(root).human);
       const open = tasks.filter((id) => ['ready', 'needs_human', 'parked'].includes(plan.tasks.get(id)?.status ?? ''));
       const changes: PlanChange[] = open.map((task) => ({ op: plan.tasks.get(task)!.status === 'ready' ? 'note' : 'hand_back', task, note: `Answer about ${about}: ${text}` }) as PlanChange);
-      out.applied = await applyChanges(root, changes, { what: `answer ${changes.length} question${changes.length === 1 ? '' : 's'} about ${about}`, by: 'Daniel', source: `incident ${key}` });
+      out.applied = await applyChanges(root, changes, { what: `answer ${changes.length} question${changes.length === 1 ? '' : 's'} about ${about}`, by: OWNER(), source: `incident ${key}` });
     }
     if (body.spec) out.clarification = await addClarification(roots.real, about, text, tasks);
     if (body.rule) out.rule = addRule(roots.real, { name: `spec questions about ${about}`, request: 'spec_plain', decide: 'helix' });
@@ -1034,7 +1040,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     }
     const tasks: string[] = Array.isArray(body.tasks) ? body.tasks.map(String) : [];
     const waiting = tasks.filter((id) => ['needs_human', 'parked'].includes(snap(which).plan.tasks.get(id)?.status ?? ''));
-    const handed = waiting.length ? await applyChanges(root, waiting.map((task) => ({ op: 'hand_back', task, note: `${name} is set now.` }) as PlanChange), { what: `hand back ${waiting.length} task${waiting.length === 1 ? '' : 's'}: ${name} is set`, by: 'Daniel' }) : undefined;
+    const handed = waiting.length ? await applyChanges(root, waiting.map((task) => ({ op: 'hand_back', task, note: `${name} is set now.` }) as PlanChange), { what: `hand back ${waiting.length} task${waiting.length === 1 ? '' : 's'}: ${name} is set`, by: OWNER() }) : undefined;
     return { saved: name, where: body.where === 'github' ? 'github' : 'keychain', handed };
   }
 
@@ -1042,7 +1048,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     const rules = readRules(root);
     const rule: Rule = { id: `R-${Math.max(0, ...rules.map((x) => Number(x.id.slice(2)) || 0)) + 1}`, at: new Date().toISOString(), ...r };
     const file = writeRules(root, [...rules.filter((x) => x.name.toLowerCase() !== r.name.toLowerCase()), rule]);
-    void commitFile(root, file, `Helix: rule ${rule.id}, ${rule.decide === 'helix' ? 'decide' : 'always ask about'} "${rule.name}" (Daniel, in Helix Loop)`);
+    void commitFile(root, file, `Helix: rule ${rule.id}, ${rule.decide === 'helix' ? 'decide' : 'always ask about'} "${rule.name}" (${OWNER()}, in Helix Loop)`);
     changed('real', 'config');
     return rule;
   }
@@ -1053,7 +1059,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   }
 
   // A builder's report_issue under a Pause or Notify rule (spec §10): its pass stops at once and the task waits
-  // for Daniel, or a notification goes out.
+  // for the owner, or a notification goes out.
   function onFeedback(task: string) {
     const r = readReports(roots.real).findLast((x) => x.task === task && x.kind === 'issue');
     if (!r || Date.now() - Date.parse(r.at) > 5000) return;
@@ -1129,7 +1135,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
 
   function readLog(root: string, rel: string): string {
     const clean = logPath(rel);
-    const file = [join(root, clean), join(root, `${clean}.gz`)].find((f) => existsSync(f));
+    const file = [logFile(root, clean), logFile(root, `${clean}.gz`)].find((f) => existsSync(f));
     if (!file) throw new HttpError(404, 'that log is gone');
     const buf = readFileSync(file);
     const s = (file.endsWith('.gz') ? gunzipSync(buf) : buf).toString('utf8');

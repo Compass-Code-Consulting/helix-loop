@@ -4,11 +4,11 @@
 // two or more series, a crosshair or per-bar tooltip that keyboard focus reaches too, and a table view.
 (() => {
   // The page draws once from its embedded model; inside the loop app it is redrawn in place with each new model
-  // (window.mushyMetrics.update), keeping its scroll position and theme.
+  // (window.helixMetrics.update), keeping its scroll position and theme.
   let M = JSON.parse(document.getElementById('data').textContent);
   const LIVE = (() => {
     try {
-      return window.parent !== window && !!window.parent.mushyApp;
+      return window.parent !== window && !!window.parent.helixApp;
     } catch {
       return false;
     }
@@ -427,7 +427,7 @@
   function versions() {
     const nav = document.getElementById('versions');
     if (!nav) return;
-    const known = Array.isArray(window.MUSHY_METRICS_VERSIONS) ? window.MUSHY_METRICS_VERSIONS : (M.versions ?? []);
+    const known = Array.isArray(window.HELIX_METRICS_VERSIONS) ? window.HELIX_METRICS_VERSIONS : (M.versions ?? []);
     const list = [...known].sort((a, b) => a.at - b.at);
     if (!M.file || !list.length) return nav.remove();
     const at = list.findIndex((v) => v.file === M.file);
@@ -843,14 +843,14 @@
       else root.setAttribute('data-theme', mode);
       buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
       try {
-        localStorage.setItem('mushy-metrics-theme', mode);
+        localStorage.setItem('helix-metrics-theme', mode);
       } catch {
         // storage unavailable: the choice lasts this visit
       }
     };
     let saved = 'auto';
     try {
-      saved = localStorage.getItem('mushy-metrics-theme') ?? 'auto';
+      saved = localStorage.getItem('helix-metrics-theme') ?? 'auto';
     } catch {
       // no storage
     }
@@ -880,7 +880,7 @@
     clearTimeout(timer);
     timer = setTimeout(draw, 150);
   });
-  window.mushyMetrics = {
+  window.helixMetrics = {
     update(model) {
       M = model;
       now = M.generatedAt;

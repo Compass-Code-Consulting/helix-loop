@@ -5,8 +5,9 @@ import { promisify } from 'node:util';
 import { paths } from '../config.ts';
 import { atomicWrite, loadPlan } from '../plan/store.ts';
 import { afterEdit, PlanEditError, runningTasks } from './actions.ts';
+import { ownerOf } from './prompts.ts';
 
-// Every plan change the app applies, by Daniel or by Helix, is recorded with the commit that made it
+// Every plan change the app applies, by the owner or by Helix, is recorded with the commit that made it
 // (runs/changes.jsonl), so that for a day it can be undone (spec §8.1): the changed task files go back to what
 // they were before it, as a new commit. An undo is refused when something later changed one of those files
 // (the loop's own passes included), or when one of its tasks is in a pass.
@@ -17,7 +18,7 @@ export const UNDO_MS = 24 * 3_600_000;
 export interface Change {
   id: string; // C-1
   at: string;
-  by: string; // "Daniel" or "Helix monitor"
+  by: string; // "the owner" or "Helix monitor"
   what: string; // one line
   commit: string;
   files: string[]; // relative to the root: the plan files it changed
@@ -78,7 +79,7 @@ export async function undoChange(root: string, id: string, now = Date.now()): Pr
     if (before === undefined) rmSync(join(root, rel), { force: true });
     else atomicWrite(join(root, rel), before);
   }
-  const r = await afterEdit(root, c.files.map((f) => join(root, f)), `Plan: undo ${c.what} (Daniel, in Helix Loop)`);
+  const r = await afterEdit(root, c.files.map((f) => join(root, f)), `Plan: undo ${c.what} (${ownerOf(root)}, in Helix Loop)`);
   append(file, { type: 'undone', id, at: new Date(now).toISOString(), commit: r.commit });
   return { commit: r.commit };
 }

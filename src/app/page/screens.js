@@ -317,7 +317,7 @@
     const name = h('input', { class: 'input mono', value: s.name ?? '', placeholder: 'STRIPE_TEST_KEY' });
     const value = h('input', { class: 'input mono', type: 'password', autocomplete: 'off', placeholder: 'Pasted here, sent once, never shown again' });
     let where = 'github';
-    const repo = h('select', { class: 'input' }, (s.repos?.length ? s.repos : ['mushy-social-media']).map((r) => h('option', { value: r }, r)));
+    const repo = h('select', { class: 'input' }, (s.repos?.length ? s.repos : S.state?.lanes ?? []).map((r) => h('option', { value: r }, r)));
     const env = h('input', { class: 'input mono', value: 'production', style: { width: '160px' } });
     const gh = h('div', { class: 'row wrap' }, h('span', { class: 'muted' }, 'Repository'), repo, h('span', { class: 'muted' }, 'Environment'), env);
     const whereBox = h('div');

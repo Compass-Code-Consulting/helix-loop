@@ -1,4 +1,4 @@
-// Home (spec §6.2): what needs Daniel, and what to do first. Everything waiting on him in groups with one shared
+// Home (spec §6.2): what needs the owner, and what to do first. Everything waiting on them in groups with one shared
 // cause and one action, sorted by what each holds up; a group opens in place to act on its members together. The
 // loop panel on the right says how the loop is doing, and collapses to a strip.
 (() => {
@@ -91,7 +91,7 @@
     const moved = w?.finishMovedMs ?? 0;
     const movedText = Math.abs(moved) < 6 * 3_600_000 ? null : [`${the} ${moved > 0 ? 'moved' : 'came'} `, h('span', { class: moved > 0 ? 't-crit' : 't-ok' }, `${F.days(Math.abs(moved))} ${moved > 0 ? 'later' : 'sooner'}`), `, to ${finish}`, code ? `; code complete is projected for ${code}` : ''];
     fill(B.welcome,
-      w ? h('div', { class: 'who' }, `Welcome back, Daniel · away ${F.dur(w.awayMs).replace(/ \d+ min$/, '')}, on ${w.mode === 'auto' ? 'Auto-pilot' : 'Active pilot'}`) : null,
+      w ? h('div', { class: 'who' }, `Welcome back, ${HX.owner()} · away ${F.dur(w.awayMs).replace(/ \d+ min$/, '')}, on ${w.mode === 'auto' ? 'Auto-pilot' : 'Active pilot'}`) : null,
       h('h2', null, headline),
       w
         ? h('p', null, `While you were away: ${F.plural(w.merged, 'task')} merged, ${w.failed} failed for good`, movedText ? [', and ', movedText] : `, and ${projected}`, '.', w.movers.length && moved > 0 ? ` Most of that slip comes from ${w.movers.join(' and ')}.` : '')
@@ -116,7 +116,7 @@
         const l = g.lanes.length === 1 ? g.lanes[0] : g.lanes.length ? 'several lanes' : 'no lane';
         lanes.set(l, [...(lanes.get(l) ?? []), g]);
       }
-      return fill(B.groups, [...lanes].map(([l, gs]) => [h('div', { class: 'cap', style: { margin: '10px 0 2px', color: HX.LANE_COLOR[l] ?? 'var(--color-neutral-400)' } }, l), gs.map((g) => group(g, max))]));
+      return fill(B.groups, [...lanes].map(([l, gs]) => [h('div', { class: 'cap', style: { margin: '10px 0 2px', color: HX.laneColor(l) ?? 'var(--color-neutral-400)' } }, l), gs.map((g) => group(g, max))]));
     }
     fill(B.groups, groups.map((g) => group(g, max)));
   }
@@ -152,7 +152,7 @@
     render();
   }
 
-  // The members selected in an open group: all, until Daniel unticks some.
+  // The members selected in an open group: all, until the owner unticks some.
   function selection(g) {
     let s = V.sel.get(g.id);
     if (!s) V.sel.set(g.id, (s = new Set(g.members.map((m) => m.id))));

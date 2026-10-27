@@ -5,7 +5,7 @@ import { dependentsOf, downstream, type Board } from './board.ts';
 import { feedbackRule, reached, type HitlRecord, type Raised } from './hitl.ts';
 import type { Incident } from './incidents.ts';
 
-// Home's groups (spec §6.2): everything waiting on Daniel, grouped by shared cause, never listed flat, and sorted
+// Home's groups (spec §6.2): everything waiting on the owner, grouped by shared cause, never listed flat, and sorted
 // by what each group holds up. Each group has one action; its members can be acted on together. Groups come
 // from what can be known exactly (the same human task, failure, variable or requirement); Helix's names and
 // merges arrive through the incidents.
@@ -108,7 +108,7 @@ export function triage(input: TriageInput): Group[] {
     });
   }
 
-  // What Helix brought to Daniel instead of deciding, by the kind of request it named.
+  // What Helix brought to the owner instead of deciding, by the kind of request it named.
   const asked = new Map<string, Raised[]>();
   for (const r of input.hitl.raised) {
     if (r.answered || r.tasks.every((id) => plan.tasks.get(id)?.status === 'done')) continue;
@@ -151,7 +151,7 @@ export function triage(input: TriageInput): Group[] {
       if (rule.send_to === 'off' || !reached(rule, { onTask: Math.max(0, ...inc.members.map((m) => m.count)), tasks: inc.members.length })) continue;
       if (rule.send_to === 'helix' && config.helix?.monitor?.enabled) continue;
       if (!open.some((m) => waiting(m.task)) && inc.kind !== 'flaky_test' && inc.kind !== 'environment') continue;
-      // Handing back is for tasks that wait for Daniel; a shared failure shows every task it hit.
+      // Handing back is for tasks that wait for the owner; a shared failure shows every task it hit.
       if (inc.kind === 'gate_failure') {
         open = open.filter((m) => waiting(m.task));
         members.splice(0, members.length, ...members.filter((m) => waiting(m.id)));
@@ -227,7 +227,7 @@ export function triage(input: TriageInput): Group[] {
     });
   }
 
-  // What Helix resolved on Daniel's behalf, not yet reviewed.
+  // What Helix resolved on the owner's behalf, not yet reviewed.
   const unrated = input.hitl.records.filter((r) => !input.hitl.ratings.has(r.id));
   if (unrated.length) {
     const unsure = unrated.filter((r) => r.confidence < 0.7).length;

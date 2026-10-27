@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import type { Config, Paths } from './config.ts';
+import { gitAuthor, type Config, type Paths } from './config.ts';
 import { git, gitNet, gitNetOk, hasRemote, head } from './git.ts';
 import { readLedger, record } from './ledger.ts';
 import { compareWithOrigin } from './merge.ts';
@@ -8,15 +8,15 @@ import type { HumanTask, RepoName } from './types.ts';
 
 // Release tags (Compass & Code's convention): v<YYYY>.<MM>.<DD>.<N>, annotated, where N counts that
 // day's releases of the repo from 1. A release is cut every `every_merged_tasks` merges, whenever a §21
-// stage closes with unreleased work, and on `mushy-loop release <repo>`; all three go through
+// stage closes with unreleased work, and on `helix-loop release <repo>`; all three go through
 // releaseRepo, with the same holds. A tag is what deploys: today straight to production; later the
 // same tag promotes through test, then staging, then production.
 //
 // Production's secrets reach whatever a v* tag runs: the workflows and actions under .github/, and the
 // OpenTofu code under infra/ that the deploy job applies (release.review_paths). The loop never tags a
 // release that changes those since the previous release (or the root commit). It writes
-// runs/approvals/<repo>-<tag>.json instead, and `mushy-loop approve-release` tags exactly that commit
-// once Daniel has read the diff. Later releases of the repo wait behind it, because each would carry
+// runs/approvals/<repo>-<tag>.json instead, and `helix-loop approve-release` tags exactly that commit
+// once the owner has read the diff. Later releases of the repo wait behind it, because each would carry
 // the same unreviewed change.
 
 export interface Approval {
@@ -181,7 +181,7 @@ export async function releaseRepo(r: ReleaseRequest): Promise<ReleaseOutcome> {
       since,
       paths: changed.split('\n'),
       review: `git -C ${quote(r.dir)} diff ${since} ${commit} -- ${specs.map(quote).join(' ')}`,
-      approve: `node harness/bin/mushy-loop.ts approve-release ${r.repo} ${tag}`,
+      approve: `helix-loop approve-release ${r.repo} ${tag}`,
       reason: r.reason,
       tasks: r.tasks,
       requestedAt: new Date(r.now).toISOString(),
@@ -202,7 +202,7 @@ export async function releaseRepo(r: ReleaseRequest): Promise<ReleaseOutcome> {
 async function createTag(dir: string, tag: string, commit: string, reason: string, tasks: { id: string; title: string }[]): Promise<void> {
   const body = tasks.map((t) => `- ${t.id} ${t.title}`).join('\n');
   const message = `Release ${tag}\n\n${reason}: ${tasks.length} task${tasks.length === 1 ? '' : 's'}.\n\n${body}`;
-  await git(dir, '-c', 'user.name=Mushy Loop', '-c', 'user.email=loop@mushymarketing.com', 'tag', '-a', tag, '-m', message, commit);
+  await git(dir, ...gitAuthor(), 'tag', '-a', tag, '-m', message, commit);
 }
 
 async function pushTag(dir: string, tag: string, push: boolean): Promise<boolean | 'skipped'> {
@@ -220,7 +220,7 @@ export interface ApproveInput {
   now: number;
 }
 
-// `mushy-loop approve-release`: tags exactly the reviewed commit with exactly the recorded name, pushes
+// `helix-loop approve-release`: tags exactly the reviewed commit with exactly the recorded name, pushes
 // it, records the release, and removes the approval. A push that fails is retried like any release
 // tag's: before the repo's next release, and when the loop starts.
 export async function approveRelease(input: ApproveInput): Promise<{ approval: Approval; pushed: boolean | 'skipped' }> {

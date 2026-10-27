@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { stringify } from 'yaml';
 import { builderEnv } from '../agents/adapter.ts';
-import { loadConfig, monitorModel, monitorOf, paths, type Config } from '../config.ts';
+import { loadConfig, logFile, monitorModel, monitorOf, paths, type Config } from '../config.ts';
 import { readLedger } from '../ledger.ts';
 import { hashToken, newToken } from '../live.ts';
 import { loadPlan } from '../plan/store.ts';
@@ -19,7 +19,7 @@ import { health, KEY_ENV, readKey } from './health.ts';
 import { appendHitl, decide, pilotOf, readHitl, readRules, REQUESTS, type RequestKind } from './hitl.ts';
 import { appendStored, incidents as findIncidents, readStored, type Fix, type Incident, type PlanChange } from './incidents.ts';
 import { str, ToolError, type Tool } from './mcp.ts';
-import { monitorPromptName, readPrompt } from './prompts.ts';
+import { fillPrompt, monitorPromptName, ownerOf, readPrompt } from './prompts.ts';
 import { loopStatus, mapModel, readReports } from './state.ts';
 import { addMessage, addProposal, resolveThread, setSession, thread, type Thread } from './threads.ts';
 import { boardInput } from './views.ts';
@@ -29,17 +29,17 @@ import { boardInput } from './views.ts';
 // app's, not its prompts': it reads the plan, the spec and the logs, and changes only what these tools allow,
 // after the app's checks. It runs from a folder outside the control plane, so no project instructions reach it.
 //
-// It has two roles, with separate sessions, prompts and tools. The assistant answers Daniel in conversations
-// and makes the plan changes he asks for (it was the steward). The monitor watches the loop: from a digest the
+// It has two roles, with separate sessions, prompts and tools. The assistant answers the owner in conversations
+// and makes the plan changes they ask for (it was the steward). The monitor watches the loop: from a digest the
 // app prepares, it names and merges incidents, proposes one fix for each, resolves what the pilot level lets it
-// resolve, and brings Daniel the rest. Its turns draw on a subscription, so it is off until Daniel turns it on.
+// resolve, and brings the owner the rest. Its turns draw on a subscription, so it is off until the owner turns it on.
 
 export type HelixRole = 'assistant' | 'monitor';
 
 export interface HelixJob {
   role: HelixRole;
   key?: string; // the assistant's thread
-  focus?: string; // the monitor's: an incident Daniel asked about ("Ask Helix to revise")
+  focus?: string; // the monitor's: an incident the owner asked about ("Ask Helix to revise")
   root: string;
   tokenHash: string;
   startedAt: string;
@@ -115,7 +115,7 @@ export const ASSISTANT_TOOLS: Tool<HelixContext>[] = [
       const t = planOf(root).tasks.get(id);
       const a = t?.attempts[Number(args.attempt) - 1];
       if (!a?.log) throw new ToolError(`${id} has no log for attempt ${String(args.attempt)}`);
-      const file = join(root, a.log);
+      const file = logFile(root, a.log);
       if (!existsSync(file)) throw new ToolError(`the log ${a.log} is gone`);
       const text = (a.log.endsWith('.gz') ? gunzipSync(readFileSync(file)) : readFileSync(file)).toString('utf8');
       return text.split('\n').slice(-200).join('\n').slice(-30_000);
@@ -165,7 +165,7 @@ export const ASSISTANT_TOOLS: Tool<HelixContext>[] = [
   },
   {
     name: 'update_task',
-    description: `Change a task that the loop is not running. Only these fields: ${STEWARD_TASK_FIELDS.join(', ')}; status only to ready (hand it back) or parked. Give each field its whole new value; for notes, keep what is there and add to it unless Daniel asks to replace it. The change is validated against the schema and the dependency graph before it lands, then committed.`,
+    description: `Change a task that the loop is not running. Only these fields: ${STEWARD_TASK_FIELDS.join(', ')}; status only to ready (hand it back) or parked. Give each field its whole new value; for notes, keep what is there and add to it unless the owner asks to replace it. The change is validated against the schema and the dependency graph before it lands, then committed.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -233,7 +233,7 @@ export const ASSISTANT_TOOLS: Tool<HelixContext>[] = [
   {
     name: 'propose_task',
     description:
-      'Propose a new task, for example one half of a split. Daniel accepts or declines it in the app; nothing is created until he accepts. Give repo, stage, area, feature, title, reqs, spec, acceptance, blocked_by and estimate_passes as a planner would.',
+      'Propose a new task, for example one half of a split. the owner accepts or declines it in the app; nothing is created until they accept. Give repo, stage, area, feature, title, reqs, spec, acceptance, blocked_by and estimate_passes as a planner would.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -247,7 +247,7 @@ export const ASSISTANT_TOOLS: Tool<HelixContext>[] = [
           required: ['repo', 'stage', 'area', 'title', 'reqs', 'spec', 'acceptance', 'blocked_by', 'estimate_passes'],
           additionalProperties: false,
         },
-        why: { type: 'string', description: 'One sentence Daniel reads beside the proposal.' },
+        why: { type: 'string', description: 'One sentence the owner reads beside the proposal.' },
       },
       required: ['task', 'why'],
       additionalProperties: false,
@@ -257,19 +257,19 @@ export const ASSISTANT_TOOLS: Tool<HelixContext>[] = [
       const task = args.task as Partial<Task>;
       if (!task || typeof task !== 'object') throw new ToolError('task is required');
       const e = addProposal(paths(root).threads, job.key!, why, task);
-      return `Proposed as ${e.id}; Daniel accepts or declines it in the thread.`;
+      return `Proposed as ${e.id}; the owner accepts or declines it in the thread.`;
     },
   },
   {
     name: 'resolve_thread',
-    description: 'Close this thread once Daniel has read your answer and it is settled, or when he asks you to. Never on your first answer. The summary, at most three sentences, goes under Daniel\'s comment: what was decided and each change with its task ID.',
+    description: 'Close this thread once the owner has read your answer and it is settled, or when they ask you to. Never on your first answer. The summary, at most three sentences, goes under the owner\'s comment: what was decided and each change with its task ID.',
     inputSchema: { type: 'object', properties: { summary: { type: 'string', maxLength: 600 } }, required: ['summary'], additionalProperties: false },
     call: (args, { root, job }) => {
-      // Answer first: a thread is resolved only once Daniel has read an answer, or when he pressed Resolve.
+      // Answer first: a thread is resolved only once the owner has read an answer, or when they pressed Resolve.
       const t = thread(paths(root).threads, job.key!);
       const answered = t?.messages.some((m) => m.author === 'helix' && m.kind === 'message');
-      const asked = t?.messages.findLast((m) => m.author === 'daniel' && m.kind === 'message')?.text === RESOLVE_REQUEST;
-      if (!answered && !asked) throw new ToolError('Not yet: answer Daniel first, in plain words, and leave the thread open. Do not mention this to him.');
+      const asked = t?.messages.findLast((m) => m.author === 'owner' && m.kind === 'message')?.text === RESOLVE_REQUEST;
+      if (!answered && !asked) throw new ToolError('Not yet: answer the owner first, in plain words, and leave the thread open. Do not mention this to them.');
       resolveThread(paths(root).threads, job.key!, str(args, 'summary', 600)!);
       job.resolved = true;
       return 'Resolved; the summary is under the comment.';
@@ -296,7 +296,7 @@ export function requestOf(inc: Pick<Incident, 'kind'>): RequestKind {
       return 'scope';
     case 'credential_missing':
     case 'blocked_on_human':
-      return 'human_done'; // only Daniel can add a secret or do a human task
+      return 'human_done'; // only the owner can add a secret or do a human task
     default:
       return 'failures';
   }
@@ -350,16 +350,16 @@ function allowed(root: string, request: RequestKind, name?: string): { ok: boole
   const pilot = pilotOf(config);
   const { decision, rule } = decide(pilot, readRules(root), request, name);
   const level = pilot.mode === 'auto' ? `Auto-pilot · ${pilot.auto_level}` : `Active pilot · ${pilot.active_level}`;
-  if (decision === 'helix') return { ok: true, why: rule ? `Daniel's rule: decide "${rule.name}" yourself` : level, parks: false };
-  if (decision === 'parks') return { ok: false, why: `On ${level} you park this kind instead: park the task with a note saying what Daniel must decide`, parks: true };
-  return { ok: false, why: rule ? `Daniel's rule: always ask about "${rule.name}". Use raise_request.` : `On ${level} Daniel decides this kind. Use raise_request.`, parks: false };
+  if (decision === 'helix') return { ok: true, why: rule ? `The owner's rule: decide "${rule.name}" yourself` : level, parks: false };
+  if (decision === 'parks') return { ok: false, why: `On ${level} you park this kind instead: park the task with a note saying what the owner must decide`, parks: true };
+  return { ok: false, why: rule ? `The owner's rule: always ask about "${rule.name}". Use raise_request.` : `On ${level} the owner decides this kind. Use raise_request.`, parks: false };
 }
 
 export const MONITOR_TOOLS: Tool<HelixContext>[] = [
   ...ASSISTANT_TOOLS.filter((t) => READING.includes(t.name)),
   {
     name: 'get_incident',
-    description: 'One incident by its key: its kind, cause, every task in it with its count and latest failure, when it happened, the fix proposed and what Daniel decided.',
+    description: 'One incident by its key: its kind, cause, every task in it with its count and latest failure, when it happened, the fix proposed and what the owner decided.',
     inputSchema: { type: 'object', properties: { key: { type: 'string' } }, required: ['key'], additionalProperties: false },
     call: (args, { root }) => {
       const key = str(args, 'key', 400)!;
@@ -370,7 +370,7 @@ export const MONITOR_TOOLS: Tool<HelixContext>[] = [
   },
   {
     name: 'group_feedback',
-    description: 'Name an incident in one line for Daniel, and merge into it the incidents whose cause is the same though their text differs.',
+    description: 'Name an incident in one line for the owner, and merge into it the incidents whose cause is the same though their text differs.',
     inputSchema: { type: 'object', properties: { key: { type: 'string' }, title: { type: 'string', maxLength: 120 }, merge: { type: 'array', items: { type: 'string' } } }, required: ['key', 'title'], additionalProperties: false },
     call: (args, { root }) => {
       const key = str(args, 'key', 400)!;
@@ -383,7 +383,7 @@ export const MONITOR_TOOLS: Tool<HelixContext>[] = [
   },
   {
     name: 'propose_fix',
-    description: 'Propose exactly one fix for an incident: plan changes applied together as one commit when Daniel accepts (or when you may apply it yourself, with apply_fix). For a spec question, give answer: the answer every task in it gets in its notes, and the spec sections you read.',
+    description: 'Propose exactly one fix for an incident: plan changes applied together as one commit when the owner accepts (or when you may apply it yourself, with apply_fix). For a spec question, give answer: the answer every task in it gets in its notes, and the spec sections you read.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -422,13 +422,13 @@ export const MONITOR_TOOLS: Tool<HelixContext>[] = [
   },
   {
     name: 'apply_fix',
-    description: "Apply the fix you proposed for an incident yourself. Refused unless the pilot level and Daniel's rules let you decide that kind of request; then it waits for Daniel. Records what you did for him to review.",
-    inputSchema: { type: 'object', properties: { key: { type: 'string' }, question: { type: 'string', description: 'The request as it would have been put to Daniel.' }, why: { type: 'string' } }, required: ['key', 'question', 'why'], additionalProperties: false },
+    description: "Apply the fix you proposed for an incident yourself. Refused unless the pilot level and the owner's rules let you decide that kind of request; then it waits for the owner. Records what you did for them to review.",
+    inputSchema: { type: 'object', properties: { key: { type: 'string' }, question: { type: 'string', description: 'The request as it would have been put to the owner.' }, why: { type: 'string' } }, required: ['key', 'question', 'why'], additionalProperties: false },
     call: async (args, { root }) => {
       const key = str(args, 'key', 400)!;
       const inc = incidentsOf(root).find((i) => i.key === key);
       if (!inc?.fix) throw new ToolError(`no fix proposed for ${key}`);
-      if (inc.decision) throw new ToolError(`Daniel already ${inc.decision.decision} this fix`);
+      if (inc.decision) throw new ToolError(`the owner already ${inc.decision.decision} this fix`);
       const request = requestOf(inc);
       const a = allowed(root, request, inc.title);
       if (!a.ok) throw new ToolError(`Not yours to decide: ${a.why}`);
@@ -437,14 +437,14 @@ export const MONITOR_TOOLS: Tool<HelixContext>[] = [
   },
   {
     name: 'resolve_hitl',
-    description: "Resolve a request the loop would put to Daniel (a builder unsure how to go on, a question, a task that grew, a repeated failure) by applying plan changes yourself. Refused unless the pilot level and Daniel's rules let you decide that kind; on Auto-pilot some kinds may only be parked. Name the kind of request in a few words (\"lockfile-only merge conflicts\"): Daniel's ratings attach to that name.",
+    description: "Resolve a request the loop would put to the owner (a builder unsure how to go on, a question, a task that grew, a repeated failure) by applying plan changes yourself. Refused unless the pilot level and the owner's rules let you decide that kind; on Auto-pilot some kinds may only be parked. Name the kind of request in a few words (\"lockfile-only merge conflicts\"): the owner's ratings attach to that name.",
     inputSchema: {
       type: 'object',
       properties: {
         request: { enum: REQUESTS.map((r) => r.kind) },
         name: { type: 'string', maxLength: 80 },
         tasks: { type: 'array', items: { type: 'string' } },
-        question: { type: 'string', description: 'The request as it would have been put to Daniel.' },
+        question: { type: 'string', description: 'The request as it would have been put to the owner.' },
         chose: { type: 'string', description: 'What you did, in one line.' },
         why: { type: 'string' },
         confidence: { type: 'number' },
@@ -466,7 +466,7 @@ export const MONITOR_TOOLS: Tool<HelixContext>[] = [
   },
   {
     name: 'raise_request',
-    description: 'Bring Daniel a request you may not decide: the question, two or three options as plan changes, and the one you would pick. It waits on Home; the tasks wait for him.',
+    description: 'Bring the owner a request you may not decide: the question, two or three options as plan changes, and the one you would pick. It waits on Home; the tasks wait for them.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -485,21 +485,21 @@ export const MONITOR_TOOLS: Tool<HelixContext>[] = [
       const file = paths(root).hitl;
       const { raised } = readHitl(file);
       const tasks = Array.isArray(args.tasks) ? args.tasks.map(String) : [];
-      if (raised.some((r) => !r.answered && r.tasks.join() === tasks.join() && r.request === args.request)) return 'Already waiting for Daniel.';
+      if (raised.some((r) => !r.answered && r.tasks.join() === tasks.join() && r.request === args.request)) return 'Already waiting for the owner.';
       const options = (args.options as { label: string; changes: unknown }[]).map((o) => ({ label: String(o.label).slice(0, 40), changes: changesArg({ changes: o.changes }) }));
       const id = `Q-${raised.length + 1}`;
       appendHitl(file, { type: 'raised', id, at: new Date().toISOString(), request: args.request as RequestKind, name: str(args, 'name', 80)!, tasks, question: str(args, 'question', 300)!, why: str(args, 'why', 300, false), options, recommend: Number.isInteger(args.recommend) ? Number(args.recommend) : undefined });
-      return `Raised as ${id}; it waits for Daniel on Home.`;
+      return `Raised as ${id}; it waits for the owner on Home.`;
     },
   },
   {
     name: 'note_tasks',
-    description: "Add a note to the notes of tasks waiting on a human task Daniel just finished: what their builders need from it, such as an ID or a URL. Never a secret's value, only its name and where it is stored. Only tasks that wait on that human task, and only notes.",
-    inputSchema: { type: 'object', properties: { human: { type: 'string', description: 'The human task Daniel marked done (HT-##).' }, tasks: { type: 'array', items: { type: 'string' } }, note: { type: 'string', maxLength: 1000 } }, required: ['human', 'tasks', 'note'], additionalProperties: false },
+    description: "Add a note to the notes of tasks waiting on a human task the owner just finished: what their builders need from it, such as an ID or a URL. Never a secret's value, only its name and where it is stored. Only tasks that wait on that human task, and only notes.",
+    inputSchema: { type: 'object', properties: { human: { type: 'string', description: 'The human task the owner marked done (HT-##).' }, tasks: { type: 'array', items: { type: 'string' } }, note: { type: 'string', maxLength: 1000 } }, required: ['human', 'tasks', 'note'], additionalProperties: false },
     call: async (args, { root }) => {
       const id = str(args, 'human', 20)!;
       const plan = planOf(root);
-      if (plan.human.get(id)?.status !== 'done') throw new ToolError(`${id} isn't done; notes from it wait until Daniel marks it done`);
+      if (plan.human.get(id)?.status !== 'done') throw new ToolError(`${id} isn't done; notes from it wait until the owner marks it done`);
       const tasks = (Array.isArray(args.tasks) ? args.tasks.map(String) : []).filter((t) => plan.tasks.get(t)?.blocked_by.includes(id));
       if (!tasks.length) throw new ToolError(`none of those tasks waits on ${id}`);
       const note = str(args, 'note', 1000)!;
@@ -547,7 +547,7 @@ async function applyAndRecord(root: string, r: { request: RequestKind; name: str
       chose: r.chose, why: r.why, confidence: r.confidence, action, change: applied.change?.id,
     });
   }
-  return `Applied${applied.created.length ? `; created ${applied.created.join(', ')}` : ''}${applied.change ? ` as ${applied.change.id}, which Daniel can undo for a day` : ''}.`;
+  return `Applied${applied.created.length ? `; created ${applied.created.join(', ')}` : ''}${applied.change ? ` as ${applied.change.id}, which the owner can undo for a day` : ''}.`;
 }
 
 // The monitor's one-line reads of running passes: runs/helix-reads.jsonl, the latest per task wins.
@@ -589,22 +589,22 @@ export function digest(root: string, since: string | undefined, focus?: string):
   const lines = [
     `Pilot mode: ${pilot.mode === 'auto' ? `Auto-pilot · ${pilot.auto_level}` : `Active pilot · ${pilot.active_level}`}. The loop is ${live.running ? 'running' : 'stopped'}.`,
     focus?.startsWith('human:')
-      ? `Daniel just marked ${focus.slice(6)} done. Its notes say: ${planOf(root).human.get(focus.slice(6))?.notes ?? '(none)'}. With note_tasks, add what the tasks waiting on it need from it (an ID or a URL, never a secret's value) to their notes. Those tasks: ${[...planOf(root).tasks.values()].filter((t) => t.blocked_by.includes(focus.slice(6)) && t.status !== 'done').map((t) => t.id).join(', ') || 'none'}.`
-      : focus ? `Daniel asked you to look again at incident ${focus} and revise its fix.` : '',
+      ? `${ownerOf(root)} just marked ${focus.slice(6)} done. Its notes say: ${planOf(root).human.get(focus.slice(6))?.notes ?? '(none)'}. With note_tasks, add what the tasks waiting on it need from it (an ID or a URL, never a secret's value) to their notes. Those tasks: ${[...planOf(root).tasks.values()].filter((t) => t.blocked_by.includes(focus.slice(6)) && t.status !== 'done').map((t) => t.id).join(', ') || 'none'}.`
+      : focus ? `${ownerOf(root)} asked you to look again at incident ${focus} and revise its fix.` : '',
     `Since your last turn${since ? ` (${since})` : ''}: ${passes.length} passes ended, ${passes.filter((x) => x.outcome === 'merged').length} merged.`,
     ...passes.filter((x) => x.outcome !== 'merged').slice(-20).map((x) => `- ${x.task} attempt ${x.attempt} (${x.agent}): ${x.outcome}${x.failing ? `: ${x.failing}` : ''}`),
     reports.length ? 'Builder reports:' : '',
     ...reports.slice(-20).map((r) => `- ${r.task} (${r.agent}) ${r.kind === 'issue' ? `${r.issue}: ` : ''}${r.message.slice(0, 300)}`),
     'Open incidents (key · kind · tasks · failures · fix):',
-    ...incs.slice(0, 25).map((i) => `- ${i.key} · ${i.kind} · ${i.members.length} tasks · ${i.failures} · ${i.fix ? `${i.fix.id}${i.decision ? ` ${i.decision.decision}` : ' waiting for Daniel'}` : 'none'}${i.title ? ` · named "${i.title}"` : ''}`),
+    ...incs.slice(0, 25).map((i) => `- ${i.key} · ${i.kind} · ${i.members.length} tasks · ${i.failures} · ${i.fix ? `${i.fix.id}${i.decision ? ` ${i.decision.decision}` : ` waiting for ${ownerOf(root)}`}` : 'none'}${i.title ? ` · named "${i.title}"` : ''}`),
     waiting.length ? `Tasks that need a person: ${waiting.map((t) => t.id).join(', ')}` : '',
-    raised.length ? `Your requests waiting for Daniel: ${raised.map((r) => `${r.id} ${r.question}`).join('; ')}` : '',
+    raised.length ? `Your requests waiting for ${ownerOf(root)}: ${raised.map((r) => `${r.id} ${r.question}`).join('; ')}` : '',
     live.running ? `Running: ${[...plan.tasks.values()].filter((t) => t.status === 'claimed').map((t) => t.id).join(', ')}.${monitorOf(config).passReads ? ' Give each a one-line read with note_pass when you have one.' : ''}` : '',
   ];
   return lines.filter(Boolean).join('\n');
 }
 
-// What the Resolve button sends, as Daniel's message in the thread.
+// What the Resolve button sends, as the owner's message in the thread.
 export const RESOLVE_REQUEST = 'Please resolve this thread now, with your summary.';
 
 export const HELIX_SERVER = { name: 'helix', instructions: "Helix Loop's plan tools, for Helix." };
@@ -695,10 +695,10 @@ export class Helix {
     const { model, effort } = job.role === 'monitor' ? monitorModel(config, agent, level) : config.agents[agent].models.plan;
     const pilot = pilotOf(loadConfig(job.root === this.runner.config().root ? job.root : this.runner.config().root));
     const promptName = job.role === 'assistant' ? 'assistant' : monitorPromptName(pilot);
-    const system = readPrompt(this.runner.config().root, promptName)?.text ?? '';
+    const system = fillPrompt(this.runner.config().root, readPrompt(this.runner.config().root, promptName)?.text ?? '');
     // The monitor starts fresh each turn from a digest; the assistant resumes its thread's own session.
     const resume = job.role === 'assistant' && t!.agent === agent ? t!.session : undefined;
-    const prompt = job.role === 'monitor' ? digest(job.root, this.lastMonitor[job.root], job.focus) : resume ? newMessages(t!) : firstPrompt(t!);
+    const prompt = job.role === 'monitor' ? digest(job.root, this.lastMonitor[job.root], job.focus) : resume ? newMessages(t!, ownerOf(job.root)) : firstPrompt(t!, ownerOf(job.root));
     const url = `http://127.0.0.1:${this.runner.port()}/mcp/helix`;
     const cwd = join(tmpdir(), 'helix-loop-helix');
     mkdirSync(cwd, { recursive: true });
@@ -757,29 +757,29 @@ export function monitorSpentToday(file: string, day: string, localDay: (ms: numb
   return usd;
 }
 
-function firstPrompt(t: Thread): string {
+function firstPrompt(t: Thread, owner: string): string {
   return [
     `Thread ${t.key}, about ${targetLabel(t.target)}.`,
-    `Daniel commented:`,
+    `${owner} commented:`,
     '',
     t.root.text,
-    ...t.messages.slice(1).filter((m) => m.kind === 'message').map((m) => `\n${m.author === 'daniel' ? 'Daniel' : 'You'}: ${m.text}`),
+    ...t.messages.slice(1).filter((m) => m.kind === 'message').map((m) => `\n${m.author === 'owner' ? owner : 'You'}: ${m.text}`),
   ].join('\n');
 }
 
-function newMessages(t: Thread): string {
+function newMessages(t: Thread, owner: string): string {
   const lastMine = t.messages.findLastIndex((m) => m.author === 'helix' && m.kind === 'message');
   const since = t.messages.slice(lastMine + 1);
   return since
     .map((m) =>
       m.kind === 'decision'
-        ? `Daniel ${m.decision} proposal ${m.proposal}.${m.text ? ` ${m.text}` : ''}`
-        : m.kind === 'message' && m.author === 'daniel'
-          ? `Daniel: ${m.text}`
+        ? `${owner} ${m.decision} proposal ${m.proposal}.${m.text ? ` ${m.text}` : ''}`
+        : m.kind === 'message' && m.author === 'owner'
+          ? `${owner}: ${m.text}`
           : '',
     )
     .filter(Boolean)
-    .join('\n\n') || 'Daniel reopened the thread.';
+    .join('\n\n') || `${owner} reopened the thread.`;
 }
 
 interface TurnResult {

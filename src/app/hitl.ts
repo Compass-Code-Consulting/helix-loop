@@ -1,12 +1,12 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { FEEDBACK_KINDS, type ActiveLevel, type AutoLevel, type Config, type FeedbackKind, type FeedbackRule, type PilotConfig } from '../config.ts';
+import { FEEDBACK_KINDS, paths, type ActiveLevel, type AutoLevel, type Config, type FeedbackKind, type FeedbackRule, type PilotConfig } from '../config.ts';
 import { atomicWrite } from '../plan/store.ts';
 
-// Pilot mode (spec §7): who resolves the decisions the loop would put to a person. On Active pilot Daniel is at
+// Pilot mode (spec §7): who resolves the decisions the loop would put to a person. On Active pilot the owner is at
 // his desk and Helix brings him what his level asks for; on Auto-pilot Helix resolves what it can and parks the
-// rest. The decision table is data (config `pilot.table` overrides the default below), the rules Daniel's
+// rest. The decision table is data (config `pilot.table` overrides the default below), the rules the owner's
 // ratings taught Helix override the table (harness/helix/rules.yaml), and the floors override everything.
 
 // The kinds of request the table knows, in the order the page lists them.
@@ -25,9 +25,9 @@ export type RequestKind = (typeof REQUESTS)[number]['kind'];
 
 export type Column = 'cautious' | 'prudent' | 'intrepid' | 'intrepid_auto' | 'yolo';
 export const COLUMNS: Column[] = ['cautious', 'prudent', 'intrepid', 'intrepid_auto', 'yolo'];
-// asks: Daniel decides, and the task waits for him. helix: Helix decides. parks: Helix parks the task until
-// Daniel is back (Auto-pilot), and the rest of the loop goes on. always: a floor, at every level.
-export type Decision = 'asks' | 'helix' | 'parks' | 'always' | 'daniel';
+// asks: the owner decides, and the task waits for them. helix: Helix decides. parks: Helix parks the task until
+// the owner is back (Auto-pilot), and the rest of the loop goes on. always: a floor, at every level.
+export type Decision = 'asks' | 'helix' | 'parks' | 'always' | 'owner';
 
 const row = (c: Decision, p: Decision, i: Decision, ia: Decision, y: Decision): Record<Column, Decision> => ({ cautious: c, prudent: p, intrepid: i, intrepid_auto: ia, yolo: y });
 export const DEFAULT_TABLE: Record<RequestKind, Record<Column, Decision>> = {
@@ -39,9 +39,9 @@ export const DEFAULT_TABLE: Record<RequestKind, Record<Column, Decision>> = {
   failures: row('asks', 'asks', 'asks', 'parks', 'helix'),
   security: row('asks', 'asks', 'asks', 'parks', 'helix'),
   release: row('always', 'always', 'always', 'always', 'always'),
-  human_done: row('daniel', 'daniel', 'daniel', 'daniel', 'daniel'),
+  human_done: row('owner', 'owner', 'owner', 'owner', 'owner'),
 };
-// What no level and no rule lowers: these always wait for Daniel.
+// What no level and no rule lowers: these always wait for the owner.
 export const FLOORS: RequestKind[] = ['release', 'human_done'];
 
 export const DEFAULT_PILOT: PilotConfig = { mode: 'active', active_level: 'prudent', auto_level: 'intrepid', record: true };
@@ -72,14 +72,14 @@ export function columnOf(pilot: PilotConfig): Column {
 
 export interface Rule {
   id: string; // R-1
-  name: string; // the kind of request, as Helix named it and Daniel edited it: "lockfile-only merge conflicts"
+  name: string; // the kind of request, as Helix named it and the owner edited it: "lockfile-only merge conflicts"
   request?: RequestKind; // the table row it belongs to, when it has one
   decide: 'helix' | 'ask'; // ▼ Decide these yourself, ▲ Keep asking
   at: string;
   from?: string; // the request it was rated on
 }
 
-export const rulesFile = (root: string) => join(root, 'harness', 'helix', 'rules.yaml');
+export const rulesFile = (root: string) => join(paths(root).helix, 'rules.yaml');
 
 export function readRules(root: string): Rule[] {
   const f = rulesFile(root);
@@ -95,7 +95,7 @@ export function readRules(root: string): Rule[] {
 export function writeRules(root: string, rules: Rule[]): string {
   const f = rulesFile(root);
   mkdirSync(dirname(f), { recursive: true });
-  atomicWrite(f, `# What Daniel's ratings taught Helix (spec §7.3): kinds of request it now decides, or must always ask about.\n# They override the pilot table, never its floors. Written by Helix Loop; Undo in Settings › Pilot mode.\n${stringify({ rules }, { lineWidth: 0 })}`);
+  atomicWrite(f, `# What the owner's ratings taught Helix (spec §7.3): kinds of request it now decides, or must always ask about.\n# They override the pilot table, never its floors. Written by Helix Loop; Undo in Settings › Pilot mode.\n${stringify({ rules }, { lineWidth: 0 })}`);
   return f;
 }
 
@@ -119,7 +119,7 @@ export interface HitlRecord {
   raisedBy: string; // a builder (T-0057 attempt 2, codex), the loop, or Helix's monitor
   task?: string;
   tasks?: string[];
-  question: string; // the request as it would have been put to Daniel
+  question: string; // the request as it would have been put to the owner
   compared: ActiveLevel; // the Active-pilot level the record compares against
   mode: 'active' | 'auto';
   level: string;
@@ -130,7 +130,7 @@ export interface HitlRecord {
   change?: string; // the applied change's id (runs/changes.jsonl), for undo
 }
 
-// A request Helix brings to Daniel instead of deciding it: shown on Home with its options, each a plan change.
+// A request Helix brings to the owner instead of deciding it: shown on Home with its options, each a plan change.
 export interface Raised {
   id: string; // Q-1
   at: string;

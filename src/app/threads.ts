@@ -9,7 +9,7 @@ import type { AgentName, Task } from '../types.ts';
 // thread, keyed by target and root ("T-0034#c3"); a reply under a root belongs to that root's thread, and a new
 // root comment never reopens an older thread. The latest `state` entry of a thread wins, so nothing is rewritten.
 
-export type Author = 'daniel' | 'helix';
+export type Author = 'owner' | 'helix';
 export type EntryKind = 'comment' | 'reply' | 'message' | 'summary' | 'proposal' | 'decision' | 'state';
 
 export interface Entry {
@@ -32,10 +32,10 @@ export interface Thread {
   key: string; // `${target}#${root}`
   target: string;
   root: Entry;
-  replies: Entry[]; // under the root comment in the detail panel: Daniel's replies and Helix's summaries
+  replies: Entry[]; // under the root comment in the detail panel: the owner's replies and Helix's summaries
   messages: Entry[]; // the sidebar conversation: messages, proposals and decisions, in order
   state: 'open' | 'resolved';
-  waitingOn: 'helix' | 'daniel' | null; // who speaks next while it is open
+  waitingOn: 'helix' | 'owner' | null; // who speaks next while it is open
   session?: string;
   agent?: AgentName;
 }
@@ -58,9 +58,10 @@ export function readEntries(dir: string, target: string): Entry[] {
     .filter(Boolean)
     .flatMap((l) => {
       try {
-        // Before Helix was named, it signed as the steward.
+        // Before Helix was named, it signed as the steward; before Helix Loop stood alone, the owner was daniel.
         const e = JSON.parse(l) as Omit<Entry, 'author'> & { author: string };
         if (e.author === 'steward') e.author = 'helix';
+        if (e.author === 'daniel') e.author = 'owner';
         return [e as Entry];
       } catch {
         return []; // a line cut short by a crash
@@ -100,7 +101,7 @@ export function threadsOf(target: string, entries: Entry[]): Thread[] {
       replies: own.filter((e) => e.kind === 'reply' || e.kind === 'summary'),
       messages,
       state,
-      waitingOn: state === 'resolved' ? null : speaker === 'helix' ? 'daniel' : 'helix',
+      waitingOn: state === 'resolved' ? null : speaker === 'helix' ? 'owner' : 'helix',
       session: [...states].reverse().find((s) => s.session)?.session,
       agent: [...states].reverse().find((s) => s.agent)?.agent,
     };
@@ -136,9 +137,9 @@ const clean = (text: string) => {
 // A root comment: it stays in the detail panel, and starts a thread whose first message is a copy of it.
 export function addComment(dir: string, target: string, text: string): Thread {
   const body = clean(text);
-  const root = append(dir, target, { thread: '', parent: null, author: 'daniel', kind: 'comment', text: body });
-  append(dir, target, { thread: root.id, parent: root.id, author: 'daniel', kind: 'message', text: body });
-  append(dir, target, { thread: root.id, parent: root.id, author: 'daniel', kind: 'state', text: '', state: 'open' });
+  const root = append(dir, target, { thread: '', parent: null, author: 'owner', kind: 'comment', text: body });
+  append(dir, target, { thread: root.id, parent: root.id, author: 'owner', kind: 'message', text: body });
+  append(dir, target, { thread: root.id, parent: root.id, author: 'owner', kind: 'state', text: '', state: 'open' });
   return thread(dir, threadKey(target, root.id))!;
 }
 
@@ -147,16 +148,16 @@ export function addReply(dir: string, target: string, parent: string, text: stri
   const body = clean(text);
   const t = threadsOf(target, readEntries(dir, target)).find((x) => x.root.id === parent);
   if (!t) throw new ThreadError(`${parent} is not a root comment on ${target}; replies go one level deep`);
-  append(dir, target, { thread: parent, parent, author: 'daniel', kind: 'reply', text: body });
-  append(dir, target, { thread: parent, parent, author: 'daniel', kind: 'message', text: body });
-  if (t.state === 'resolved') append(dir, target, { thread: parent, parent, author: 'daniel', kind: 'state', text: '', state: 'open' });
+  append(dir, target, { thread: parent, parent, author: 'owner', kind: 'reply', text: body });
+  append(dir, target, { thread: parent, parent, author: 'owner', kind: 'message', text: body });
+  if (t.state === 'resolved') append(dir, target, { thread: parent, parent, author: 'owner', kind: 'state', text: '', state: 'open' });
   return thread(dir, t.key)!;
 }
 
 export function addMessage(dir: string, key: string, author: Author, text: string): Thread {
   const t = mustThread(dir, key);
-  append(dir, t.target, { thread: t.root.id, parent: t.root.id, author, kind: 'message', text: author === 'daniel' ? clean(text) : text.trim() });
-  if (t.state === 'resolved' && author === 'daniel') append(dir, t.target, { thread: t.root.id, parent: t.root.id, author, kind: 'state', text: '', state: 'open' });
+  append(dir, t.target, { thread: t.root.id, parent: t.root.id, author, kind: 'message', text: author === 'owner' ? clean(text) : text.trim() });
+  if (t.state === 'resolved' && author === 'owner') append(dir, t.target, { thread: t.root.id, parent: t.root.id, author, kind: 'state', text: '', state: 'open' });
   return thread(dir, key)!;
 }
 
@@ -175,7 +176,7 @@ export function decide(dir: string, key: string, proposal: string, decision: 'ac
   const t = mustThread(dir, key);
   if (!t.messages.some((m) => m.kind === 'proposal' && m.id === proposal)) throw new ThreadError(`no proposal ${proposal} in ${key}`);
   if (t.messages.some((m) => m.kind === 'decision' && m.proposal === proposal)) throw new ThreadError(`${proposal} is already decided`);
-  append(dir, t.target, { thread: t.root.id, parent: t.root.id, author: 'daniel', kind: 'decision', text, proposal, decision });
+  append(dir, t.target, { thread: t.root.id, parent: t.root.id, author: 'owner', kind: 'decision', text, proposal, decision });
 }
 
 // The summary goes under the root comment, signed by Helix, and the thread is resolved.

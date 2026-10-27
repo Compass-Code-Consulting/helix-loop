@@ -388,13 +388,13 @@ test('scheduler: a stage opens past tasks that wait on a person, even through a 
 
 test('builders get the loop\'s environment without what a parent Claude Code or Codex session would pass on', () => {
   const env = builderEnv({
-    PATH: '/usr/bin', HOME: '/Users/daniel', LANG: 'en_US.UTF-8', TMPDIR: '/tmp', GIT_EDITOR: 'true', MUSHY_FAKE_STATE: '/tmp/state',
+    PATH: '/usr/bin', HOME: '/Users/daniel', LANG: 'en_US.UTF-8', TMPDIR: '/tmp', GIT_EDITOR: 'true', HELIX_FAKE_STATE: '/tmp/state',
     CLAUDECODE: '1', CLAUDE_EFFORT: 'max', CLAUDE_CODE_SESSION_ID: 'parent', CLAUDE_AGENT_SDK_VERSION: '0.3.309', CLAUDE_PID: '1',
     CODEX_SANDBOX: 'seatbelt', CODEX_HOME: '/parent/.codex', AI_AGENT: 'claude-code', MCP_CONNECTION_NONBLOCKING: 'true',
     VSCODE_IPC_HOOK: '/tmp/vscode.sock', ELECTRON_RUN_AS_NODE: '1', ANTHROPIC_API_KEY: 'not-a-key', OPENAI_BASE_URL: 'https://example.com',
   });
   // CODEX_HOME goes too: the codex adapter sets the one the loop uses.
-  assert.deepEqual(Object.keys(env).sort(), ['GIT_EDITOR', 'HOME', 'LANG', 'MUSHY_FAKE_STATE', 'PATH', 'TMPDIR']);
+  assert.deepEqual(Object.keys(env).sort(), ['GIT_EDITOR', 'HOME', 'LANG', 'HELIX_FAKE_STATE', 'PATH', 'TMPDIR']);
 });
 
 test('validate: only design-role work may wait on a design-role task', () => {

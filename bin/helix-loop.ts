@@ -217,13 +217,13 @@ async function main(): Promise<number> {
     }
     case 'metrics': {
       const plan = loadPlan(p.tasks, p.human);
-      const v = writeVersion(p.metrics, buildMetrics({ events: readLedger(p.ledger), plan, now: Date.now(), history: taskHistory(root), targets: weeklyTargets(loadConfig(root)) }), loadConfig(root).metrics_every_passes ?? VERSION_EVERY);
+      const v = writeVersion(p.metrics, buildMetrics({ events: readLedger(p.ledger), plan, now: Date.now(), history: taskHistory(root), targets: weeklyTargets(loadConfig(root)), timeZone: projectInfo(loadConfig(root)).timezone, product: projectInfo(loadConfig(root)).name }), loadConfig(root).metrics_every_passes ?? VERSION_EVERY);
       console.log(join(p.metrics, v.file));
       return 0;
     }
     case 'stats': {
       const holding = [...loadPlan(p.tasks, p.human).tasks.values()].filter((x) => x.status === 'claimed' && x.claimed_by).map((x) => x.claimed_by!);
-      for (const line of formatStats(buildStats(readLedger(p.ledger), AGENTS, Date.now(), holding))) console.log(line);
+      for (const line of formatStats(buildStats(readLedger(p.ledger), AGENTS, Date.now(), holding), projectInfo(loadConfig(root)).timezone)) console.log(line);
       return 0;
     }
     case 'status': {
@@ -395,7 +395,7 @@ async function main(): Promise<number> {
           claude: claudeAdapter(config.agents.claude, config),
           codex: dry ? codexAdapter(config.agents.codex, config, dry.codexHome) : codexAdapter(config.agents.codex, config),
         },
-        notify: macNotifier(config.notify.macos),
+        notify: macNotifier(config.notify.macos, projectInfo(config).name),
         renderMap: renderDependencyMap,
         log: (line) => console.log(`${new Date().toLocaleTimeString()} ${line}`),
         maxPasses: values['max-passes'] ? Number(values['max-passes']) : undefined,

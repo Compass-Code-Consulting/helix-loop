@@ -292,7 +292,7 @@
       h('div', { class: 'small muted' }, 'Inbox: a group of its own on Home. Helix: the monitor handles it and brings a fix (with the monitor off, it comes to Home). Pause stops the pass and the task waits for you. Reports are advisory: status and outcomes stay with the gate, the merge queue and the ledger.'),
       h('div', { class: 'stack' },
         h('h6', { class: 'cap' }, 'Per-lane overrides'),
-        fb.lanes.length ? fb.lanes.map((l) => h('div', { class: 'glass pad stack' }, h('b', { style: { fontWeight: 500, color: HX.LANE_COLOR[l.lane] } }, l.lane),
+        fb.lanes.length ? fb.lanes.map((l) => h('div', { class: 'glass pad stack' }, h('b', { style: { fontWeight: 500, color: HX.laneColor(l.lane) } }, l.lane),
           h('table', { class: 'matrix' }, h('tbody', null, Object.entries(l.rules).map(([kind, r]) => {
             const k = fb.kinds.find((x) => x.kind === kind);
             return k ? row(k, l.lane, { ...k.rule, ...r }) : null;
@@ -410,7 +410,7 @@
     return h('div', { class: 'page stack lg', style: { maxWidth: '980px' } },
       head('Releases', `Each lane is tagged every ${F.plural(d.releaseEvery, 'merged task')}, or when a stage closes with unreleased work. A release that changes ${d.reviewPaths.join(' or ')} waits for you, at every pilot level.`),
       d.releases.map((r) => h('div', { class: 'glass pad stack' },
-        h('div', { class: 'row' }, h('b', { style: { fontWeight: 500, color: HX.LANE_COLOR[r.repo] } }, r.repo), h('span', { class: 'grow' }), h('span', { class: 'muted' }, `${F.plural(r.unreleased, 'task')} unreleased`)),
+        h('div', { class: 'row' }, h('b', { style: { fontWeight: 500, color: HX.laneColor(r.repo) } }, r.repo), h('span', { class: 'grow' }), h('span', { class: 'muted' }, `${F.plural(r.unreleased, 'task')} unreleased`)),
         r.holds.map((x) => h('div', { class: 'small t-warn' }, x)),
         r.approvals.map((a) => h('div', { class: 'row' }, HX.tag('waits for you', 'tag-crit'), h('span', { class: 'grow' }, `${a.tag} changes ${F.plural(a.paths.length, 'reviewed file')} since ${a.since}`), h('a', { class: 'btn btn-primary', href: '#home/release' }, 'Review diffs'))),
         r.unreleased && !r.approvals.length ? h('div', null, HX.btn('Release now', HX.act(async () => {

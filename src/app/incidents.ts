@@ -9,7 +9,7 @@ import type { Report } from './state.ts';
 // Incidents (spec §2, §9.1): builder feedback with one cause, grouped. Grouping starts mechanical, by what can
 // be known exactly: the same failing test or step, the same missing variable, the same requirement in a
 // question, the same human task. Helix's monitor then names groups and merges those whose cause is the same
-// though their text differs, and proposes one fix for each; runs/incidents.jsonl keeps that, and what Daniel
+// though their text differs, and proposes one fix for each; runs/incidents.jsonl keeps that, and what the owner
 // decided. Everything else is derived from the ledger and the builders' reports on each read.
 
 const FAILED = new Set(['gate_failed', 'timeout', 'agent_error', 'no_commit']);
@@ -25,7 +25,7 @@ export interface Member {
 }
 
 // A plan change, as a fix proposes it: each is one of the direct actions (actions.ts), applied together in one
-// commit when Daniel accepts the fix.
+// commit when the owner accepts the fix.
 export type PlanChange =
   | { op: 'hand_back'; task: string; note?: string }
   | { op: 'park'; task: string; note?: string }
@@ -141,7 +141,7 @@ export function incidents(input: { plan: Plan; events: LedgerEvent[]; reports: R
     add(key, kind, cause, r.task, r.at, line(r.message), { attempt: r.attempt });
   }
 
-  // What Helix and Daniel added: names and merges, fixes, decisions.
+  // What Helix and the owner added: names and merges, fixes, decisions.
   for (const s of input.stored) {
     if (s.type === 'named') {
       const target = byKey.get(s.key);

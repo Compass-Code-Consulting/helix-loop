@@ -124,9 +124,9 @@ const hm = (ms: number) => {
 const pct = (ms: number, of: number) => (of > 0 ? `${Math.round((ms / of) * 100)}%` : '—');
 const mtok = (n: number) => `${(n / 1_000_000).toFixed(1)}M`;
 
-export function formatStats(s: BuildStats): string[] {
+export function formatStats(s: BuildStats, timeZone?: string): string[] {
   if (!s.startedAt) return ['The loop has not started yet.'];
-  const started = new Date(s.startedAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' });
+  const started = new Date(s.startedAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone, timeZoneName: 'short' });
   const out = [`Build started ${started}: ${hm(s.elapsedMs)} elapsed, the loop running for ${hm(s.upMs)}; ${s.merges} tasks merged.`];
   out.push('agent    passes  merged  working          gating           limited          idle             cost      tokens in / cached / out');
   for (const a of s.agents) {

@@ -2,9 +2,10 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { isMap, isSeq, parseDocument } from 'yaml';
-import { loadConfig, paths, type Config } from '../config.ts';
+import { configPath, loadConfig, paths, type Config } from '../config.ts';
 import { atomicWrite } from '../plan/store.ts';
 import { commit } from './actions.ts';
+import { ownerOf } from './prompts.ts';
 
 // Settings › Loop controls (spec §6.8): every value the loop runs with that the page may change, where it lives
 // in harness/config.yaml, what it does, and how to check a new value. Edits collect in a change set and are
@@ -162,10 +163,10 @@ export function checkConfig(root: string, text: string): Config {
   }
 }
 
-export const configFile = (root: string) => join(root, 'harness', 'config.yaml');
+export const configFile = (root: string) => configPath(root);
 
 // Applies a change set to a root's config. In git it is committed, saying which keys changed.
-export async function applyChangeSet(root: string, changes: ChangeSet[], by = 'Daniel'): Promise<{ committed: boolean; text: string }> {
+export async function applyChangeSet(root: string, changes: ChangeSet[], by = ownerOf(root)): Promise<{ committed: boolean; text: string }> {
   if (!changes.length) throw new ConfigEditError('nothing to apply');
   const file = configFile(root);
   const text = applyToText(readFileSync(file, 'utf8'), changes);

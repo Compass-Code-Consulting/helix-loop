@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { AGENTS, type AgentName, type RepoName } from './types.ts';
@@ -17,10 +17,24 @@ export interface AgentConfig {
   weekly_target?: number; // the share of the subscription's weekly window to have used by its reset (quota.ts paceSlots)
   command: string;
   models: Record<Role, ModelChoice>;
+  allow?: string[]; // more Claude Code tool rules a pass may use, as Bash(<command>:*)
+}
+
+// Who and what the loop builds for: the product's name, the person who does its human tasks and steers the
+// loop, and the time zone dates are written in. The app, Helix and the documents speak in these.
+export interface ProjectInfo {
+  name: string;
+  owner: string;
+  timezone: string;
 }
 
 export interface Config {
-  root: string; // the control plane
+  root: string; // the project: the folder that holds .helix/
+  project?: Partial<ProjectInfo>;
+  // The prefix of the variables the loop sets for a product repo's scripts (<PREFIX>_GATE_ID, <PREFIX>_E2E_CLIENT,
+  // ...): HELIX unless the product's own code reads another. The HELIX_ names are always set too.
+  env_prefix?: string;
+  git_author?: { name: string; email: string }; // who the loop's own commits and tags are by
   agents: Record<AgentName, AgentConfig>;
   repos: Record<RepoName, { gate: string; prepare?: string }>;
   limits: {
@@ -55,7 +69,7 @@ export interface Config {
   // The loop app (app/server.ts): its port on 127.0.0.1. A pass wires its builder to the app's MCP endpoint
   // only while the app answers there.
   app?: { port: number };
-  // Who decides the decisions the loop would put to a person (app/hitl.ts): Daniel at his desk (active), or
+  // Who decides the decisions the loop would put to a person (app/hitl.ts): the owner at their desk (active), or
   // Helix while he is away (auto), and how much reaches him at each.
   pilot?: Partial<PilotConfig>;
   // Where each kind of builder feedback goes (app/hitl.ts feedbackRule), with per-lane overrides.
@@ -146,14 +160,75 @@ export interface FeedbackRule {
 export type FeedbackRules = Partial<Record<FeedbackKind, Partial<FeedbackRule>>>;
 export type FeedbackConfig = FeedbackRules & { lanes?: Partial<Record<string, FeedbackRules>> };
 
-export const CONTROL_PLANE = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// The tool's own files (the schemas, Helix's preset prompts, the templates, the skill, the hooks, the fake CLIs
+// and the app's page) sit beside src/, from source and from a build alike: the nearest package.json up.
+function packageRoot(from: string): string {
+  for (let d = from; ; d = dirname(d)) {
+    if (existsSync(join(d, 'package.json')) && existsSync(join(d, 'schema'))) return d;
+    if (dirname(d) === d) throw new Error(`helix-loop: cannot find its own files above ${from}`);
+  }
+}
+export const PACKAGE_ROOT = packageRoot(dirname(fileURLToPath(import.meta.url)));
+export const asset = (...parts: string[]) => join(PACKAGE_ROOT, ...parts);
+// A script the tool runs as its own process (the CLI, Claude Code's hook): from source, the .ts file, which
+// Node runs as it is; installed, its compiled .js under dist/, since Node strips no types under node_modules.
+const FROM_SOURCE = import.meta.url.endsWith('.ts');
+export const script = (...parts: string[]) => (FROM_SOURCE ? `${asset(...parts)}.ts` : `${asset('dist', ...parts)}.js`);
+export const BIN = script('bin', 'helix-loop');
+
+// A project keeps everything Helix Loop needs in one hidden folder: its spec, its TaskSet, its config, its
+// app settings, and (ignored by git) the loop's runs, the product repos and the passes' worktrees.
+export const HELIX_DIR = '.helix';
+export const configPath = (root: string) => join(root, HELIX_DIR, 'config.yaml');
+// A pass's log, as the ledger and the plan record it: relative to .helix/ (runs/logs/<day>/<task>-<agent>-<n>.log).
+export const logFile = (root: string, rel: string) => join(root, HELIX_DIR, rel);
+
+// The project a command acts on: the nearest folder up from `from` with a .helix/config.yaml, as git finds
+// its repository.
+export function findProject(from = process.cwd()): string | undefined {
+  for (let d = resolve(from); ; d = dirname(d)) {
+    if (existsSync(configPath(d))) return d;
+    if (dirname(d) === d) return undefined;
+  }
+}
+
+export class NoProjectError extends Error {}
+export function projectRoot(explicit?: string): string {
+  const root = explicit ?? process.env.HELIX_PROJECT ?? findProject();
+  if (!root) throw new NoProjectError('Not in a Helix Loop project (no .helix/config.yaml here or above). Run `helix-loop init` to start one, or pass --root.');
+  if (!existsSync(configPath(root))) throw new NoProjectError(`${root} is not a Helix Loop project: ${configPath(root)} is missing. Run \`helix-loop init\` there.`);
+  return resolve(root);
+}
+
+// The identity on the loop's own commits (plan updates, a pass's leftover work) and release tags: the config's
+// git_author. One process acts for one project, so the last config loaded names it for helpers that have no
+// config at hand.
+let lastAuthor: Config['git_author'];
+export function gitAuthor(config?: Config): string[] {
+  const a = (config ? config.git_author : lastAuthor) ?? { name: 'Helix Loop', email: 'helix-loop@localhost' };
+  return ['-c', `user.name=${a.name}`, '-c', `user.email=${a.email}`];
+}
+
+// Variables for a product repo's scripts, under the project's prefix and under HELIX_.
+export function productEnv(config: Config, vars: Record<string, string>): Record<string, string> {
+  const prefix = config.env_prefix ?? 'HELIX';
+  return Object.fromEntries(Object.entries(vars).flatMap(([k, v]) => [[`HELIX_${k}`, v], [`${prefix}_${k}`, v]]));
+}
+
+export function projectInfo(config: Config): ProjectInfo {
+  return {
+    name: config.project?.name ?? basename(config.root),
+    owner: config.project?.owner ?? 'the owner',
+    timezone: config.project?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+  };
+}
 
 // Each agent's weekly pacing target, for the metrics page's pace lines.
 export function weeklyTargets(config: Config): Record<string, number | undefined> {
   return Object.fromEntries(AGENTS.map((a) => [a, config.agents[a].weekly_target]));
 }
 
-export function loadConfig(root = CONTROL_PLANE, file = join(root, 'harness', 'config.yaml')): Config {
+export function loadConfig(root: string, file = configPath(root)): Config {
   const raw = parse(readFileSync(file, 'utf8')) as Omit<Config, 'root'>;
   for (const a of AGENTS) {
     if (!raw.agents?.[a]) throw new Error(`config: agents.${a} is missing`);
@@ -175,6 +250,7 @@ export function loadConfig(root = CONTROL_PLANE, file = join(root, 'harness', 'c
   if (!Array.isArray(review) || !review.length || review.some((g) => typeof g !== 'string' || !g)) {
     throw new Error('config: release.review_paths must list at least one path glob; an empty list would release anything unreviewed');
   }
+  lastAuthor = raw.git_author;
   return { ...raw, release: { ...raw.release, review_paths: review }, root };
 }
 
@@ -185,44 +261,61 @@ export function repoConfig(config: Config, repo: RepoName): { gate: string; prep
   return r;
 }
 
-// Where everything lives, relative to the control plane. One place, so tests can point a whole
-// loop at a temporary directory.
+// Where everything lives in a project, under its .helix/ folder. One place, so tests can point a whole loop at a
+// temporary directory.
 export function paths(root: string) {
+  const h = join(root, HELIX_DIR);
   return {
-    spec: join(root, 'spec', 'Mushy — Technical Product Specification.md'),
-    specSections: join(root, 'spec', 'sections'),
-    specIndex: join(root, 'spec', 'index.json'),
-    tasks: join(root, 'plan', 'tasks'),
-    human: join(root, 'plan', 'human'),
-    schema: join(root, 'plan', 'schema'),
-    syntheticReqs: join(root, 'plan', 'synthetic-reqs.yaml'),
-    map: join(root, 'plan', 'Mushy.LoopEngineering.DependencyMap.html'),
-    prompts: join(root, 'prompts'),
-    runs: join(root, 'runs'),
-    ledger: join(root, 'runs', 'runs.jsonl'),
-    metrics: join(root, 'runs', 'metrics'), // the metrics page's versions (metrics/archive.ts)
-    approvals: join(root, 'runs', 'approvals'),
-    agentsState: join(root, 'runs', 'agents.json'),
-    logs: join(root, 'runs', 'logs'),
-    stopFile: join(root, 'runs', 'STOP'),
-    pause: join(root, 'runs', 'PAUSE'), // while it exists no new pass starts, and the loop waits instead of exiting
-    stopPass: join(root, 'runs', 'stop-pass'), // <task>.json: the loop app asks for that task's pass to stop
-    lock: join(root, 'runs', 'loop.lock'),
-    repos: join(root, 'repos'),
-    worktrees: join(root, 'worktrees'),
-    hooks: join(root, 'harness', 'hooks'),
-    live: join(root, 'runs', 'live.json'), // the passes in flight (live.ts)
-    reports: join(root, 'runs', 'reports.jsonl'), // what builders report over MCP (app/mcp.ts)
-    steward: join(root, 'runs', 'steward.jsonl'), // the steward's turns before it was renamed Helix: still counted in today's spend
-    helixTurns: join(root, 'runs', 'helix.jsonl'), // each Helix turn, its role and its cost (app/helix.ts)
-    hitl: join(root, 'runs', 'hitl.jsonl'), // what Helix resolved on Daniel's behalf, and his ratings (app/hitl.ts)
-    incidents: join(root, 'runs', 'incidents.jsonl'), // incidents' fixes and what became of them (app/incidents.ts)
-    changes: join(root, 'runs', 'changes.jsonl'), // each plan change the app applied, for undo (app/changes.ts)
-    helix: join(root, 'harness', 'helix'), // Helix's prompts and the rules Daniel's ratings taught it, in git
-    clarifications: join(root, 'spec', 'clarifications.md'), // answers sent into the spec, for the loop engineer to fold in
-    threads: join(root, 'runs', 'threads'), // comments and steward threads (app/threads.ts)
-    appSettings: join(root, 'runs', 'app.yaml'), // this machine's loop app settings
-    dryRun: join(root, 'runs', 'dry-run'), // the dry run's own control plane (dryrun.ts)
+    home: h,
+    config: join(h, 'config.yaml'),
+    spec: specFile(join(h, 'spec')),
+    specSections: join(h, 'spec', 'sections'),
+    specIndex: join(h, 'spec', 'index.json'),
+    clarifications: join(h, 'spec', 'clarifications.md'), // answers sent into the spec, for the loop engineer to fold in
+    plan: join(h, 'plan'),
+    taskset: join(h, 'plan', 'taskset.yaml'),
+    tasks: join(h, 'plan', 'tasks'),
+    human: join(h, 'plan', 'human'),
+    syntheticReqs: join(h, 'plan', 'synthetic-reqs.yaml'),
+    deferredReqs: join(h, 'plan', 'deferred-reqs.yaml'),
+    implementationPlan: join(h, 'plan', 'ImplementationPlan.md'),
+    humanPlan: join(h, 'plan', 'HumanImplementationPlan.md'),
+    map: join(h, 'plan', 'DependencyMap.html'),
+    prompts: join(h, 'prompts'), // build.md, the build prompt template
+    helix: join(h, 'helix'), // the owner's edits to Helix's prompts, and the rules their ratings taught it
+    appSettings: join(h, 'app.yaml'), // the project's app settings
+    schema: asset('schema'), // the tool's own
+    hooks: asset('hooks'),
+    runs: join(h, 'runs'),
+    ledger: join(h, 'runs', 'runs.jsonl'),
+    metrics: join(h, 'runs', 'metrics'), // the metrics page's versions (metrics/archive.ts)
+    approvals: join(h, 'runs', 'approvals'),
+    agentsState: join(h, 'runs', 'agents.json'),
+    logs: join(h, 'runs', 'logs'),
+    stopFile: join(h, 'runs', 'STOP'),
+    pause: join(h, 'runs', 'PAUSE'), // while it exists no new pass starts, and the loop waits instead of exiting
+    stopPass: join(h, 'runs', 'stop-pass'), // <task>.json: the app asks for that task's pass to stop
+    lock: join(h, 'runs', 'loop.lock'),
+    live: join(h, 'runs', 'live.json'), // the passes in flight (live.ts)
+    reports: join(h, 'runs', 'reports.jsonl'), // what builders report over MCP (app/mcp.ts)
+    steward: join(h, 'runs', 'steward.jsonl'), // Helix's turns from before it had that name: still counted in today's spend
+    helixTurns: join(h, 'runs', 'helix.jsonl'), // each Helix turn, its role and its cost (app/helix.ts)
+    hitl: join(h, 'runs', 'hitl.jsonl'), // what Helix resolved on the owner's behalf, and their ratings (app/hitl.ts)
+    incidents: join(h, 'runs', 'incidents.jsonl'), // incidents' fixes and what became of them (app/incidents.ts)
+    changes: join(h, 'runs', 'changes.jsonl'), // each plan change the app applied, for undo (app/changes.ts)
+    threads: join(h, 'runs', 'threads'), // comments and Helix's threads (app/threads.ts)
+    dryRun: join(h, 'runs', 'dry-run'), // the dry run's own project (dryrun.ts)
+    repos: join(h, 'repos'),
+    worktrees: join(h, 'worktrees'),
   };
+}
+
+// The project's spec: .helix/spec/spec.md, or the one other Markdown file there (the spec may keep its title as
+// its name).
+export function specFile(dir: string): string {
+  const named = join(dir, 'spec.md');
+  if (existsSync(named) || !existsSync(dir)) return named;
+  const md = readdirSync(dir).filter((f) => f.endsWith('.md') && f !== 'clarifications.md');
+  return md.length === 1 ? join(dir, md[0]!) : named;
 }
 export type Paths = ReturnType<typeof paths>;

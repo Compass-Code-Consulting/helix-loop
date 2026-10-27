@@ -16,20 +16,20 @@ const chart = (legend: boolean) => `<div class="plot"></div>${legend ? '<div cla
 
 export function renderMetrics(model: MetricsModel): string {
   assets ??= { css: asset('./page.css'), js: asset('./page.js') };
-  const zone = model.timeZone === 'America/Chicago' ? 'Central Time' : 'the build’s time zone';
+  const zone = model.timeZone.replace(/_/g, ' ');
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Mushy Build Metrics</title>
+<title>${esc(model.product)} Build Metrics</title>
 <style>${assets.css}</style>
 </head>
 <body>
 <main>
 <header>
-<div><h1>Mushy build metrics</h1><p class="sub" id="stamp"></p></div>
+<div><h1>${esc(model.product)} build metrics</h1><p class="sub" id="stamp"></p></div>
 ${THEME}
 </header>
 <nav class="versions" id="versions" aria-label="Versions"></nav>
@@ -43,7 +43,7 @@ ${figure('progress', 'Tasks done', 'Solid lines are what happened. Dashed lines 
 
 <section>
 <h2>Subscriptions</h2>
-<p class="sub">Each agent’s subscription allows so much use a week. The loop paces each agent so that its week lasts until the window resets, leaving some for Daniel’s own use.</p>
+<p class="sub">Each agent’s subscription allows so much use a week. The loop paces each agent so that its week lasts until the window resets, leaving some for the owner’s own use.</p>
 ${figure('allowance', 'Weekly window used', 'Solid lines are each window’s share used, as passes reported it. Dashed lines are the even pace to what the loop aims to have used by the reset: an agent ahead of its pace runs one pass at a time, or none until the pace catches up.', chart(true))}
 </section>
 
@@ -111,7 +111,7 @@ const THEME =
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 // The list of every version, newest first, with the numbers that show how the build has moved between them.
-export function renderIndex(versions: MetricsVersion[], timeZone: string, every: number): string {
+export function renderIndex(versions: MetricsVersion[], timeZone: string, every: number, product = 'The'): string {
   assets ??= { css: asset('./page.css'), js: asset('./page.js') };
   const when = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   const finish = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric' });
@@ -130,13 +130,13 @@ export function renderIndex(versions: MetricsVersion[], timeZone: string, every:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Mushy Build Metrics Versions</title>
+<title>${esc(product)} Build Metrics Versions</title>
 <style>${assets.css}</style>
 </head>
 <body>
 <main>
 <header>
-<div><h1>Mushy build metrics</h1><p class="sub">Every version the loop has written, newest first; it writes one every ${every} passes and leaves each as it was.</p></div>
+<div><h1>${esc(product)} build metrics</h1><p class="sub">Every version the loop has written, newest first; it writes one every ${every} passes and leaves each as it was.</p></div>
 </header>
 ${latest ? `<p class="latest"><a href="${esc(encodeURI(latest.file))}">Open the latest version: ${esc(when.format(latest.at))}, after ${latest.passes} passes</a></p>` : '<p class="empty">No versions yet.</p>'}
 <figure class="card">

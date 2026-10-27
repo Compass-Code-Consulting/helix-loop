@@ -1,75 +1,90 @@
+import type { TaskSet } from '../app/taskset.ts';
+import type { ProjectInfo } from '../config.ts';
 import type { SpecIndex } from '../spec/index.ts';
 import type { HumanTask, MapModel, Plan, Task } from '../types.ts';
-import { stagesOf, stageTitle } from './stages.ts';
-import type { Synthetic } from './staging.ts';
+import { stageIndex, stagesOf, stageTitle } from './stages.ts';
+import type { Synthetic } from './requirements.ts';
 
-// Renders the plan data into the two documents Daniel reads (spec §0): the Implementation Plan for the
-// agents and the Human Implementation Plan for him. Generated after every promotion; never edited by hand.
-// Tasks are grouped by stage, then by feature area in the order plan/planners.yaml lists the areas.
-
-const REPO_SHORT: Record<string, string> = { 'mushy-social-media': 'app', 'mushy-website': 'website', 'mushy-docs': 'docs', 'mushy-support-n-engineering': 'support' };
-const OTHER = 'Other';
+// Renders the plan data into the two documents people read: the Implementation Plan, Lane › Epic › Task as the
+// TaskSet orders them, and the Human Implementation Plan for the owner. Generated after every plan change; never
+// edited by hand.
 
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n+/g, ' ');
-const date = (iso: string) => new Date(iso).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
-const day = (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Chicago' });
 const passes = (ts: Task[]) => ts.reduce((s, t) => s + t.estimate_passes, 0);
+const formats = (timeZone: string) => ({
+  date: (iso: string) => new Date(iso).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone, timeZoneName: 'short' }),
+  day: (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone }),
+});
 
-// Feature areas in document order: the planners' order first, then any other name alphabetically.
-function featureOrder(tasks: Task[], order: string[]): string[] {
-  const present = new Set(tasks.map((t) => t.feature ?? OTHER));
-  return [...order.filter((f) => present.has(f)), ...[...present].filter((f) => !order.includes(f)).sort()];
+// The stages an epic's tasks fall in, as "Day 1–Day 3" or "Day 2"; nothing for a plan without stages.
+function stageSpan(plan: Plan, tasks: Task[]): string {
+  const stages = stagesOf(plan);
+  const at = [...new Set(tasks.filter((t) => t.stage).map((t) => stageIndex(stages, t.stage)))].sort((a, b) => a - b);
+  if (!at.length) return '';
+  const label = (i: number) => stageTitle(plan, stages[i]!).split(':')[0]!;
+  return at.length === 1 ? label(at[0]!) : `${label(at[0]!)}–${label(at.at(-1)!)}`;
 }
 
-export function renderImplementationPlan(plan: Plan, map: MapModel, index: SpecIndex, synthetic: Synthetic[], areas: string[] = []): string {
+export function renderImplementationPlan(plan: Plan, map: MapModel, index: SpecIndex, synthetic: Synthetic[], taskset: TaskSet, info: ProjectInfo): string {
+  const { date } = formats(info.timezone);
   const tasks = [...plan.tasks.values()];
   const byId = new Map(map.nodes.map((n) => [n.id, n]));
-  const features = featureOrder(tasks, areas);
-  const inArea = (f: string, ts: Task[]) => ts.filter((t) => (t.feature ?? OTHER) === f);
-  const stages = stagesOf(plan);
+  const epicTasks = (ids: string[]) => ids.map((id) => plan.tasks.get(id)).filter((t): t is Task => !!t);
+  const done = (ts: Task[]) => ts.filter((t) => t.status === 'done').length;
+  const hasStages = stagesOf(plan).length > 0;
   const out: string[] = [];
-  out.push('# Mushy Implementation Plan');
+  out.push(`# ${info.name} Implementation Plan`);
   out.push('');
-  out.push(`Generated ${date(map.generatedAt)} CT from the plan data in \`plan/tasks/\`, against spec v${index.version}.`);
-  out.push('Never edit this file: change the task files and regenerate it with `node harness/bin/mushy-loop.ts render`.');
+  out.push(`Generated ${date(map.generatedAt)} from the plan data in \`.helix/plan/\`, against spec v${index.version}.`);
+  out.push('Never edit this file: change the TaskSet and the task files, and regenerate it with `helix-loop plan render`.');
   out.push('');
   out.push('## Summary');
   out.push('');
-  out.push(`- **Tasks:** ${tasks.length}, estimated at ${passes(tasks)} passes.`);
+  out.push(`- **Tasks:** ${tasks.length} in ${taskset.lanes.length} lane${taskset.lanes.length === 1 ? '' : 's'} and ${taskset.lanes.reduce((n, l) => n + l.epics.length, 0)} epics, estimated at ${passes(tasks)} passes.`);
   out.push(`- **Status:** ${map.totals.done} done, ${map.totals.ready} ready, ${map.totals.claimed} in progress, ${map.totals.needsHuman} waiting on a person, ${map.totals.parked} parked.`);
-  out.push(`- **Projected finish:** ${date(map.projectedFinish)} CT, at ${Math.round(map.passHours * 60)} minutes per pass with ${map.agents.length} agents.`);
+  out.push(`- **Projected finish:** ${date(map.projectedFinish)}, at ${Math.round(map.passHours * 60)} minutes per pass with ${map.agents.length} agents.`);
   out.push(`- **Critical path:** ${map.criticalPath.length} steps; the full chain is listed at the end.`);
   const pinned = tasks.filter((t) => t.agent);
-  if (pinned.length) out.push(`- **Pinned:** ${pinned.length} tasks run only on ${[...new Set(pinned.map((t) => `${t.agent}${t.role === 'design' ? ' in the design role' : ''}`))].join(' or ')} (mascot SVGs and animations, MA-4).`);
+  if (pinned.length) out.push(`- **Pinned:** ${pinned.length} tasks run only on ${[...new Set(pinned.map((t) => `${t.agent}${t.role === 'design' ? ' in the design role' : ''}`))].join(' or ')}.`);
+  if (taskset.derived) out.push('- **Epics:** derived from each task\'s feature, since the plan has no `taskset.yaml` yet (`helix-loop taskset init` writes one).');
   out.push('');
-  out.push('A stage opens when every task in earlier stages is done, waiting on a person, or mascot design work; inside a stage the loop runs the critical path first.');
-  out.push('');
-  out.push(`| Area | ${stages.map((s) => stageTitle(plan, s).split(':')[0]).join(' | ')} | Tasks | Passes |`);
-  out.push(`| --- | ${stages.map(() => '---').join(' | ')} | --- | --- |`);
-  for (const f of features) {
-    const mine = inArea(f, tasks);
-    out.push(`| ${f} | ${stages.map((s) => mine.filter((t) => t.stage === s).length || '').join(' | ')} | ${mine.length} | ${passes(mine)} |`);
+  if (hasStages) {
+    out.push('Each task also belongs to a stage. A stage opens when every task in earlier stages is done, waiting on a person, or design work; inside the open stages the loop runs the critical path first.');
+    out.push('');
   }
-  out.push(`| **Total** | ${stages.map((s) => tasks.filter((t) => t.stage === s).length).join(' | ')} | ${tasks.length} | ${passes(tasks)} |`);
+  out.push(`| Lane | Epic | Tasks | Done | Passes |${hasStages ? ' Stages |' : ''}`);
+  out.push(`| --- | --- | --- | --- | --- |${hasStages ? ' --- |' : ''}`);
+  for (const l of taskset.lanes) {
+    for (const e of l.epics) {
+      const ts = epicTasks(e.tasks);
+      if (!ts.length) continue;
+      out.push(`| ${l.name} | ${cell(e.title)} | ${ts.length} | ${done(ts)} | ${passes(ts)} |${hasStages ? ` ${stageSpan(plan, ts)} |` : ''}`);
+    }
+  }
+  out.push(`| **Total** | | ${tasks.length} | ${done(tasks)} | ${passes(tasks)} |${hasStages ? ' |' : ''}`);
   out.push('');
-  for (const s of stages) {
-    const inStage = tasks.filter((t) => t.stage === s);
-    if (!inStage.length) continue;
-    out.push(`## ${stageTitle(plan, s)}`);
+  for (const l of taskset.lanes) {
+    const laneTasks = l.epics.flatMap((e) => epicTasks(e.tasks));
+    if (!laneTasks.length) continue;
+    out.push(`## ${l.name}`);
     out.push('');
-    out.push(`${inStage.length} tasks, ${passes(inStage)} passes.`);
+    out.push(`${laneTasks.length} tasks in ${l.epics.length} epics, ${done(laneTasks)} done, ${passes(laneTasks)} passes.`);
     out.push('');
-    for (const f of features) {
-      const rows = inArea(f, inStage).sort((a, b) => (byId.get(a.id)?.es ?? 0) - (byId.get(b.id)?.es ?? 0) || a.id.localeCompare(b.id));
+    for (const e of l.epics) {
+      const rows = epicTasks(e.tasks).sort((a, b) => (byId.get(a.id)?.es ?? 0) - (byId.get(b.id)?.es ?? 0) || a.id.localeCompare(b.id));
       if (!rows.length) continue;
-      out.push(`### ${f}`);
+      const span = stageSpan(plan, rows);
+      out.push(`### ${e.title}`);
       out.push('');
-      out.push('| Task | Title | Repo | Requirements | Waits on | Passes | Status |');
-      out.push('| --- | --- | --- | --- | --- | --- | --- |');
+      out.push(`${rows.length} tasks, ${done(rows)} done, ${passes(rows)} passes${span ? `, in ${span}` : ''}.`);
+      out.push('');
+      out.push(`| Task | Title |${hasStages ? ' Stage |' : ''} Requirements | Waits on | Passes | Status |`);
+      out.push(`| --- | --- |${hasStages ? ' --- |' : ''} --- | --- | --- | --- |`);
       for (const t of rows) {
         const crit = byId.get(t.id)?.critical ? ' ◆' : '';
         const who = t.agent ? ` (${t.agent}${t.role ? `, ${t.role}` : ''})` : '';
-        out.push(`| ${t.id}${crit} | ${cell(t.title)}${who} | ${REPO_SHORT[t.repo] ?? t.repo} | ${t.reqs.join(', ')} | ${t.blocked_by.join(', ') || '—'} | ${t.estimate_passes} | ${t.status} |`);
+        const stage = hasStages ? ` ${t.stage ? stageTitle(plan, t.stage).split(':')[0] : '—'} |` : '';
+        out.push(`| ${t.id}${crit} | ${cell(t.title)}${who} |${stage} ${t.reqs.join(', ')} | ${t.blocked_by.join(', ') || '—'} | ${t.estimate_passes} | ${t.status} |`);
       }
       out.push('');
     }
@@ -94,14 +109,15 @@ export function renderImplementationPlan(plan: Plan, map: MapModel, index: SpecI
   out.push('');
   for (const id of map.criticalPath) {
     const n = byId.get(id)!;
-    const t = plan.tasks.get(id);
-    out.push(`1. ${id} (${n.kind === 'human' ? 'human step' : `${t?.feature ?? OTHER}, ${t?.stage ? stageTitle(plan, t.stage).split(':')[0] : ''}`}): ${n.title}`);
+    const e = taskset.epicOf.get(id);
+    out.push(`1. ${id} (${n.kind === 'human' ? 'human step' : `${e ? `${e.lane} › ${e.title}` : 'no epic'}`}): ${n.title}`);
   }
   out.push('');
   return out.join('\n');
 }
 
-export function renderHumanPlan(plan: Plan, map: MapModel): string {
+export function renderHumanPlan(plan: Plan, map: MapModel, info: ProjectInfo): string {
+  const { date, day } = formats(info.timezone);
   const byId = new Map(map.nodes.map((n) => [n.id, n]));
   const isDone = (id: string) => (plan.tasks.get(id)?.status ?? plan.human.get(id)?.status) === 'done';
   const waitsOn = (h: HumanTask) => h.blocked_by.filter((d) => !isDone(d));
@@ -134,11 +150,11 @@ export function renderHumanPlan(plan: Plan, map: MapModel): string {
     return b.length ? `${b.length} task${b.length === 1 ? '' : 's'}` : '—';
   };
   const out: string[] = [];
-  out.push('# Mushy Human Implementation Plan');
+  out.push(`# ${info.name} Human Implementation Plan`);
   out.push('');
-  out.push(`Generated ${date(map.generatedAt)} CT from the plan data in \`plan/human/\`.`);
-  out.push('These are the steps only Daniel can do, sign or pay for (spec §0).');
-  out.push('Never edit this file: change the files in `plan/human/` and regenerate it with `node harness/bin/mushy-loop.ts render`.');
+  out.push(`Generated ${date(map.generatedAt)} from the plan data in \`.helix/plan/human/\`.`);
+  out.push(`These are the steps only ${info.owner} can do, sign or pay for.`);
+  out.push('Never edit this file: change the files in `.helix/plan/human/` and regenerate it with `helix-loop plan render`.');
   out.push('');
   out.push('## Summary');
   out.push('');
@@ -190,7 +206,7 @@ export function renderHumanPlan(plan: Plan, map: MapModel): string {
     if (h.secrets?.length) out.push(`- **Credentials:** ${h.secrets.map((s) => `${s.name}, kept in ${s.stored_in}`).join('; ')}.`);
     if (h.handoff_prompt) {
       out.push('');
-      out.push('Hand-off prompt for Daniel\'s agent:');
+      out.push(`Hand-off prompt for ${info.owner}'s agent:`);
       out.push('');
       out.push('```text');
       out.push(h.handoff_prompt.trim());

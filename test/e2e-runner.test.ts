@@ -20,11 +20,11 @@ test('the e2e runner runs the worktree script for a registered pass and returns 
   const runner = new E2ERunner('e2e:direct', 60_000, () => {});
   const url = await runner.start(0);
   const pass = runner.register(dir);
-  const env = { ...process.env, MUSHY_E2E_RUNNER: url, MUSHY_E2E_PASS: pass };
+  const env = { ...process.env, HELIX_E2E_RUNNER: url, HELIX_E2E_PASS: pass };
   const res = await exec('node', [CLIENT, 'e2e/home.spec.ts', '--grep', '[AN-1]'], { env }).catch((e) => e as { code: number; stdout: string });
   assert.equal((res as { code: number }).code, 3);
   assert.match((res as { stdout: string }).stdout, /ran e2e\/home\.spec\.ts --grep \[AN-1\]/);
-  assert.doesNotMatch((res as { stdout: string }).stdout, /__MUSHY_E2E_EXIT__/);
+  assert.doesNotMatch((res as { stdout: string }).stdout, /__HELIX_E2E_EXIT__/);
 
   runner.unregister(pass);
   const refused = await exec('node', [CLIENT], { env }).catch((e) => e as { code: number; stderr: string });

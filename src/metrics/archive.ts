@@ -37,7 +37,7 @@ export function readVersions(dir: string): MetricsVersion[] {
 export function writeVersion(dir: string, model: MetricsModel, every = VERSION_EVERY): MetricsVersion {
   mkdirSync(dir, { recursive: true });
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: model.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(model.generatedAt);
-  const file = `Mushy.LoopEngineering.Metrics.${day}.${String(model.passCount).padStart(4, '0')}.html`;
+  const file = `Metrics.${day}.${String(model.passCount).padStart(4, '0')}.html`;
   const version: MetricsVersion = {
     file,
     at: model.generatedAt,
@@ -52,7 +52,7 @@ export function writeVersion(dir: string, model: MetricsModel, every = VERSION_E
   const versions = [...readVersions(dir).filter((v) => v.file !== file), version].sort((a, b) => a.at - b.at);
   atomicWrite(join(dir, file), renderMetrics({ ...model, file, versions, versionEvery: every }));
   atomicWrite(join(dir, 'versions.json'), `${JSON.stringify(versions, null, 2)}\n`);
-  atomicWrite(join(dir, 'versions.js'), `window.MUSHY_METRICS_VERSIONS = ${embedJson(versions)};\n`);
-  atomicWrite(join(dir, 'index.html'), renderIndex(versions, model.timeZone, every));
+  atomicWrite(join(dir, 'versions.js'), `window.HELIX_METRICS_VERSIONS = ${embedJson(versions)};\n`);
+  atomicWrite(join(dir, 'index.html'), renderIndex(versions, model.timeZone, every, model.product));
   return version;
 }

@@ -6,7 +6,7 @@ import type { Plan, Task } from '../types.ts';
 // simulation of the loop's choices with the slots it has now, not a promise: a failed attempt, a limit or a
 // person's step moves it.
 //
-// Whatever waits on Daniel gets a date too, or most of the plan would have none (on 2026-10-27, four tasks that
+// Whatever waits on the owner gets a date too, or most of the plan would have none (on 2026-10-27, four tasks that
 // needed him held 208 of 416): a human task is done after its lead time from now (half of it once started), a
 // task that needs him or is parked is handed back now. Home measures what an item costs by moving its date
 // and running this again; code complete (board.ts) is this run with every human task done now.
@@ -20,7 +20,7 @@ export interface ProjectionInput {
   passHours: number;
   slots: number; // passes at once, across agents
   running: { task: string; startedAt: number }[];
-  // When each open human task is done, and when each task that needs Daniel or is parked can run again.
+  // When each open human task is done, and when each task that needs the owner or is parked can run again.
   humanDone?: Map<string, number>;
   handedBack?: Map<string, number>;
   // Whether the finish waits for the human tasks too (project complete), or only for builder work (code

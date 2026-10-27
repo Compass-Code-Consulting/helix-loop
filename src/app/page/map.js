@@ -141,7 +141,7 @@
     // People first: the human tasks the build waits on.
     const humans = M.board.human.filter((x) => x.status !== 'done' && (q ? match(x) : scope === 'all' ? true : scope === 'critical' ? x.critical : x.frontier)).sort((a, b) => b.held - a.held);
     if (humans.length) {
-      rows.push({ kind: 'lane', id: 'lane:human', text: 'Human tasks · Daniel', meta: `${humans.length} of ${M.board.human.filter((x) => x.status !== 'done').length} open`, color: 'var(--warn)' });
+      rows.push({ kind: 'lane', id: 'lane:human', text: `Human tasks · ${HX.owner()}`, meta: `${humans.length} of ${M.board.human.filter((x) => x.status !== 'done').length} open`, color: 'var(--warn)' });
       for (const x of humans) rows.push({ kind: 'human', id: x.id, t: x });
     }
     for (const l of M.board.lanes) {
@@ -158,7 +158,7 @@
         if (!isFolded) for (const t of epicMatch && !hits.length ? ts : hits) laneRows.push({ kind: 'task', id: t.id, t });
       }
       if (!laneRows.length) continue;
-      rows.push({ kind: 'lane', id: `lane:${l.name}`, text: l.name, meta: `${Math.round((l.done / Math.max(1, l.total)) * 100)}%`, color: HX.LANE_COLOR[l.name] ?? 'var(--color-accent)' });
+      rows.push({ kind: 'lane', id: `lane:${l.name}`, text: l.name, meta: `${Math.round((l.done / Math.max(1, l.total)) * 100)}%`, color: HX.laneColor(l.name) ?? 'var(--color-accent)' });
       rows.push(...laneRows);
     }
     M.rows = rows;
@@ -554,7 +554,7 @@
   }
 
   // Notes: every build prompt carries them. Edited in place; a draft survives a refresh, and a change made
-  // elsewhere while Daniel writes is offered with "Load theirs".
+  // elsewhere while the owner writes is offered with "Load theirs".
   const drafts = {};
   function notesEditor(id, notes, running) {
     const ta = h('textarea', { class: 'input', rows: 4, placeholder: running ? '' : 'Notes for the next builder: what to read first, what to avoid.', readOnly: running });

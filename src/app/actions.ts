@@ -3,13 +3,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import { parseDocument } from 'yaml';
-import { CONTROL_PLANE, paths } from '../config.ts';
+import { BIN, gitAuthor, paths } from '../config.ts';
 import { readLive } from '../live.ts';
 import { atomicWrite, loadPlan, nextTaskId, writeTask } from '../plan/store.ts';
 import { validateDocument, validateGraph, type Problem } from '../plan/validate.ts';
 import type { HumanTask, Plan, Task } from '../types.ts';
 
-// Plan edits from the app: Daniel's direct actions and the steward's tools. Each edit is checked before it
+// Plan edits from the app: the owner's direct actions and the steward's tools. Each edit is checked before it
 // lands: the task must not be one the loop is running (the loop writes its own copy back when the pass ends),
 // the document must pass its schema, and the whole plan, as changed, its graph checks. It is then written
 // atomically, the plan documents are rendered by the CLI's own `render`, and both are committed with a
@@ -200,8 +200,8 @@ function check(plan: Plan, schemaDir: string, kind: 'task' | 'human', value: Tas
 // Renders the plan documents with the CLI, then commits the edited files and the documents together. A root
 // that is not a git checkout (the dry run) is only rendered. Says whether a commit was made, and which.
 export async function afterEdit(root: string, files: string[], message: string): Promise<{ committed: boolean; commit?: string }> {
-  const docs = ['ImplementationPlan', 'HumanImplementationPlan'].map((d) => join(root, 'plan', `Mushy.LoopEngineering.${d}.md`));
-  await exec(process.execPath, [join(CONTROL_PLANE, 'harness', 'bin', 'helix-loop.ts'), 'render', '--root', root], { timeout: 120_000 }).catch(() => undefined);
+  const docs = [paths(root).implementationPlan, paths(root).humanPlan];
+  await exec(process.execPath, [BIN, 'render', '--root', root], { timeout: 120_000 }).catch(() => undefined);
   if (!existsSync(join(root, '.git'))) return { committed: false };
   const rel = [...files, ...docs.filter(existsSync)].map((f) => relative(root, f));
   if (!(await commit(root, rel, message))) return { committed: false };
@@ -213,7 +213,7 @@ export async function afterEdit(root: string, files: string[], message: string):
 // The loop commits plan/tasks and plan/human in this same checkout after each merge. Two commits at once
 // collide on git's index lock; the loop's next commit catches up if its own fails, and this one retries.
 export async function commit(root: string, files: string[], message: string): Promise<boolean> {
-  const id = ['-c', 'user.name=Helix Loop', '-c', 'user.email=loop@mushymarketing.com'];
+  const id = gitAuthor();
   for (let i = 0; i < 6; i++) {
     try {
       await exec('git', ['add', '--', ...files], { cwd: root });

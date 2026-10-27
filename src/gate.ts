@@ -5,6 +5,7 @@ import { suspensionWatch } from './clock.ts';
 import { addedConflictMarkers, changedFiles, commitsAhead, git, isDirty } from './git.ts';
 import { sh } from './proc.ts';
 import type { Task } from './types.ts';
+import { gitAuthor } from './config.ts';
 
 // The gate (design doc §4 step 6): the loop's checks on a finished pass, then the repo's own full
 // check. Nothing reaches main without passing it.
@@ -44,6 +45,7 @@ export interface GateInput {
   clock: Clock;
   logFile: string;
   env?: NodeJS.ProcessEnv;
+  envPrefix?: string; // the project's prefix for the gate's id variable (config env_prefix)
   signal?: AbortSignal; // kills the prepare step and the gate command: the pass was stopped from the loop app
 }
 
@@ -55,7 +57,7 @@ export async function commitLeftovers(worktree: string, task: Task, summary: str
   const subject = first.startsWith(`${task.id}:`) ? first.slice(0, 100) : `${task.id}: ${task.title}`.slice(0, 100);
   const body = summary.split('\n').slice(first.startsWith(`${task.id}:`) ? 1 : 0).join('\n').trim();
   const message = `${subject}\n\n${body}\n\nTask: ${task.id} [${task.reqs.join(', ')}]\nAgent: ${agentLabel}`.replace(/\n{3,}/g, '\n\n');
-  await git(worktree, '-c', 'user.name=Mushy Loop', '-c', 'user.email=loop@mushymarketing.com', 'commit', '-q', '--no-verify', '-m', message);
+  await git(worktree, ...gitAuthor(), 'commit', '-q', '--no-verify', '-m', message);
   return true;
 }
 
@@ -100,8 +102,8 @@ const LINT = /^\s*(\d+:\d+\s+error\s+.+)$/; // eslint, under its file's line
 const UNCAUGHT = /^\s*((?:[A-Z]\w*)?Error(?: \[[A-Z_]+\])?: \S.*)$/; // a script's uncaught exception: "Error: …", "TypeError: …"
 const ANY_ERROR = /\b(?:error|failed|failure)\b|ERR!|ERR_PNPM_/i;
 const WRAPPER = /ELIFECYCLE|Command failed with exit code|^\s*[>$] /; // a package manager saying a script failed, or echoing one it runs
-// A gate runner starting a step: mushy-social-media's "> gate 70-unit: …", mushy-website's "Checking 40-unit.ts",
-// mushy-docs' "Checking: scripts/checks/40-unit.ts". stepName gives the step's name.
+// A gate runner starting a step, as repos' gate scripts print it: "> gate 70-unit: …", "Checking 40-unit.ts",
+// "Checking: scripts/checks/40-unit.ts". stepName gives the step's name.
 const STEP = /^\s*(?:> gate (\S+):|Checking:? (\S+)\.[cm]?[jt]s$)/;
 const ANSI = /\x1b\[[0-9;]*[A-Za-z]/g; // terminal colours
 
@@ -197,6 +199,9 @@ export function pageAtFailure(worktree: string): string | undefined {
   return `${relative(worktree, first.file)}:\n${text.length > PAGE_LIMIT ? `${text.slice(0, PAGE_LIMIT)}\n[…]` : text}`;
 }
 
+// The gate's id, which a repo's scripts use to keep parallel gates' databases and ports apart.
+const gateId = (prefix = 'HELIX', id: string) => ({ HELIX_GATE_ID: id, [`${prefix}_GATE_ID`]: id });
+
 export async function runGate(input: GateInput): Promise<GateOutcome> {
   const { worktree, task, clock } = input;
   const started = clock.monotonic();
@@ -286,7 +291,7 @@ export async function runGate(input: GateInput): Promise<GateOutcome> {
       timeoutMs: input.gateTimeoutMs,
       logFile: input.logFile,
       signal: input.signal,
-      env: { ...process.env, ...input.env, CI: '1', MUSHY_GATE_ID: `${task.id}-${relative(join(worktree, '..'), worktree)}` },
+      env: { ...process.env, ...input.env, CI: '1', ...gateId(input.envPrefix, `${task.id}-${relative(join(worktree, '..'), worktree)}`) },
       onLine: seen && ((line) => {
         const end = stepEnd(line);
         if (end) return void seen.ends.push(end);

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
+import { paths } from '../config.ts';
 import { atomicWrite } from '../plan/store.ts';
 import { stageIndex, stagesOf, stageTitle } from '../plan/stages.ts';
 import type { Plan, RepoName, Stage, Task } from '../types.ts';
@@ -47,7 +48,7 @@ export interface TaskSetFile {
   lanes: Record<string, { repo: string; epics: Record<string, { title: string; stage?: Stage }> }>;
 }
 
-export const tasksetFile = (root: string) => join(root, 'plan', 'taskset.yaml');
+export const tasksetFile = (root: string) => paths(root).taskset;
 
 const slug = (s: string) => s.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'general';
 

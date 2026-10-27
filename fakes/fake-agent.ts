@@ -2,13 +2,13 @@
 // real output format (captured from live runs on 2026-10-23), so the dry run exercises the real
 // adapters. What it does per task comes from a scenario file:
 //
-//   MUSHY_FAKE_SCENARIO  JSON: { "T-0001": ["implement"], "T-0002@codex": ["limit:90", "implement"] }
+//   HELIX_FAKE_SCENARIO  JSON: { "T-0001": ["implement"], "T-0002@codex": ["limit:90", "implement"] }
 //                        A list is consumed one entry per call; "T-x@agent" lists win over "T-x".
-//   MUSHY_FAKE_STATE     directory for call counters and session-limit state, one file per agent, and
+//   HELIX_FAKE_STATE     directory for call counters and session-limit state, one file per agent, and
 //                        each task's latest arguments, prompt and environment variable names
 //                        (<task>@<agent>.args.json, .prompt.md, .env.json), and every prompt the task got,
 //                        numbered by its call across both agents (<task>.prompt-<n>.md)
-//   MUSHY_LOOP_NOW       the loop's clock (virtual in the dry run)
+//   HELIX_LOOP_NOW       the loop's clock (virtual in the dry run)
 //   CODEX_HOME           where the codex fake writes its rollout file
 //
 // A "*" list applies to every task without one of its own. Actions: work:<s> (<s> real seconds of reported
@@ -30,10 +30,10 @@ import { parse } from 'yaml';
 const kind = process.argv[2] as 'claude' | 'codex';
 const args = process.argv.slice(3);
 
-// The loop's sign-in check (agents/auth.ts), answered as each CLI does. MUSHY_FAKE_AUTH_CLAUDE or _CODEX (or
-// MUSHY_FAKE_AUTH for both) picks another answer: "apikey" or "signedout".
+// The loop's sign-in check (agents/auth.ts), answered as each CLI does. HELIX_FAKE_AUTH_CLAUDE or _CODEX (or
+// HELIX_FAKE_AUTH for both) picks another answer: "apikey" or "signedout".
 if (args.join(' ') === 'auth status --json' || args.join(' ') === 'login status') {
-  const auth = process.env[`MUSHY_FAKE_AUTH_${kind.toUpperCase()}`] ?? process.env.MUSHY_FAKE_AUTH ?? 'subscription';
+  const auth = process.env[`HELIX_FAKE_AUTH_${kind.toUpperCase()}`] ?? process.env.HELIX_FAKE_AUTH ?? 'subscription';
   if (kind === 'claude') {
     const method = auth === 'apikey' ? 'api_key' : 'claude.ai';
     process.stdout.write(JSON.stringify({ loggedIn: auth !== 'signedout', authMethod: auth === 'signedout' ? 'none' : method, apiProvider: 'firstParty' }, null, 2) + '\n');
@@ -41,9 +41,9 @@ if (args.join(' ') === 'auth status --json' || args.join(' ') === 'login status'
   process.exit(auth === 'signedout' && kind === 'codex' ? 1 : 0);
 }
 
-const now = Number(process.env.MUSHY_LOOP_NOW ?? Date.now());
-const stateDir = process.env.MUSHY_FAKE_STATE!;
-const scenario = JSON.parse(readFileSync(process.env.MUSHY_FAKE_SCENARIO!, 'utf8')) as Record<string, string[]>;
+const now = Number(process.env.HELIX_LOOP_NOW ?? Date.now());
+const stateDir = process.env.HELIX_FAKE_STATE!;
+const scenario = JSON.parse(readFileSync(process.env.HELIX_FAKE_SCENARIO!, 'utf8')) as Record<string, string[]>;
 const cwd = kind === 'codex' && args.includes('-C') ? args[args.indexOf('-C') + 1]! : process.cwd();
 const prompt = readFileSync(0, 'utf8');
 

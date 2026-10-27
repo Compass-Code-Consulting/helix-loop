@@ -106,7 +106,7 @@ function file(ctx: BuilderContext, r: Omit<Report, 'at' | 'pass' | 'task' | 'age
 export const BUILDER_TOOLS: Tool<BuilderContext>[] = [
   {
     name: 'report_progress',
-    description: 'Tell Daniel, in a few words, what you are doing now on this task, as you start each main step. It shows on the task\'s bar in the dependency map. It changes nothing in the loop.',
+    description: 'Tell the owner, in a few words, what you are doing now on this task, as you start each main step. It shows on the task\'s bar in the dependency map. It changes nothing in the loop.',
     inputSchema: {
       type: 'object',
       properties: { message: { type: 'string', maxLength: 144, description: 'What you are doing now, at most 144 characters.' } },
@@ -121,7 +121,7 @@ export const BUILDER_TOOLS: Tool<BuilderContext>[] = [
   {
     name: 'report_issue',
     description:
-      'Report something outside your task that is in your way, the moment you find it: the spec is ambiguous or silent on something the task needs (spec_question); a test unrelated to your change fails intermittently (flaky_test); the task needs something a human task provides (blocked_on_human); a secret, environment variable or access is missing (credential_missing: name the variable, never a value); the task is bigger than planned or the plan misses a dependency (scope_grew); merge conflicts, or main changed under you (conflict); or the sandbox, network or tooling fails you (environment). It goes to Daniel or to Helix, and into this attempt\'s notes. Keep working unless you cannot go on; set blocking when you cannot.',
+      'Report something outside your task that is in your way, the moment you find it: the spec is ambiguous or silent on something the task needs (spec_question); a test unrelated to your change fails intermittently (flaky_test); the task needs something a human task provides (blocked_on_human); a secret, environment variable or access is missing (credential_missing: name the variable, never a value); the task is bigger than planned or the plan misses a dependency (scope_grew); merge conflicts, or main changed under you (conflict); or the sandbox, network or tooling fails you (environment). It goes to the owner or to Helix, and into this attempt\'s notes. Keep working unless you cannot go on; set blocking when you cannot.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -138,7 +138,7 @@ export const BUILDER_TOOLS: Tool<BuilderContext>[] = [
       if (!(ISSUE_KINDS as readonly string[]).includes(kind)) throw new ToolError(`kind is one of ${ISSUE_KINDS.join(', ')}`);
       const p = Array.isArray(args.paths) ? args.paths.filter((x): x is string => typeof x === 'string').slice(0, 20).map((x) => x.slice(0, 300)) : undefined;
       file(ctx, { kind: 'issue', issue: kind, message: str(args, 'message', 2000)!, ...(p?.length ? { paths: p } : {}), ...(args.blocking === true ? { blocking: true } : {}) });
-      return 'Reported to Daniel. Keep going with the task.';
+      return 'Reported to the owner. Keep going with the task.';
     },
   },
 ];

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describePace, loadQuota, localDay, mapAgents, overBudget, paceSlots, helixSpentUsd } from '../agents/quota.ts';
-import { paths, type Config } from '../config.ts';
+import { logFile, paths, projectInfo, type Config } from '../config.ts';
 import { meanPassHours, readLedger, type LedgerEvent } from '../ledger.ts';
 import { readLive, type LivePass } from '../live.ts';
 import { computeMap } from '../map/graph.ts';
@@ -17,7 +17,7 @@ import { readFeed } from './feed.ts';
 import { allThreads, type Thread } from './threads.ts';
 
 // What the app shows, derived from the control plane's files the way the CLI derives it: nothing here is
-// stored, so the page can never disagree with `mushy-loop status`.
+// stored, so the page can never disagree with `helix-loop status`.
 
 export interface LoopStatus {
   running: boolean;
@@ -74,7 +74,7 @@ export function passesNow(root: string, plan: Plan, status: LoopStatus): PassNow
   if (live && live.pid === status.pid) {
     return live.passes.map((x) => {
       const log = passLog(root, x.task, x.agent, x.attempt, x.startedAt);
-      const feed = log ? readFeed(join(root, log), x.agent, root, 0) : undefined;
+      const feed = log ? readFeed(logFile(root, log), x.agent, root, 0) : undefined;
       return { ...x, title: plan.tasks.get(x.task)?.title, log, lastMessage: feed?.lastMessage };
     });
   }
@@ -83,8 +83,8 @@ export function passesNow(root: string, plan: Plan, status: LoopStatus): PassNow
     const agent = t.claimed_by;
     const attempt = t.attempts.length + 1;
     const log = passLog(root, t.id, agent, attempt);
-    const feed = log ? readFeed(join(root, log), agent, root, 0) : undefined;
-    const startedAt = log ? statSync(join(root, log)).birthtime.toISOString() : (status.since ?? new Date().toISOString());
+    const feed = log ? readFeed(logFile(root, log), agent, root, 0) : undefined;
+    const startedAt = log ? statSync(logFile(root, log)).birthtime.toISOString() : (status.since ?? new Date().toISOString());
     return [{ id: `${t.id}:${agent}:${attempt}`, task: t.id, title: t.title, repo: t.repo, agent, attempt, startedAt, phase: feed?.phase ?? 'setup', phaseAt: startedAt, toolCalls: feed?.summary.toolCalls ?? 0, log, inferred: true, lastMessage: feed?.lastMessage }];
   });
 }
@@ -95,7 +95,7 @@ export function passLog(root: string, task: string, agent: AgentName, attempt: n
   const days = startedAt ? [startedAt.slice(0, 10)] : [0, 1].map((back) => new Date(Date.now() - back * 86_400_000).toISOString().slice(0, 10));
   for (const day of days) {
     const rel = join('runs', 'logs', day, `${task}-${agent}-${attempt}.log`);
-    if (existsSync(join(root, rel))) return rel;
+    if (existsSync(logFile(root, rel))) return rel;
   }
   return undefined;
 }
@@ -105,14 +105,14 @@ export function mapModel(root: string, plan: Plan, events: LedgerEvent[], config
   const quota = loadQuota(paths(root).agentsState, now);
   const status = loopStatus(root, events);
   const agents = mapAgents(config, quota, passesNow(root, plan, status), now);
-  return { ...computeMap(plan, { now, passHours: meanPassHours(events), agents, mode: status.mode }), lanes: Object.keys(config.repos) };
+  return { ...computeMap(plan, { now, passHours: meanPassHours(events), agents, mode: status.mode }), lanes: Object.keys(config.repos), product: projectInfo(config).name, owner: projectInfo(config).owner };
 }
 
 // taskHistory reads the plan's git history; it changes only when a task file is added or removed.
 let history: { root: string; at: number; value: [number, number][] } | undefined;
 export function metricsModel(root: string, plan: Plan, events: LedgerEvent[], config: Config, now = Date.now()): MetricsModel {
   if (!history || history.root !== root || now - history.at > 5 * 60_000) history = { root, at: now, value: taskHistory(root) };
-  const model = buildMetrics({ events, plan, now, history: history.value });
+  const model = buildMetrics({ events, plan, now, history: history.value, timeZone: projectInfo(config).timezone, product: projectInfo(config).name });
   return { ...model, versions: readVersions(paths(root).metrics), versionEvery: config.metrics_every_passes };
 }
 
@@ -253,7 +253,7 @@ export function appState(root: string, snap: Snapshot, config: Config, opts: { d
   });
   const threads = allThreads(p.threads);
   for (const t of threads) {
-    if (t.waitingOn === 'daniel') inbox.push({ id: `thread:${t.key}:${t.messages.length}`, kind: 'thread', title: `The steward answered on ${t.target}`, detail: t.messages.at(-1)?.text.slice(0, 200), thread: t.key, at: t.messages.at(-1)?.at });
+    if (t.waitingOn === 'owner') inbox.push({ id: `thread:${t.key}:${t.messages.length}`, kind: 'thread', title: `The steward answered on ${t.target}`, detail: t.messages.at(-1)?.text.slice(0, 200), thread: t.key, at: t.messages.at(-1)?.at });
   }
 
   return {

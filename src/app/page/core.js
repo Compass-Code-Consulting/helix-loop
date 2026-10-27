@@ -88,8 +88,18 @@
   HX.BADGE = { claude: 'C', codex: 'X' };
   HX.PHASE = { setup: 'setting up', agent: 'working', gate: 'gating', merge: 'merging' };
   HX.LEVEL = { cautious: 'Cautious', prudent: 'Prudent', intrepid: 'Intrepid', yolo: 'YOLO' };
-  HX.LANE_COLOR = { 'mushy-social-media': 'var(--lane-social)', 'mushy-website': 'var(--lane-website)', 'mushy-docs': 'var(--lane-docs)', 'mushy-support-n-engineering': 'var(--lane-support)' };
-  HX.laneShort = (l) => (l ?? '').replace(/^mushy-/, '');
+  // The project's names and lanes, from the server's state: the owner who steers, the product, and the repos in
+  // the TaskSet's order, coloured from the palette in that order and named without the prefix they all share.
+  HX.owner = () => S.state?.project?.owner ?? 'You';
+  HX.product = () => S.state?.project?.name ?? '';
+  const lanes = () => S.state?.lanes ?? [];
+  HX.laneColor = (l) => (lanes().includes(l) ? `var(--lane-${lanes().indexOf(l) % 6})` : null);
+  HX.laneShort = (l) => {
+    const all = lanes();
+    const prefix = all.length > 1 ? all.reduce((p, x) => { while (!x.startsWith(p)) p = p.slice(0, -1); return p; }) : '';
+    const cut = prefix.slice(0, prefix.lastIndexOf('-') + 1);
+    return (l ?? '').startsWith(cut) ? (l ?? '').slice(cut.length) : (l ?? '');
+  };
   HX.badge = (agent, big = false) => h('b', { class: `badge${big ? ' big' : ''}`, title: HX.AGENT[agent] ?? agent }, HX.BADGE[agent] ?? '?');
   // Times that tick: any element with data-since shows how long ago, refreshed every second.
   setInterval(() => {
@@ -97,7 +107,7 @@
   }, 1000);
   HX.ticker = (iso, fmt) => h('span', { 'data-since': iso, 'data-fmt': fmt }, (fmt === 'clock' ? F.clockDur : F.dur)(Date.now() - Date.parse(iso)));
 
-  // ---- storage: this viewer's conveniences in localStorage; the layout Daniel leaves in runs/app.yaml ----
+  // ---- storage: this viewer's conveniences in localStorage; the layout the owner leaves in .helix/app.yaml ----
   HX.store = {
     get: (k) => {
       try {

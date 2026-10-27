@@ -169,8 +169,8 @@ test('metrics: each version is left as written, and the shared list and the inde
   const plan = planOf(Array.from({ length: 250 }, (_, i) => task(`T-${String(i + 1).padStart(4, '0')}`)));
   const first = writeVersion(dir, buildMetrics({ events: events(100), plan, now: T0 + 3 * HOUR }), 100);
   const second = writeVersion(dir, buildMetrics({ events: events(200), plan, now: T0 + 30 * HOUR }), 100);
-  assert.equal(first.file, 'Mushy.LoopEngineering.Metrics.2026-10-24.0100.html');
-  assert.equal(second.file, 'Mushy.LoopEngineering.Metrics.2026-10-25.0200.html');
+  assert.equal(first.file, 'Metrics.2026-10-24.0100.html');
+  assert.equal(second.file, 'Metrics.2026-10-25.0200.html');
   const frozen = readFileSync(join(dir, first.file), 'utf8');
   const embedded = (html: string) => JSON.parse(/<script type="application\/json" id="data">(.*?)<\/script>/s.exec(html)![1]!) as { file: string; versions: { file: string }[]; versionEvery: number };
   assert.deepEqual(embedded(frozen).versions.map((v) => v.file), [first.file]);

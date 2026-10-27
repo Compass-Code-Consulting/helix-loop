@@ -8,7 +8,7 @@ import { hashToken, LiveBoard, newToken } from './live.ts';
 import { describePace, loadQuota, loopMode, mapAgents, markAvailable, markLimited, overBudget, paceSlots, rollDay, saveQuota, helixSpentUsd, type Pace, type QuotaState } from './agents/quota.ts';
 import type { Clock } from './clock.ts';
 import { suspensionWatch } from './clock.ts';
-import { repoConfig, weeklyTargets, type Config, type Paths } from './config.ts';
+import { asset, gitAuthor, productEnv, projectInfo, repoConfig, weeklyTargets, type Config, type Paths } from './config.ts';
 import { commitLeftovers, runGate, type GateStep } from './gate.ts';
 import { addWorktree, branchFor, commitsAhead, ensureUnionMerge, git, gitOk, head, removeWorktree } from './git.ts';
 import { compress, meanPassHours, readLedger, record, type LedgerEvent, type PassPhases } from './ledger.ts';
@@ -94,7 +94,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
     problems.push(...validateGraph(plan), ...validateRepos(plan, config.repos), ...validateState(plan), ...validateReleaseHolds(plan, config.release.hold_until));
     if (problems.length) {
       for (const x of problems.slice(0, 30)) log(`plan: ${x.id}: ${x.message}`);
-      notify('Mushy loop', `Plan is invalid (${problems.length} problems). Run: mushy-loop validate`);
+      notify('The loop', `Plan is invalid (${problems.length} problems). Run: helix-loop validate`);
       return finish(EXIT.harnessError, `plan invalid: ${problems.length} problems`);
     }
     const index = loadIndex(p.specIndex);
@@ -171,7 +171,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
     let passCount = readLedger(p.ledger).filter((e) => e.kind === 'pass').length;
     const writeMetrics = () => {
       try {
-        const v = writeVersion(p.metrics, buildMetrics({ events: readLedger(p.ledger), plan: ctx.plan, now: clock.now(), history: taskHistory(config.root), targets: weeklyTargets(config) }), every);
+        const v = writeVersion(p.metrics, buildMetrics({ events: readLedger(p.ledger), plan: ctx.plan, now: clock.now(), history: taskHistory(config.root), targets: weeklyTargets(config), timeZone: projectInfo(config).timezone, product: projectInfo(config).name }), every);
         log(`metrics: wrote ${v.file}, after ${v.passes} passes`);
       } catch (e) {
         log(`metrics: ${(e as Error).message}`);
@@ -187,7 +187,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
     }
     if (config.push) await syncAtStart(ctx);
 
-    // Rewrites the dependency map. Atomic (temp file, then rename), because Daniel keeps it open in his
+    // Rewrites the dependency map. Atomic (temp file, then rename), because the owner keeps it open in their
     // editor. `finished`: a task whose pass is ending, shown as no longer held.
     const refreshMap = (finished?: string) => {
       try {
@@ -275,8 +275,8 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
         ].join('; ');
         record(p.ledger, { kind: 'mode', at: iso(now), mode, detail: detail || undefined });
         log(`mode: ${mode}${detail ? ` (${detail})` : ''}`);
-        if (mode === 'paused') notify('Mushy loop paused', `Neither agent can take work: ${detail}`);
-        if (lastMode === 'paused') notify('Mushy loop resumed', `Running ${mode}.`);
+        if (mode === 'paused') notify('The loop paused', `Neither agent can take work: ${detail}`);
+        if (lastMode === 'paused') notify('The loop resumed', `Running ${mode}.`);
         lastMode = mode;
         refreshMap();
       }
@@ -300,7 +300,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
         }
         if (!anyWork) {
           refreshMap();
-          notify('Mushy loop', 'Every task is done.');
+          notify('The loop', 'Every task is done.');
           return finish(EXIT.allDone);
         }
         const unavailable = enabled.filter((a) => !available[a]);
@@ -314,7 +314,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
           // An agent left with nothing to take while the other is out is worth a look: the build may be
           // waiting on one task only the other agent may try.
           if (idle.length && wake - clock.now() > 30 * 60_000) {
-            notify('Mushy loop idle', `${idle.join(' and ')} has nothing it can take until ${unavailable.join(' and ')} is back at ${new Date(wake).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}.`);
+            notify('The loop is idle', `${idle.join(' and ')} has nothing it can take until ${unavailable.join(' and ')} is back at ${new Date(wake).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}.`);
           }
           // A stop file ends the wait too, so a restart doesn't wait for the reset.
           const woke = new AbortController();
@@ -329,7 +329,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
         const why = diverged.length
           ? `main has diverged from origin/main in ${diverged.join(', ')}; reconcile it, then run the loop again`
           : onlyHumanWorkLeft(plan) ? 'only work that needs a person is left' : 'no task is ready (blocked, or its stage is not open)';
-        notify('Mushy loop needs you', why);
+        notify('The loop needs you', why);
         return finish(EXIT.onlyHumanWork, why);
       }
 
@@ -352,7 +352,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
     }
   } catch (e) {
     log(`harness error: ${(e as Error).stack ?? e}`);
-    notify('Mushy loop stopped', `Harness error: ${(e as Error).message}`);
+    notify('The loop stopped', `Harness error: ${(e as Error).message}`);
     return finish(EXIT.harnessError, (e as Error).message);
   }
 }
@@ -390,7 +390,7 @@ function sourceStamp(p: Paths): string {
 function mapModel(ctx: PassContext, running: Running[], mode: LoopMode): MapModel {
   const { config, clock, paths: p } = ctx.deps;
   const agents = mapAgents(config, ctx.quota, running.map((r) => ({ agent: r.agent, task: r.task.id })), clock.now());
-  return { ...computeMap(ctx.plan, { now: clock.now(), passHours: meanPassHours(readLedger(p.ledger)), agents, mode }), lanes: Object.keys(config.repos) };
+  return { ...computeMap(ctx.plan, { now: clock.now(), passHours: meanPassHours(readLedger(p.ledger)), agents, mode }), lanes: Object.keys(config.repos), product: projectInfo(config).name, owner: projectInfo(config).owner };
 }
 
 // The earliest time one of these unavailable agents can work again.
@@ -429,9 +429,9 @@ function notePace(ctx: PassContext, agent: AgentName, pace: Pace, now: number): 
 }
 
 // A repo whose main has diverged from origin/main takes no merges, releases or new tasks: their passes
-// would only be refused at the merge. Daniel hears about it once.
+// would only be refused at the merge. the owner hears about it once.
 function holdDiverged(ctx: PassContext, repo: string, detail: string): void {
-  if (!ctx.diverged.has(repo)) ctx.deps.notify(`Mushy: ${repo} has diverged from origin`, 'Its merges, releases and tasks wait until main and origin/main agree. Details in runs/runs.jsonl.');
+  if (!ctx.diverged.has(repo)) ctx.deps.notify(`${repo} has diverged from origin`, 'Its merges, releases and tasks wait until main and origin/main agree. Details in runs/runs.jsonl.');
   ctx.diverged.set(repo, detail);
 }
 
@@ -491,7 +491,7 @@ async function probe(ctx: PassContext, agent: AgentName): Promise<void> {
 
 // Builders run only on the CLI's subscription sign-in, never an API key (DECISIONS.md, 2026-10-25). The CLI
 // is asked how it is signed in when the loop starts and then every ten minutes of real time; an agent signed in
-// any other way takes no task, and Daniel hears about it once per change. A check that cannot tell counts as
+// any other way takes no task, and the owner hears about it once per change. A check that cannot tell counts as
 // not on a subscription: a stalled agent is visible, a runaway bill is not.
 const SIGN_IN_RECHECK_MS = 10 * 60_000;
 
@@ -508,7 +508,7 @@ async function onSubscription(ctx: PassContext, agent: AgentName): Promise<boole
       : `${agent} is not signed in with its subscription (${s.method}${s.detail ? `: ${s.detail}` : ''}); it takes no tasks until it is, since builders never run on an API key`;
     record(p.ledger, { kind: 'warning', at: iso(clock.now()), detail });
     log(detail);
-    if (!s.subscription) notify('Mushy loop needs you', `Sign ${agent} in with its subscription: it is ${s.method}.`);
+    if (!s.subscription) notify('The loop needs you', `Sign ${agent} in with its subscription: it is ${s.method}.`);
   }
   return s.subscription;
 }
@@ -547,8 +547,8 @@ function reportedIssues(file: string, passId: string): string[] {
 // Every builder process (passes and probes) starts from the loop's environment cleaned of what a parent
 // session would leak (builderEnv), so starting the loop from a Claude Code session is safe.
 function agentEnv(clock: Clock, extra?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  // MUSHY_LOOP_NOW lets the dry run's fake CLIs share the loop's (virtual) clock.
-  return { ...builderEnv(process.env), ...extra, MUSHY_LOOP_NOW: String(clock.now()) };
+  // HELIX_LOOP_NOW lets the dry run's fake CLIs share the loop's (virtual) clock.
+  return { ...builderEnv(process.env), ...extra, HELIX_LOOP_NOW: String(clock.now()) };
 }
 
 // Ends a pass's claim: records the attempt, moves the task on, and sets its summary for the map. An
@@ -565,7 +565,7 @@ function release(ctx: PassContext, task: Task, agent: AgentName, outcome: Attemp
     task.summary = clipSummary(task.status === 'needs_human' ? `blocked after ${spent}: ${summary}` : summary);
   }
   writeTask(p.tasks, task);
-  if (task.status === 'needs_human') ctx.deps.notify('Mushy task needs you', `${task.id}: ${task.title}`);
+  if (task.status === 'needs_human') ctx.deps.notify('A task needs you', `${task.id}: ${task.title}`);
 }
 
 // What a pass did, in a few words: the merged commit's subject without its task id, or what failed.
@@ -766,7 +766,7 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
     let prompt: string;
     try {
       // The last failure that counted against the task. Interruptions (a session limit, a suspension, a
-      // transient error, an origin that diverged) say nothing about the code, and their notes are for Daniel.
+      // transient error, an origin that diverged) say nothing about the code, and their notes are for the owner.
       const last = task.attempts.filter((a) => a.outcome !== 'merged' && !UNCOUNTED_OUTCOMES.includes(a.outcome)).pop();
       const input = { template: ctx.template, task, index: ctx.index, sectionsDir: p.specSections, budgetBytes: config.limits.prompt_budget_bytes };
       prompt = renderPrompt({ ...input, retryLog: last?.note, carried });
@@ -779,14 +779,14 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
       task.summary = clipSummary(`blocked: ${firstLine(e.message)}`);
       task.claimed_by = null;
       writeTask(p.tasks, task);
-      deps.notify('Mushy task needs you', e.message);
+      deps.notify('A task needs you', e.message);
       return;
     }
 
     const inv = adapter.invocation(role, worktree, prompt, await passMcp(ctx, mcpToken));
     const slept = suspensionWatch(clock, config.limits.suspension_threshold_seconds * 1000);
     const e2eEnv = ctx.runner && passId
-      ? { MUSHY_E2E_CLIENT: join(config.root, 'harness', 'clients', 'e2e-client.mjs'), MUSHY_E2E_RUNNER: ctx.runner.url, MUSHY_E2E_PASS: passId }
+      ? productEnv(config, { E2E_CLIENT: asset('clients', 'e2e-client.mjs'), E2E_RUNNER: ctx.runner.url, E2E_PASS: passId })
       : {};
     phases.setupMs = since(startedMono);
     checkStop();
@@ -851,6 +851,7 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
         task,
         agentLabel: label,
         summary: result.summary,
+        envPrefix: config.env_prefix,
         gateCommand: repoConfig(config, task.repo).gate,
         prepare: repoConfig(config, task.repo).prepare,
         gateTimeoutMs: config.limits.gate_timeout_minutes * 60_000,
@@ -966,7 +967,7 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
   const gz = await compress(logFile).catch(() => logFile);
   const logPath = gz === logFile ? logRel : `${logRel}.gz`;
   const kept = keepBranch ? branch : undefined;
-  // What the builder reported as in its way goes with the attempt, so the next attempt and Daniel see it.
+  // What the builder reported as in its way goes with the attempt, so the next attempt and the owner see it.
   const issues = reportedIssues(p.reports, livePass);
   if (issues.length) note = [note, `The builder reported:\n${issues.join('\n')}`].filter(Boolean).join('\n\n');
   if (blocked) {
@@ -976,7 +977,7 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
     task.claimed_by = null;
     task.notes = [task.notes, `${agent}: ${note}`].filter(Boolean).join('\n\n');
     writeTask(p.tasks, task);
-    deps.notify('Mushy task needs you', `${task.id} is blocked: ${note.slice(8, 200)}`);
+    deps.notify('A task needs you', `${task.id} is blocked: ${note.slice(8, 200)}`);
   } else if (outcome === 'stopped' && stop.request && task.status === 'claimed') {
     // The task goes where the request said, and its note goes into the task's notes for the next builder.
     const asked = stop.request;
@@ -1065,14 +1066,14 @@ async function noteFailure(ctx: PassContext, task: Task, seen: FailureSeen): Pro
   if (tasks.length < 2) return;
   const open = [...ctx.plan.tasks.values()].find((t) => t.status !== 'done' && filedFor(t) === signature);
   if (open) {
-    const again = reopenedFix(open, list, 'America/Chicago');
+    const again = reopenedFix(open, list, projectInfo(ctx.deps.config).timezone);
     if (!again) return;
     writeTask(p.tasks, again);
     ctx.plan.tasks.set(again.id, again);
     ctx.failures.delete(signature);
     log(`🔧 ${again.id} is ready again, fix first: ${again.summary}`);
     record(p.ledger, { kind: 'warning', at: iso(clock.now()), task: again.id, detail: `${again.id} ${again.summary}: ${signature}` });
-    notify('Mushy loop reopened a fix', `${again.id}: ${again.summary}`);
+    notify('The loop reopened a fix', `${again.id}: ${again.summary}`);
     return void (await commitPlan(ctx, `plan: ${again.id} ${again.summary}`, false));
   }
   const knownReq = (r: string) => Boolean(ctx.index.reqs[r]) || [...ctx.plan.tasks.values()].some((t) => t.reqs.includes(r));
@@ -1082,7 +1083,7 @@ async function noteFailure(ctx: PassContext, task: Task, seen: FailureSeen): Pro
     failures: list,
     first: ctx.plan.tasks.get(list[0]!.task) ?? task,
     knownReq,
-    timeZone: 'America/Chicago',
+    timeZone: projectInfo(ctx.deps.config).timezone,
     passMinutes: ctx.deps.config.limits.pass_timeout_minutes,
   });
   if (!fix) return;
@@ -1092,11 +1093,11 @@ async function noteFailure(ctx: PassContext, task: Task, seen: FailureSeen): Pro
   const which = tasks.join(' and ');
   log(`🔧 filed ${fix.id}, fix first: a test failed ${which}: ${signature.slice(0, 160)}`);
   record(p.ledger, { kind: 'warning', at: iso(clock.now()), task: fix.id, detail: `filed ${fix.id} for a test failing ${which}: ${signature}` });
-  notify('Mushy loop filed a fix', `${fix.id}: a test failed ${which}`);
+  notify('The loop filed a fix', `${fix.id}: a test failed ${which}`);
   await commitPlan(ctx, `plan: ${fix.id} filed, fix first, for a test failing ${which}`, false);
 }
 
-// The loop's side of a release; release.ts decides and records it. Logs what happened, tells Daniel
+// The loop's side of a release; release.ts decides and records it. Logs what happened, tells the owner
 // what needs him, and holds a repo found diverged. A release that fails is reported; it never undoes a merge.
 async function tagRelease(ctx: PassContext, repo: string, ids: string[], reason: string): Promise<void> {
   const { config, paths: p, clock, log, notify } = ctx.deps;
@@ -1118,13 +1119,13 @@ async function tagRelease(ctx: PassContext, repo: string, ids: string[], reason:
       if (r.diverged) holdDiverged(ctx, repo, r.diverged);
       if (r.approval?.requested) {
         const { tag, paths } = r.approval.approval;
-        notify('Mushy release needs your approval', `${repo} ${tag} changes ${paths.length === 1 ? paths[0] : `${paths.length} files`} that run with production secrets. See: mushy-loop status`);
+        notify('A release needs your approval', `${repo} ${tag} changes ${paths.length === 1 ? paths[0] : `${paths.length} files`} that run with production secrets. See: helix-loop status`);
       }
     }
   } catch (e) {
     const detail = `release of ${repo} failed: ${(e as Error).message}`;
     record(p.ledger, { kind: 'warning', at: iso(clock.now()), detail });
-    notify('Mushy release failed', detail);
+    notify('A release failed', detail);
     log(`🏷 ${detail}`);
   }
 }
@@ -1161,7 +1162,7 @@ async function stageRelease(ctx: PassContext, stage: string): Promise<boolean> {
 // Planning continues while the loop runs, and every change must validate before it is taken: new task
 // files join the plan; a task the loop isn't running (ready, waiting on a person or parked, and unclaimed)
 // is taken from disk when a person has changed it there, so a task can be revised or handed back without
-// a restart; and human tasks are re-read so Daniel can mark one done. A task in a pass, or done, stays
+// a restart; and human tasks are re-read so the owner can mark one done. A task in a pass, or done, stays
 // as the loop has it, and the loop writes it back when the pass ends.
 const IDLE: readonly TaskStatus[] = ['ready', 'needs_human', 'parked'];
 const idle = (t: Task) => IDLE.includes(t.status) && !t.claimed_by;
@@ -1246,18 +1247,18 @@ async function checkTampering(ctx: PassContext, task: Task, repoDir: string, con
   if (controlAfter !== controlBefore) {
     // Could be the loop engineer editing while the loop runs; recorded and reported, not fatal.
     record(p.ledger, { kind: 'warning', at: iso(clock.now()), task: task.id, detail: `control-plane protected files changed during the pass:\n${controlAfter}` });
-    notify('Mushy loop', `Protected control-plane files changed during ${task.id}; check runs/runs.jsonl.`);
+    notify('The loop', `Protected control-plane files changed during ${task.id}; check runs/runs.jsonl.`);
   }
   if (problems.length) {
     record(p.ledger, { kind: 'warning', at: iso(clock.now()), task: task.id, detail: `tampering: ${problems.join('; ')}` });
-    notify('Mushy loop stopped', `${task.id}: ${problems[0]!.split('\n')[0]}`);
+    notify('The loop stopped', `${task.id}: ${problems[0]!.split('\n')[0]}`);
     ctx.stop(`after ${task.id}: ${problems.join('; ')}`);
   }
 }
 
 // Plan state is progress, and progress lives in git: the control plane commits plan/tasks and plan/human
 // after each merge, and nothing else under plan/. The dependency map (about 390 KB) is rewritten after
-// every pass but committed only as a stage's snapshot when the stage closes; `mushy-loop map`
+// every pass but committed only as a stage's snapshot when the stage closes; `helix-loop map`
 // regenerates it from the plan data at any time.
 async function commitPlan(ctx: PassContext, message: string, withMap: boolean): Promise<void> {
   const { config, paths: p } = ctx.deps;
@@ -1268,7 +1269,7 @@ async function commitPlan(ctx: PassContext, message: string, withMap: boolean): 
   if (!files.length) return;
   await ctx.queue.enqueue('control-plane', async () => {
     await gitOk(root, 'add', '--', ...files);
-    await gitOk(root, '-c', 'user.name=Mushy Loop', '-c', 'user.email=loop@mushymarketing.com', 'commit', '-q', '-m', message, '--', ...files);
+    await gitOk(root, ...gitAuthor(ctx.deps.config), 'commit', '-q', '-m', message, '--', ...files);
   });
 }
 

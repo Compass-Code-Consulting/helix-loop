@@ -7,7 +7,7 @@ import type { AgentName } from '../types.ts';
 
 export interface SignIn {
   subscription: boolean;
-  method: string; // as shown to Daniel: "subscription", "API key", "Console", "signed out", or what the CLI said
+  method: string; // as shown to the owner: "subscription", "API key", "Console", "signed out", or what the CLI said
   detail?: string;
 }
 

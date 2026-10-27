@@ -52,14 +52,14 @@ export function renderDependencyMap(model: MapModel): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Mushy Dependency Map</title>
+<title>${esc(model.product ?? '')} Dependency Map</title>
 <style>${CSS}</style>
 </head>
 <body>
 <div class="wrap">
   <header class="sheet">
     <div class="ttl">
-      <h1>Mushy build: dependency map</h1>
+      <h1>${esc(model.product ?? 'The')} build: dependency map</h1>
       <p class="sub">Every task and human task, placed by its earliest start from the dependency graph. Click a task to see what it waits on and what it unblocks.</p>
     </div>
     <div class="titleblock" aria-label="Sheet details">
@@ -344,7 +344,7 @@ var MODE = {
 };
 var HOUR = 3600e3;
 // Everything drawn from the model, set by load(): the page draws once from its embedded model, and the loop
-// app (when the map is shown inside it) calls window.mushyMap.update with each new model, in place.
+// app (when the map is shown inside it) calls window.helixMap.update with each new model, in place.
 var M, t0, tGen, tFin, nowH, finH, nodes, by, critSet, overdueList, deps, succ, spanH, allEdges;
 function setModel(model){
   M = model;
@@ -371,15 +371,15 @@ function setModel(model){
 }
 // The loop app, when this page is shown inside it: it adds its own sections to the detail panel and hears of
 // selections. Absent (null) when the page is opened on its own.
-var HOST = (function(){ try { return window.parent !== window && window.parent.mushyApp ? window.parent.mushyApp : null; } catch(e){ return null; } })();
+var HOST = (function(){ try { return window.parent !== window && window.parent.helixApp ? window.parent.helixApp : null; } catch(e){ return null; } })();
 function isCrit(n){ return critSet.has(n.id); }
 function lsHours(n){ return n.latestStart ? (Date.parse(n.latestStart) - t0) / HOUR : null; }
 function overdue(n){ return n.kind === "human" && n.status !== "done" && n.latestStart && Date.parse(n.latestStart) < tGen; }
 
 var $ = function(id){ return document.getElementById(id); };
 function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; }
-var store = { get: function(k){ try { return localStorage.getItem("mushy-map:" + k); } catch(e){ return null; } },
-              set: function(k, v){ try { localStorage.setItem("mushy-map:" + k, v); } catch(e){} } };
+var store = { get: function(k){ try { return localStorage.getItem("helix-map:" + k); } catch(e){ return null; } },
+              set: function(k, v){ try { localStorage.setItem("helix-map:" + k, v); } catch(e){} } };
 
 // ---- formatting ----
 function fmtDate(ms, withTime){
@@ -883,7 +883,7 @@ function panel(){
   p.replaceChildren();
   if (!state.sel){
     if (overdueList.length){
-      p.appendChild(el("h2", null, "Waiting on Daniel"));
+      p.appendChild(el("h2", null, "Waiting on a person"));
       p.appendChild(el("p", "note", overdueList.length + " human task" + (overdueList.length === 1 ? " is" : "s are") + " past the latest start that keeps the projected finish. Every hour of delay moves the finish."));
       p.appendChild(linkList(overdueList.map(function(n){ return n.id; }), ""));
     }
@@ -1010,13 +1010,13 @@ function load(model){
 load(JSON.parse(document.getElementById("model").textContent));
 // Start with the snapshot in view when the chart is wider than the viewport.
 if (zoom !== "fit" && isFinite(nowH)) scroller.scrollLeft = Math.max(0, nowH * pph - 80);
-window.mushyMap = {
+window.helixMap = {
   update: load,
   live: function(m){ liveMap = m || Object.create(null); applyLive(); layoutBars(); banner(); },
   select: function(id){ if (id) goTo(id); else if (state.sel) select(null); },
   selected: function(){ return state.sel; }
 };
-if (HOST && HOST.mapReady) HOST.mapReady(window.mushyMap, document);
+if (HOST && HOST.mapReady) HOST.mapReady(window.helixMap, document);
 document.documentElement.dataset.ready = "1";
 })();
 `;

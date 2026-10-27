@@ -33,7 +33,7 @@ function skillFiles(root: string): SkillFile[] {
     }
   };
   walk(skillDir);
-  const schemaDir = join(root, 'plan', 'schema');
+  const schemaDir = join(root, 'schema');
   for (const name of readdirSync(schemaDir).sort()) {
     if (name.endsWith('.json')) files.push({ path: `schema/${name}`, source: join(schemaDir, name) });
   }
