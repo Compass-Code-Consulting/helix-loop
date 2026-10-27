@@ -13,7 +13,7 @@ execFileSync(join(root, 'node_modules', '.bin', 'tsc'), ['-p', join(root, 'tscon
 for (const f of ['page.css', 'page.js']) copyFileSync(join(root, 'src', 'metrics', f), join(dist, 'src', 'metrics', f));
 for (const cli of ['claude', 'codex']) {
   mkdirSync(join(dist, 'fakes'), { recursive: true });
-  writeFileSync(join(dist, 'fakes', cli), readFileSync(join(root, 'fakes', cli), 'utf8').replace('fake-agent.ts', 'fake-agent.js'));
+  writeFileSync(join(dist, 'fakes', cli), readFileSync(join(root, 'fakes', cli), 'utf8').replaceAll('fake-agent.ts', 'fake-agent.js'));
   chmodSync(join(dist, 'fakes', cli), 0o755);
 }
 chmodSync(join(dist, 'bin', 'helix-loop.js'), 0o755);

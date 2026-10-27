@@ -10,7 +10,7 @@
   "files": ["dist/", "src/app/page/", "src/metrics/page.css", "src/metrics/page.js", "schema/", "presets/", "templates/", "skill/", "clients/", "docs/", "README.md"],
   "scripts": {
     "build": "node scripts/build.ts",
-    "prepare": "node scripts/build.ts",
+    "prepack": "node scripts/build.ts",
     "typecheck": "tsc --noEmit -p .",
     "test": "node --test 'test/**/*.test.ts'",
     "docs": "node bin/helix-loop.ts docs",
