@@ -1,3 +1,4 @@
+import { relative } from 'node:path';
 import { describePace, loadQuota, mapAgents, paceSlots } from '../agents/quota.ts';
 import { loadConfig, paths } from '../config.ts';
 import { meanPassHours, readLedger } from '../ledger.ts';
@@ -32,3 +33,9 @@ export function paceLine(root: string, agent: 'claude' | 'codex'): string | unde
 
 // Dates as people read them, in the project's time zone.
 export const when = (ms: number, timeZone?: string) => new Date(ms).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone });
+
+// A path to show: relative when it is under the current folder, else whole.
+export const shown = (file: string) => {
+  const rel = relative(process.cwd(), file);
+  return rel && !rel.startsWith('..') ? rel : file;
+};

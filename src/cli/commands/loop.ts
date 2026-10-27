@@ -23,7 +23,7 @@ import { describeBase, pendingApprovals } from '../../release.ts';
 import { buildStats, formatStats } from '../../stats.ts';
 import { AGENTS } from '../../types.ts';
 import { define, str, UsageError } from '../command.ts';
-import { currentMap, paceLine, when } from '../shared.ts';
+import { currentMap, paceLine, when, shown } from '../shared.ts';
 
 // Running the loop, and seeing where it is.
 
@@ -63,7 +63,7 @@ Exit codes: 0 every task is done, 10 only work that needs a person is left, 3 st
     }
     if (dry) {
       Object.assign(process.env, dry.env);
-      out(`dry run in ${relative(process.cwd(), dry.root)}, with the fake CLIs`);
+      out(`dry run in ${shown(dry.root)}, with the fake CLIs`);
     }
     const agents = str(opts, 'agents');
     if (agents !== undefined) {
@@ -187,7 +187,7 @@ The loop writes one every metrics_every_passes passes on its own and keeps each 
     const info = projectInfo(config);
     const plan = loadPlan(p.tasks, p.human);
     const v = writeVersion(p.metrics, buildMetrics({ events: readLedger(p.ledger), plan, now: Date.now(), history: taskHistory(root), targets: weeklyTargets(config), timeZone: info.timezone, product: info.name }), config.metrics_every_passes ?? VERSION_EVERY);
-    out(relative(process.cwd(), join(p.metrics, v.file)));
+    out(shown(join(p.metrics, v.file)));
   },
 });
 

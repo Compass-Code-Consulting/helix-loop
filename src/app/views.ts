@@ -15,6 +15,7 @@ import { incidents as findIncidents, readStored, type Incident } from './inciden
 import { loopStatus, passesNow, readReports, type PassNow, type Snapshot } from './state.ts';
 import { loadTaskSet } from './taskset.ts';
 import { sortGroups, triage, type Group } from './triage.ts';
+import { PROJECTION_METHOD } from './projection.ts';
 
 // What the redesigned page reads (spec §6), derived from the files on each change: the board for the Map, the
 // groups for Home, a task's whole story, and Helix's record. The server caches one View per root and drops it
@@ -74,7 +75,7 @@ export interface Welcome {
 }
 
 // The summary that leads Home after an hour away (spec §6.2), from the ledger, not a model.
-export function welcome(v: View, last: { at: string; finish?: number; mode?: 'active' | 'auto' } | undefined): Welcome | undefined {
+export function welcome(v: View, last: { at: string; finish?: number; method?: number; mode?: 'active' | 'auto' } | undefined): Welcome | undefined {
   if (!last) return undefined;
   const since = Date.parse(last.at);
   const awayMs = v.at - since;
@@ -88,7 +89,7 @@ export function welcome(v: View, last: { at: string; finish?: number; mode?: 'ac
     mode: last.mode ?? pilotOf(v.config).mode,
     merged,
     failed,
-    finishMovedMs: last.finish ? v.board.finish - last.finish : 0,
+    finishMovedMs: last.finish && last.method === PROJECTION_METHOD ? v.board.finish - last.finish : 0,
     finish: v.board.finish,
     movers: v.groups.filter((g) => (g.finishMs ?? 0) > 6 * HOUR || g.held > 20).slice(0, 2).map((g) => (g.kind === 'your_tasks' ? g.members[0]!.id : g.title)),
   };

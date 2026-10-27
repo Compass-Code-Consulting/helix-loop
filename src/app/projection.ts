@@ -39,13 +39,27 @@ export interface Projection {
   finish: number; // when the last task ends: the last human task too, unless withHuman is off
 }
 
+// When each open human task is expected done: its lead time (half of it once started), counted from when the
+// human tasks it waits on are expected done, since a review can't start before the account it reviews exists.
+// What it waits on in builder work is the projection's to add (project: humanEnd).
+// The projection's method, saved with a finish date so a later date is compared only with one made the same
+// way: when the method changes (2: human tasks in chains, and the last human task ends the project), a finish
+// that moved for that reason is not a slip.
+export const PROJECTION_METHOD = 2;
+
 export function expectedHumanDone(plan: Plan, now: number): Map<string, number> {
   const out = new Map<string, number>();
-  for (const h of plan.human.values()) {
-    if (h.status === 'done') continue;
+  const done = (id: string, seen: Set<string>): number => {
+    const h = plan.human.get(id);
+    if (!h || h.status === 'done' || seen.has(id)) return now;
+    if (out.has(id)) return out.get(id)!;
+    seen.add(id);
     const days = h.status === 'in_progress' ? Math.max(0.5, h.lead_time_days / 2) : Math.max(0.25, h.lead_time_days);
-    out.set(h.id, now + days * 24 * HOUR);
-  }
+    const from = Math.max(now, ...h.blocked_by.filter((d) => plan.human.has(d)).map((d) => done(d, seen)));
+    out.set(id, from + days * 24 * HOUR);
+    return out.get(id)!;
+  };
+  for (const h of plan.human.values()) if (h.status !== 'done') done(h.id, new Set());
   return out;
 }
 
@@ -131,8 +145,9 @@ export function project(input: ProjectionInput): Projection {
     const h = plan.human.get(id);
     if (!h || h.status === 'done' || seen.has(id)) return now;
     seen.add(id);
+    const lead = h.status === 'in_progress' ? Math.max(0.5, h.lead_time_days / 2) : Math.max(0.25, h.lead_time_days);
     const after = Math.max(now, ...h.blocked_by.map((d) => (plan.human.has(d) ? humanEnd(d, seen) : (end.get(d) ?? now))));
-    return Math.max(human.get(id) ?? now, after + ((human.get(id) ?? now) - now));
+    return Math.max(human.get(id) ?? now, after + lead * 24 * HOUR);
   };
   const builders = Math.max(now, ...[...out.values()].map((p) => p.end));
   const finish = input.withHuman === false ? builders : Math.max(builders, ...[...plan.human.keys()].map((id) => humanEnd(id)));

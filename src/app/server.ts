@@ -37,6 +37,7 @@ import { readTaskSetFile } from './taskset.ts';
 import { loadPlan } from '../plan/store.ts';
 import { addComment, addMessage, addReply, allThreads, decide, isTarget, newConversationTarget, readEntries, thread, threadsOf, ThreadError } from './threads.ts';
 import { builderHistory, buildView, helixSummary, mergeBuckets, pilotView, resolvedRecord, taskCommits, welcome, type View } from './views.ts';
+import { PROJECTION_METHOD } from './projection.ts';
 
 // `helix-loop app` (spec §4): one local process serving one live page, its JSON API and change stream, and the
 // MCP endpoints for builders and Helix. It shares only files with the loop, so either can restart without the
@@ -553,7 +554,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         return reply(res, 200, await addSecret(which, body));
       case '/api/home/seen': {
         const s = loadSettings(settingsFile);
-        saveSettings(settingsFile, { ...s, lastHome: { at: new Date().toISOString(), finish: view('real').board.finish, mode: pilotOf(loadConfig(roots.real)).mode } });
+        saveSettings(settingsFile, { ...s, lastHome: { at: new Date().toISOString(), finish: view('real').board.finish, method: PROJECTION_METHOD, mode: pilotOf(loadConfig(roots.real)).mode } });
         return reply(res, 200, { ok: true });
       }
       case '/api/dismiss': {

@@ -10,6 +10,7 @@ import { define, str, UsageError, type Context } from '../command.ts';
 import { referenceMarkdown } from '../help.ts';
 import { COMMANDS } from '../registry.ts';
 import { migrateLegacy } from '../migrate.ts';
+import { shown } from '../shared.ts';
 
 // Starting a project, installing the Helix skill, checking a machine, and the docs generator.
 
@@ -273,7 +274,7 @@ const doctor = define({
       config = loadConfig(root);
       line(true, `config: ${config.project?.name ?? basename(root)}, ${Object.keys(config.repos).length} repos`);
     } catch (e) {
-      line(false, `config: ${(e as Error).message}`, `Fix ${relative(process.cwd(), configPath(root))}.`);
+      line(false, `config: ${(e as Error).message}`, `Fix ${shown(configPath(root))}.`);
       return 1;
     }
     for (const a of ['claude', 'codex'] as const) if (config.agents[a].enabled && !which(config.agents[a].command)) line(false, `${a} is enabled but \`${config.agents[a].command}\` isn't on the PATH`, `Install it, or set agents.${a}.enabled: false.`);
@@ -284,7 +285,7 @@ const doctor = define({
       line(!!head, `repo ${r}${head ? ` (main at ${head.slice(0, 7)})` : ''}`, existsSync(dir) ? `${dir} has no main branch.` : `Clone it: git clone <url> ${relative(process.cwd(), dir)}`);
     }
     line(existsSync(p.spec) ? (existsSync(p.specIndex) ? true : false) : 'warn', existsSync(p.spec) ? `spec: ${basename(p.spec)}` : 'no spec yet', existsSync(p.spec) ? 'Index it: `helix-loop spec index`.' : 'Write one with the Helix skill (/helix spec), into .helix/spec/.');
-    line(existsSync(join(p.prompts, 'build.md')), 'build prompt', `Copy ${asset('templates', 'prompts', 'build.md')} to ${relative(process.cwd(), join(p.prompts, 'build.md'))}.`);
+    line(existsSync(join(p.prompts, 'build.md')), 'build prompt', `Copy ${asset('templates', 'prompts', 'build.md')} to ${shown(join(p.prompts, 'build.md'))}.`);
     out(bad ? `\n${bad} problem${bad === 1 ? '' : 's'}.` : '\nReady. `helix-loop validate` checks the plan itself.');
     return bad ? 1 : 0;
   },

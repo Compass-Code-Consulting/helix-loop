@@ -57,7 +57,7 @@ export async function migrateLegacy(root: string, opts: MigrateOptions, out: (s?
     return false;
   }
   const git = existsSync(join(root, '.git'));
-  const tracked = new Set(git ? execFileSync('git', ['ls-files'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }).toString().split('\n').filter(Boolean) : []);
+  const tracked = new Set(git ? execFileSync('git', ['-c', 'core.quotePath=false', 'ls-files', '-z'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }).toString().split('\0').filter(Boolean) : []);
   const isTracked = (rel: string) => tracked.has(rel) || [...tracked].some((f) => f.startsWith(`${rel}/`));
   const moves: Move[] = [];
   const move = (from: string, to: string) => {
@@ -124,7 +124,9 @@ export async function migrateLegacy(root: string, opts: MigrateOptions, out: (s?
     for (const r of readdirSync(repos)) {
       if (!existsSync(join(repos, r, '.git'))) continue;
       const mine = existsSync(trees) ? readdirSync(trees).map((t) => join(trees, t)).filter((t) => existsSync(join(t, '.git')) && readFileSync(join(t, '.git'), 'utf8').includes(`/repos/${r}/.git/worktrees/`)) : [];
-      spawnSync('git', ['worktree', 'repair', ...mine], { cwd: join(repos, r) });
+      // Only the worktrees that moved, named: with no paths, repair would follow the repo's records to wherever
+      // they point, and a copy of a control plane would re-point the original's worktrees at itself.
+      if (mine.length) spawnSync('git', ['worktree', 'repair', ...mine], { cwd: join(repos, r) });
       spawnSync('git', ['worktree', 'prune'], { cwd: join(repos, r) });
     }
   }

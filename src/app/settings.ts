@@ -10,7 +10,7 @@ import { AGENTS, type AgentName } from '../types.ts';
 export interface AppSettings {
   helix?: { assistant?: AgentName; monitor?: AgentName };
   dismissed?: string[]; // items the owner dismissed on Home
-  lastHome?: { at: string; finish?: number; mode?: 'active' | 'auto' }; // the last time he looked at Home
+  lastHome?: { at: string; finish?: number; method?: number; mode?: 'active' | 'auto' }; // the last time he looked at Home
   ui?: Record<string, string | number | boolean>; // panel widths and toggles: the task column, Wrap, folds
 }
 

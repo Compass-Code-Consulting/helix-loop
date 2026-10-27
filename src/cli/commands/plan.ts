@@ -16,7 +16,7 @@ import { atomicWrite, loadPlan, writeTask } from '../../plan/store.ts';
 import { validateCoverage, validateGraph, validatePrompts, validateReleaseHolds, validateRepos, validateSchemas, validateState } from '../../plan/validate.ts';
 import { loadIndex, writeIndex } from '../../spec/index.ts';
 import { define, UsageError } from '../command.ts';
-import { currentMap } from '../shared.ts';
+import { currentMap, shown } from '../shared.ts';
 
 // The spec and the TaskSet: indexing the spec, checking the plan, writing its documents, and bringing a TaskSet
 // written with the Helix skill into the project.
@@ -103,7 +103,7 @@ The app and Helix run this after every plan change; never edit those files by ha
     atomicWrite(p.implementationPlan, renderImplementationPlan(plan, map, loadIndex(p.specIndex), synthetic, loadTaskSet(root, plan), info));
     atomicWrite(p.humanPlan, renderHumanPlan(plan, map, info));
     atomicWrite(p.map, renderDependencyMap(map));
-    for (const f of [p.implementationPlan, p.humanPlan, p.map]) out(relative(process.cwd(), f));
+    for (const f of [p.implementationPlan, p.humanPlan, p.map]) out(shown(f));
   },
 });
 
@@ -115,7 +115,7 @@ const map = define({
   run({ root, out }) {
     const p = paths(root);
     atomicWrite(p.map, renderDependencyMap(currentMap(root)));
-    out(relative(process.cwd(), p.map));
+    out(shown(p.map));
   },
 });
 
@@ -222,7 +222,7 @@ async function importTaskSet(root: string, from: string, mode: { apply: boolean;
   for (const id of diff.human.added) cpSync(join(base, 'human', `${id}.yaml`), join(tp.human, `${id}.yaml`));
   if (file) writeTaskSetFile(target, file);
   if (mode.dry) {
-    out(`Written into the dry run in ${relative(process.cwd(), target)}. Start it with \`helix-loop run --dry-run\` or from the app.`);
+    out(`Written into the dry run in ${shown(target)}. Start it with \`helix-loop run --dry-run\` or from the app.`);
     return 0;
   }
   const git = existsSync(join(root, '.git'));

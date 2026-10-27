@@ -110,6 +110,10 @@ test('code complete leaves out human tasks\' lead times that project complete co
   const after = buildBoard({ plan: launch, events: [] as LedgerEvent[], taskset: loadTaskSet(mkdtempSync(join(tmpdir(), 'helix-ts-')), launch), agents: [], running: [], config, now: NOW });
   assert.ok(after.finish - NOW >= 3 * 24 * HOUR, 'project complete waits for the review step');
   assert.ok(after.codeFinish! - NOW < 24 * HOUR, 'code complete does not');
+  // Human tasks in a chain wait for each other: a review of an account that takes 10 days to open, itself 5 days.
+  const chain = planOf([task({ id: 'T-0001', blocked_by: ['HT-2'] })], [human({ id: 'HT-1', lead_time_days: 10 }), human({ id: 'HT-2', lead_time_days: 5, blocked_by: ['HT-1'] })]);
+  const chained = buildBoard({ plan: chain, events: [] as LedgerEvent[], taskset: loadTaskSet(mkdtempSync(join(tmpdir(), 'helix-ts-')), chain), agents: [], running: [], config, now: NOW });
+  assert.ok(chained.tasks.find((t) => t.id === 'T-0001')!.start! - NOW >= 15 * 24 * HOUR, 'the builder task starts after the whole chain');
 
   const root = controlPlane(tasks, humans);
   writeFileSync(paths(root).taskset, stringify({ version: 1, timelines: ['project'], lanes: { 'acme-app': { repo: 'acme-app', epics: { core: { title: 'The core' } } } } }));
