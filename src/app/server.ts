@@ -715,8 +715,8 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         return reply(res, 200, { ok: true });
       }
       case '/api/taskset/init':
-        if (readTaskSetFile(roots.real)) throw new HttpError(409, 'plan/taskset.yaml exists already');
-        return reply(res, 200, cliJob('real', 'Write the TaskSet: one epic per repo, feature and stage', ['taskset', 'init']));
+        if (readTaskSetFile(roots.real)) throw new HttpError(409, '.helix/plan/taskset.yaml exists already');
+        return reply(res, 200, cliJob('real', 'Write the TaskSet: one epic per lane and feature', ['taskset', 'init']));
       case '/api/taskset/import': {
         const from = String(body.path ?? '').replace(/^~(?=\/)/, process.env.HOME ?? '~');
         if (!/^\/[\w ./@-]+$/.test(from) || from.includes('..')) throw new HttpError(400, 'an absolute path to a TaskSet folder or zip');
@@ -950,7 +950,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
       checks: [
         file
           ? { ok: !v.board.missingEpics.length, text: v.board.missingEpics.length ? `${v.board.missingEpics.length} tasks name no declared epic` : 'Every task sits in a lane and an epic' }
-          : { ok: false, warn: true, text: 'Epics are derived from feature and stage until plan/taskset.yaml is written' },
+          : { ok: false, warn: true, text: 'Epics are derived from each task\'s feature until .helix/plan/taskset.yaml is written' },
         { ok: !problems.some((p) => /cycle/i.test(p.message)), text: `No dependency cycles; ${v.board.criticalPath.length} tasks on the critical path` },
         { ok: !problems.some((p) => /requirement/i.test(p.message)), text: 'Every requirement maps to at least one task' },
         { ok: tooBig === 0, warn: tooBig > 0, text: tooBig ? `${tooBig} open tasks are estimated at more than one pass` : 'Every task fits one pass' },

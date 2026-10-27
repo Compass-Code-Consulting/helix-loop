@@ -195,7 +195,7 @@
       })),
       HX.btn('Apply from the next pass', HX.act(async () => {
         const changes = pending.map(([key, value]) => ({ key, value }));
-        const ok = await HX.confirm('Apply to harness/config.yaml', [h('div', { class: 'mono small' }, pending.map(([k, v]) => h('div', null, `${k}: ${fmtVal(c.controls.find((x) => x.key === k), v)}`))), h('p', { class: 'muted' }, 'Written into the file with its comments kept, checked as the loop loads it, and committed. The loop reads it at the start of its next round; nothing in flight is cut short.')], 'Apply');
+        const ok = await HX.confirm('Apply to .helix/config.yaml', [h('div', { class: 'mono small' }, pending.map(([k, v]) => h('div', null, `${k}: ${fmtVal(c.controls.find((x) => x.key === k), v)}`))), h('p', { class: 'muted' }, 'Written into the file with its comments kept, checked as the loop loads it, and committed. The loop reads it at the start of its next round; nothing in flight is cut short.')], 'Apply');
         if (!ok) return;
         await HX.post('/api/config/apply', { changes });
         X.pending.clear();
@@ -204,7 +204,7 @@
     const jobs = [...S.jobs.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 6);
     return h('div', { style: { minHeight: '100%', display: 'flex', flexDirection: 'column' } },
       h('div', { class: 'page stack lg', style: { flex: 1, maxWidth: '1300px' } },
-        head('Loop controls', ['What the loop runs with right now. Values come from ', h('span', { class: 'mono' }, 'harness/config.yaml'), '; changes here are written back to it.'], find),
+        head('Loop controls', ['What the loop runs with right now. Values come from ', h('span', { class: 'mono' }, '.helix/config.yaml'), '; changes here are written back to it.'], find),
         runStrip,
         X.cards,
         jobs.length ? h('div', { class: 'stack' }, h('h6', { class: 'cap' }, 'Commands'), jobs.map(jobCard)) : null),
@@ -395,7 +395,7 @@
           h('div', { class: 'levelcost' }, h('span', { class: x.capped ? 't-warn' : '' }, PER_DAY(x)), h('span', { class: 'small muted' }, x.capped ? 'its cap: it would stop early' : 'at today’s pace')),
           h('div', { class: 'small muted' }, `${MODEL(x.model)} · ${x.effort} · ${F.plural(x.turns, 'turn')}${x.heartbeats ? `, ${x.heartbeats} on the clock` : ''}`)))),
         h('p', { class: 'small muted', style: { margin: 0 } }, `What each level would have spent on ${HX.AGENT[est.agent]} over the loop’s last 24 hours (${F.plural(est.passes, 'pass', 'passes')}, ${est.issues ? F.plural(est.issues, 'builder issue') : 'no builder issues'}), at list price${est.levels.every((x) => x.measured) ? '' : '; a turn’s cost is estimated until the monitor has run on that model'}. Whatever the level, what you ask for runs: a human task done, Ask Helix to revise, Run a turn now.`)),
-      h('div', { class: 'stack' }, h('h6', { class: 'cap' }, 'Prompts'), h('p', { class: 'small muted', style: { margin: 0 } }, 'A preset per role and level, shipped with the app. An edit is saved beside its preset (harness/helix/prompts/<name>.local.md, in git) until you reset it.'),
+      h('div', { class: 'stack' }, h('h6', { class: 'cap' }, 'Prompts'), h('p', { class: 'small muted', style: { margin: 0 } }, 'A preset per role and level, shipped with the app. An edit is saved beside its preset (.helix/helix/prompts/<name>.local.md, in git) until you reset it.'),
         d.prompts.map((p) => {
           const ta = h('textarea', { class: 'input mono', rows: 6 });
           ta.value = X.drafts[`prompt:${p.name}`] ?? p.text;
@@ -456,8 +456,8 @@
             h('div', { class: 'row' }, h('b', { style: { fontSize: '15px', fontWeight: 500 } }, 'This loop’s TaskSet'), okTag(!t.problems, false, t.problems ? `${t.problems} problems` : '✓ valid'), h('span', { class: 'grow' }), h('span', { class: 'mono small muted' }, 'plan/')),
             h('div', { class: 'stat5' }, [[t.lanes, 'lanes'], [t.epics, 'epics'], [t.tasks, 'tasks'], [t.human, 'human tasks'], [t.deps, 'dependencies']].map(([v, l]) => h('div', null, h('div', { class: 'v' }, F.n(v)), h('div', { class: 'small muted' }, l)))),
             h('div', { class: 'stack', style: { gap: '3px' } }, t.checks.map((c) => h('div', { class: 'row top' }, h('span', { class: c.ok ? 't-ok' : c.warn ? 't-warn' : 't-crit' }, c.ok ? '✓' : '!'), h('span', { class: 'soft' }, c.text)))),
-            t.file ? null : h('div', { class: 'row' }, HX.btn('Write plan/taskset.yaml', HX.act(async () => {
-              if (!(await HX.confirm('Write the TaskSet', [h('p', null, 'Writes plan/taskset.yaml with one epic per repo, feature and stage, and sets each task’s epic, in the real plan. Rename and merge epics afterwards by hand.'), h('p', { class: 'mono small' }, 'helix-loop taskset init')], 'Write it'))) return;
+            t.file ? null : h('div', { class: 'row' }, HX.btn('Write .helix/plan/taskset.yaml', HX.act(async () => {
+              if (!(await HX.confirm('Write the TaskSet', [h('p', null, 'Writes .helix/plan/taskset.yaml with one epic per lane and feature, and sets each task’s epic, in the real plan. Rename and merge epics afterwards by hand.'), h('p', { class: 'mono small' }, 'helix-loop taskset init')], 'Write it'))) return;
               await HX.post('/api/taskset/init');
             })), h('span', { class: 'small muted' }, 'helix-loop taskset init'))),
           h('div', { class: 'outline pad stack' },

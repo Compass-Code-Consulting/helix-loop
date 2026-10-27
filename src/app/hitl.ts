@@ -5,9 +5,9 @@ import { FEEDBACK_KINDS, paths, type ActiveLevel, type AutoLevel, type Config, t
 import { atomicWrite } from '../plan/store.ts';
 
 // Pilot mode (spec §7): who resolves the decisions the loop would put to a person. On Active pilot the owner is at
-// his desk and Helix brings him what his level asks for; on Auto-pilot Helix resolves what it can and parks the
+// their desk and Helix brings them what their level asks for; on Auto-pilot Helix resolves what it can and parks the
 // rest. The decision table is data (config `pilot.table` overrides the default below), the rules the owner's
-// ratings taught Helix override the table (harness/helix/rules.yaml), and the floors override everything.
+// ratings taught Helix override the table (.helix/helix/rules.yaml), and the floors override everything.
 
 // The kinds of request the table knows, in the order the page lists them.
 export const REQUESTS = [
@@ -68,7 +68,7 @@ export function columnOf(pilot: PilotConfig): Column {
   return pilot.auto_level === 'yolo' ? 'yolo' : 'intrepid_auto';
 }
 
-// ---- rules learned from ratings: harness/helix/rules.yaml, in git ----
+// ---- rules learned from ratings: .helix/helix/rules.yaml, in git ----
 
 export interface Rule {
   id: string; // R-1

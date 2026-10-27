@@ -1,5 +1,5 @@
 // The Helix tab (spec §6.6): where the owner reviews Helix's work. What it resolved on their behalf, the fixes waiting
-// for him, the incidents and every change that can still be undone, and his conversations with it.
+// for them, the incidents and every change that can still be undone, and their conversations with it.
 (() => {
   'use strict';
   const { h, fill, F, S } = HX;

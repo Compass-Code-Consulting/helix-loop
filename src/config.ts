@@ -70,7 +70,7 @@ export interface Config {
   // only while the app answers there.
   app?: { port: number };
   // Who decides the decisions the loop would put to a person (app/hitl.ts): the owner at their desk (active), or
-  // Helix while he is away (auto), and how much reaches him at each.
+  // Helix while they are away (auto), and how much reaches them at each.
   pilot?: Partial<PilotConfig>;
   // Where each kind of builder feedback goes (app/hitl.ts feedbackRule), with per-lane overrides.
   feedback?: FeedbackConfig;

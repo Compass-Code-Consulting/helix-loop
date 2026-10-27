@@ -1098,7 +1098,7 @@ async function noteFailure(ctx: PassContext, task: Task, seen: FailureSeen): Pro
 }
 
 // The loop's side of a release; release.ts decides and records it. Logs what happened, tells the owner
-// what needs him, and holds a repo found diverged. A release that fails is reported; it never undoes a merge.
+// what needs a person, and holds a repo found diverged. A release that fails is reported; it never undoes a merge.
 async function tagRelease(ctx: PassContext, repo: string, ids: string[], reason: string): Promise<void> {
   const { config, paths: p, clock, log, notify } = ctx.deps;
   try {

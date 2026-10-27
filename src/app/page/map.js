@@ -1,7 +1,7 @@
 // The Map (spec §6.4): lanes, epics and tasks against time, drawn by the page from the server's board. Hybrid
 // folds finished epics and those with nothing on the frontier; the Frontier scope opens only what is running,
 // next, failing or waiting on a person, so thousands of tasks read as a few dozen rows. Folds, Wrap and the task
-// column's width are kept in runs/app.yaml, as is the time scale: Hours, Days and Weeks are presets, and a pinch on a
+// column's width are kept in .helix/app.yaml, as is the time scale: Hours, Days and Weeks are presets, and a pinch on a
 // trackpad zooms the scale between them and beyond, around the time under the pointer. Rows are drawn only where
 // the view can see them.
 (() => {
@@ -108,7 +108,7 @@
     B.legend.append(...(M.board.codeFinish != null
       ? [key('var(--color-accent)', 'code complete', TITLE.code), key('var(--crit)', 'project complete', TITLE.project)]
       : [key('var(--crit)', 'projected finish')]));
-    if (M.board.derivedEpics) B.legend.append(h('span', { class: 'derived muted', style: { marginLeft: 'auto' }, title: 'plan/taskset.yaml does not exist yet: epics are one per repo, feature and stage. Settings › Spec and TaskSet writes them down.' }, 'Epics derived from feature and stage'));
+    if (M.board.derivedEpics) B.legend.append(h('span', { class: 'derived muted', style: { marginLeft: 'auto' }, title: '.helix/plan/taskset.yaml does not exist yet: the epics are one per lane and feature. Settings › Spec and TaskSet writes them down.' }, 'Epics derived from features'));
     M.byId = new Map([...M.board.tasks, ...M.board.human.map((x) => ({ ...x, kind: 'human' }))].map((t) => [t.id, t]));
     M.epicById = new Map(M.board.epics.map((e) => [e.id, e]));
     renderTools();

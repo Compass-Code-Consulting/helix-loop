@@ -7,8 +7,8 @@ import type { Plan, Task } from '../types.ts';
 // person's step moves it.
 //
 // Whatever waits on the owner gets a date too, or most of the plan would have none (on 2026-10-27, four tasks that
-// needed him held 208 of 416): a human task is done after its lead time from now (half of it once started), a
-// task that needs him or is parked is handed back now. Home measures what an item costs by moving its date
+// needed a person held 208 of 416): a human task is done after its lead time from now (half of it once started), a
+// task that needs a person or is parked is handed back now. Home measures what an item costs by moving its date
 // and running this again; code complete (board.ts) is this run with every human task done now.
 
 const HOUR = 3_600_000;

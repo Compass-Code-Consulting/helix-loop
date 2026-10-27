@@ -8,7 +8,7 @@ import { commit } from './actions.ts';
 import { ownerOf } from './prompts.ts';
 
 // Settings › Loop controls (spec §6.8): every value the loop runs with that the page may change, where it lives
-// in harness/config.yaml, what it does, and how to check a new value. Edits collect in a change set and are
+// in .helix/config.yaml, what it does, and how to check a new value. Edits collect in a change set and are
 // applied together: written into the file in place (its comments kept), checked by loading it as the loop
 // would, and committed. The loop reads the file at the start of its next round, so nothing in flight is cut.
 
@@ -147,7 +147,7 @@ export function applyToText(text: string, changes: ChangeSet[]): string {
   return doc.toString({ lineWidth: 0 });
 }
 
-// The change set applied to a copy of harness/config.yaml and loaded as the loop loads it; throws what's wrong.
+// The change set applied to a copy of .helix/config.yaml and loaded as the loop loads it; throws what's wrong.
 export function checkConfig(root: string, text: string): Config {
   const dir = mkdtempSync(join(tmpdir(), 'helix-config-'));
   try {

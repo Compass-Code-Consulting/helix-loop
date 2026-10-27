@@ -37,7 +37,7 @@ export interface TaskSet {
   lanes: Lane[];
   timelines: Timeline[];
   epicOf: Map<string, Epic>; // task id → its epic
-  derived: boolean; // no plan/taskset.yaml: the epics were derived from feature and stage
+  derived: boolean; // no plan/taskset.yaml: the epics were derived from each task's feature
   missing: string[]; // tasks whose epic plan/taskset.yaml doesn't declare
 }
 
