@@ -1,0 +1,140 @@
+# Mushy loop configuration. Paths are relative to the control plane (the folder above harness/).
+# Decisions behind these values are in DECISIONS.md.
+
+# Hosts a sandboxed Claude Code pass may reach (Codex's workspace-write sandbox has network on).
+# Unlisted hosts are refused; localhost (Postgres, the e2e runner) is always reachable.
+agent_network:
+  allowed_domains:
+    - registry.npmjs.org
+    - github.com
+    - codeload.github.com
+    - objects.githubusercontent.com
+    - raw.githubusercontent.com
+    - cdn.playwright.dev
+    - playwright.download.prss.microsoft.com
+    - playwright.azureedge.net
+    - fonts.googleapis.com
+    - fonts.gstatic.com
+  # Writable outside the worktree: pnpm's content-addressed store and Playwright's browser cache.
+  allow_write: ["~/Library/pnpm/store", "~/Library/Caches/pnpm", "~/Library/Caches/ms-playwright"]
+
+agents:
+  claude:
+    enabled: true
+    # One pass at a time: on 2026-10-26 memory pressure reached warning level, and Daniel asked for one Claude
+    # pass and two Codex passes when memory is tight; Claude's allowance is also the one he most wants to keep.
+    slots: 1
+    # Paced so the subscription's weekly window ends at this share used (agents/quota.ts paceSlots). Daniel's
+    # own Claude use and the loop engineer's share the window, so Claude keeps more back than Codex.
+    weekly_target: 0.85
+    command: claude
+    # Claude Max 20x. Opus 5.5 for every role; effort differs by role.
+    models:
+      build: { model: claude-opus-5-5, effort: high }
+      design: { model: claude-opus-5-5, effort: xhigh }
+      plan: { model: claude-opus-5-5, effort: xhigh }
+      review: { model: claude-opus-5-5, effort: xhigh }
+  codex:
+    enabled: true
+    slots: 2
+    weekly_target: 0.9
+    command: codex
+    # ChatGPT Pro. gpt-6.1-sol is Codex's coding workhorse; gpt-6-astra its frontier model.
+    models:
+      build: { model: gpt-6.1-sol, effort: high }
+      # Mascot animations and SVGs (tasks with role: design, pinned to Codex): Astra, per Daniel.
+      design: { model: gpt-6-astra, effort: xhigh }
+      plan: { model: gpt-6-astra, effort: xhigh }
+      review: { model: gpt-6-astra, effort: xhigh }
+
+repos:
+  # gate: the repo's full check, run by the harness before every merge; defined by each repo's skeleton task.
+  # prepare: run in a fresh worktree before the agent starts (outside the sandbox), so installs are ready.
+  mushy-social-media: { gate: pnpm run gate, prepare: "test ! -f pnpm-lock.yaml || pnpm install --frozen-lockfile --prefer-offline" }
+  mushy-website: { gate: pnpm run gate, prepare: "test ! -f pnpm-lock.yaml || pnpm install --frozen-lockfile --prefer-offline" }
+  mushy-docs: { gate: pnpm run gate, prepare: "test ! -f pnpm-lock.yaml || pnpm install --frozen-lockfile --prefer-offline" }
+  mushy-support-n-engineering: { gate: pnpm run gate, prepare: "test ! -f pnpm-lock.yaml || pnpm install --frozen-lockfile --prefer-offline" }
+
+# Browser tests for sandboxed agents (harness/src/e2e-runner.ts): a repo's `pnpm e2e` asks this runner to
+# run its `e2e:direct` script outside the sandbox. Port 0 picks a free port.
+# concurrency: agents' browser-test runs at once; the rest wait their turn.
+e2e_runner: { port: 47321, script: "e2e:direct", timeout_minutes: 20, concurrency: 2 }
+
+limits:
+  pass_timeout_minutes: 60
+  gate_timeout_minutes: 30
+  # Gates (and re-gates on a new main) at once, whatever the number of passes: each is heavy local work.
+  concurrent_gates: 2
+  prompt_budget_bytes: 40000
+  agents_md_budget_bytes: 8000
+  max_attempts: 3
+  # A merge conflict isn't the code's fault, so it doesn't use an attempt; this many send the task to a
+  # person, since they mean a hotspot file that needs splitting.
+  max_conflicts: 3
+  # Notional list-price spend per agent per day. Subscriptions do not bill per token, but the cap
+  # stops a runaway (a looping agent, a mis-sized task) from burning the week's quota in a day.
+  daily_budget_usd: { claude: 1600, codex: 1600 }
+  # Used to estimate Codex's notional cost from its token counts (USD per million tokens).
+  codex_price_per_mtok: { input: 1.25, cached_input: 0.125, output: 10 }
+  # A pass's wall clock running this far ahead of its monotonic clock means the host was suspended.
+  suspension_threshold_seconds: 30
+  # Backoff when a limit is hit but no reset time could be read.
+  unknown_reset_backoff_minutes: { first: 5, max: 60 }
+
+# Paths no agent may change in a product repo; a pass touching them is refused at the gate.
+forbidden_paths:
+  - .claude/**
+  - .codex/**
+  - .pnpm-store/**
+  - "**/.env"
+  - "**/.env.*"
+  - "**/*.pem"
+  - "**/*.key"
+
+# Paths only tasks in a given area may change (glob: area prefix). CI and deploy workflows are
+# written by planned tasks in the `ci` area, never as a side effect of feature work; mushy-docs' private
+# design guide only by the design-guide task (T-3160, area docs/branding).
+# Exceptions to forbidden_paths: the committed template of environment variables holds no secrets.
+forbidden_exceptions:
+  - "**/.env.example"
+
+restricted_paths:
+  .github/workflows/**: ci
+  branding/**: docs/branding
+
+# Push to origin after each merge, once the repo has a remote.
+push: true
+# Files many tasks append to: rebases keep both sides instead of conflicting (never the lockfile).
+union_merge_paths: [AGENTS.md, docs/architecture.md, .env.example, docs/commands.md]
+# Lockfiles a rebase regenerates when they are all that conflicts: main's copy is kept and the command
+# rebuilds it from the merged manifests; the re-gate then installs from it with a frozen lockfile.
+relock: { pnpm-lock.yaml: "pnpm install --lockfile-only --no-frozen-lockfile --prefer-offline" }
+# Manifests a rebase merges key by key when they conflict, so two tasks' new dependencies both land; each is
+# then formatted with the command given. A value both sides changed stays a conflict.
+json_merge: { package.json: "pnpm exec prettier --write" }
+# The metrics page (runs/metrics/) is kept as a history: a new version every N passes, each left as written.
+metrics_every_passes: 100
+
+# Release tags, per repo: every N merged tasks, when a §21 stage closes with unreleased work, and on
+# `mushy-loop release <repo>`.
+release:
+  every_merged_tasks: 150
+  # Everything that runs with production's secrets: the workflows and actions a v* tag runs, and the
+  # OpenTofu code its deploy job applies with the production DigitalOcean token. A release that changes
+  # any of these since the previous release (or the root commit) is never tagged by the loop: it waits in
+  # runs/approvals/ for `mushy-loop approve-release <repo> <tag>` (`mushy-loop status` lists what waits).
+  review_paths: [".github/**", "infra/**"]
+  # Repos whose releases wait for a human step: nothing is tagged or pushed until it is done, and the
+  # tasks merged meanwhile go out with the first release after it. Daniel approves the website's first
+  # pages in HT-25.
+  hold_until:
+    mushy-website: HT-25
+
+notify:
+  # macOS notification centre; the harness also writes every state change to runs/runs.jsonl.
+  macos: true
+
+# The loop app (`mushy-loop app`), on 127.0.0.1 only, beside the e2e runner's port. While it answers, each
+# pass gives its builder the app's MCP endpoint to report progress and problems on.
+app:
+  port: 47320

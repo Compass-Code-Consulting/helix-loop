@@ -1,0 +1,1106 @@
+{
+  "generatedAt": "2026-10-24T14:00:00.000Z",
+  "startAt": "2026-10-23T08:00:00.000Z",
+  "passHours": 0.4,
+  "nodes": [
+    {
+      "id": "HT-01",
+      "kind": "human",
+      "lane": "human",
+      "title": "Create Stripe account and finish business verification",
+      "status": "todo",
+      "agent": null,
+      "reqs": [],
+      "blockedBy": [],
+      "dependents": [
+        "T-0008"
+      ],
+      "durationHours": 72,
+      "es": 0,
+      "ef": 72,
+      "lf": 181.2,
+      "ls": 109.2,
+      "slack": 109.2,
+      "critical": false,
+      "latestStart": "2026-10-27T21:12:00.000Z"
+    },
+    {
+      "id": "HT-02",
+      "kind": "human",
+      "lane": "human",
+      "title": "Register the X (Twitter) developer app and request elevated access",
+      "status": "in_progress",
+      "agent": null,
+      "reqs": [],
+      "blockedBy": [],
+      "dependents": [
+        "T-0012"
+      ],
+      "durationHours": 120,
+      "es": 0,
+      "ef": 120,
+      "lf": 179.2,
+      "ls": 59.2,
+      "slack": 59.2,
+      "critical": false,
+      "latestStart": "2026-10-25T19:12:00.000Z"
+    },
+    {
+      "id": "HT-03",
+      "kind": "human",
+      "lane": "human",
+      "title": "Buy mushy.social domain and delegate DNS to Cloudflare",
+      "status": "done",
+      "agent": null,
+      "reqs": [],
+      "blockedBy": [],
+      "dependents": [
+        "HT-04"
+      ],
+      "durationHours": 12,
+      "es": 0,
+      "ef": 12,
+      "lf": 12,
+      "ls": 0,
+      "slack": 0,
+      "critical": true,
+      "latestStart": "2026-10-23T08:00:00.000Z"
+    },
+    {
+      "id": "HT-04",
+      "kind": "human",
+      "lane": "human",
+      "title": "Create Meta developer app for Instagram and Facebook connectors",
+      "status": "todo",
+      "agent": null,
+      "reqs": [],
+      "blockedBy": [
+        "HT-03"
+      ],
+      "dependents": [
+        "T-0014",
+        "T-0015"
+      ],
+      "durationHours": 168,
+      "es": 12,
+      "ef": 180,
+      "lf": 180,
+      "ls": 12,
+      "slack": 0,
+      "critical": true,
+      "latestStart": "2026-10-23T20:00:00.000Z"
+    },
+    {
+      "id": "HT-05",
+      "kind": "human",
+      "lane": "human",
+      "title": "Review and approve the public pricing page copy",
+      "status": "todo",
+      "agent": null,
+      "reqs": [],
+      "blockedBy": [
+        "T-0021"
+      ],
+      "dependents": [
+        "T-0037"
+      ],
+      "durationHours": 24,
+      "es": 1.2,
+      "ef": 25.2,
+      "lf": 182.8,
+      "ls": 158.8,
+      "slack": 157.6,
+      "critical": false,
+      "latestStart": "2026-10-29T22:48:00.000Z"
+    },
+    {
+      "id": "T-0001",
+      "kind": "task",
+      "lane": "mushy-support-n-engineering",
+      "title": "Monorepo skeleton: pnpm workspaces, tsconfig base, lint and gate scripts",
+      "status": "done",
+      "agent": "claude",
+      "reqs": [
+        "ENG-001",
+        "ENG-002"
+      ],
+      "blockedBy": [],
+      "dependents": [
+        "T-0002",
+        "T-0003",
+        "T-0021",
+        "T-0022",
+        "T-0031"
+      ],
+      "durationHours": 0.8,
+      "stage": "day0",
+      "area": "skeleton",
+      "es": 0,
+      "ef": 0.8,
+      "lf": 158.4,
+      "ls": 157.6,
+      "slack": 157.6,
+      "critical": false
+    },
+    {
+      "id": "T-0002",
+      "kind": "task",
+      "lane": "mushy-support-n-engineering",
+      "title": "CI gate: typecheck, unit tests and forbidden-path check",
+      "status": "done",
+      "agent": "codex",
+      "reqs": [
+        "ENG-004"
+      ],
+      "blockedBy": [
+        "T-0001"
+      ],
+      "dependents": [],
+      "durationHours": 0.8,
+      "stage": "day0",
+      "area": "ci",
+      "es": 0.8,
+      "ef": 1.6,
+      "lf": 183.2,
+      "ls": 182.4,
+      "slack": 181.6,
+      "critical": false
+    },
+    {
+      "id": "T-0003",
+      "kind": "task",
+      "lane": "mushy-support-n-engineering",
+      "title": "Schema package: MCP tool schemas generated from one source",
+      "status": "done",
+      "agent": "claude",
+      "reqs": [
+        "MCP-001",
+        "MCP-002"
+      ],
+      "blockedBy": [
+        "T-0001"
+      ],
+      "dependents": [
+        "T-0004",
+        "T-0006",
+        "T-0011",
+        "T-0032"
+      ],
+      "durationHours": 0.8,
+      "stage": "day0",
+      "area": "schema",
+      "es": 0.8,
+      "ef": 1.6,
+      "lf": 177.6,
+      "ls": 176.8,
+      "slack": 176,
+      "critical": false
+    },
+    {
+      "id": "T-0004",
+      "kind": "task",
+      "lane": "mushy-support-n-engineering",
+      "title": "OAuth 2.1 authorization server: discovery and dynamic client registration",
+      "status": "done",
+      "agent": "codex",
+      "reqs": [
+        "AUTH-001",
+        "AUTH-002",
+        "AUTH-005"
+      ],
+      "blockedBy": [
+        "T-0003"
+      ],
+      "dependents": [
+        "T-0005"
+      ],
+      "durationHours": 0.8,
+      "stage": "day1",
+      "area": "oauth",
+      "es": 1.6,
+      "ef": 2.4,
+      "lf": 178.4,
+      "ls": 177.6,
+      "slack": 176,
+      "critical": false
+    },
+    {
+      "id": "T-0005",
+      "kind": "task",
+      "lane": "mushy-support-n-engineering",
+      "title": "OAuth token endpoint with PKCE and refresh-token rotation",
+      "status": "claimed",
+      "agent": "codex",
+      "reqs": [
+        "AUTH-003",
+        "AUTH-004"
+      ],
+      "blockedBy": [
+        "T-0004"
+      ],
+      "dependents": [
+        "T-0007",
+        "T-0008",
+        "T-0012",
+        "T-0014",
+        "T-0015",
+        "T-0016",
+        "T-0023",
+        "T-0034"
+      ],
+      "durationHours": 0.8,
+      "stage": "day1",
+      "area": "oauth",
+      "es": 2.4,
+      "ef": 3.2,
+      "lf": 179.2,
+      "ls": 178.4,
+      "slack": 176,
+      "critical": false
+    },
+    {
+      "id": "T-0006",
+      "kind": "task",
+      "lane": "mushy-support-n-engineering",
+      "title": "MCP server transport: streamable HTTP with session resumption",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "MCP-010"
+      ],
+      "blockedBy": [
+        "T-0003"
+      ],
+      "dependents": [
+        "T-0007",
+        "T-0010",
+        "T-0033"
+      ],
+      "durationHours": 0.8,
+      "stage": "day1",
+      "area": "mcp-transport",
+      "es": 1.6,
+      "ef": 2.4,
+      "lf": 182,
+      "ls": 181.2,
+      "slack": 179.6,
+      "critical": false
+    },
+    {
+      "id": "T-0007",
+      "kind": "task",
+      "lane": "mushy-support-n-engineering",
+      "title": "A2A agent card and task endpoint",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "A2A-001",
+        "A2A-002"
+      ],
+      "blockedBy": [
+        "T-0006",
+        "T-0005"
+      ],
+      "dependents": [
+        "T-0036"
+      ],
+      "durationHours": 0.8,
+      "stage": "day2",
+      "area": "a2a",
+      "es": 3.2,
+      "ef": 4,
+      "lf": 182.8,
+      "ls": 182,
+      "slack": 178.8,
+      "critical": false
+    },
+    {
+      "id": "T-0008",
+      "kind": "task",
+      "lane": "mushy-support-n-engineering",
+      "title": "Stripe checkout session and webhook signature verification",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "BILL-001",
+        "BILL-003"
+      ],
+      "blockedBy": [
+        "T-0005",
+        "HT-01"
+      ],
+      "dependents": [
+        "T-0009",
+        "T-0026"
+      ],
+      "durationHours": 0.8,
+      "stage": "day2",
+      "area": "billing",
+      "es": 72,
+      "ef": 72.8,
+      "lf": 182,
+      "ls": 181.2,
+      "slack": 109.2,
+      "critical": false
+    },
+    {
+      "id": "T-0009",
+      "kind": "task",
+      "lane": "mushy-support-n-engineering",
+      "title": "Usage metering per workspace, flushed to Stripe hourly",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "BILL-007"
+      ],
+      "blockedBy": [
+        "T-0008"
+      ],
+      "dependents": [
+        "T-0037"
+      ],
+      "durationHours": 0.4,
+      "stage": "day3",
+      "area": "billing",
+      "es": 72.8,
+      "ef": 73.2,
+      "lf": 182.8,
+      "ls": 182.4,
+      "slack": 109.6,
+      "critical": false
+    },
+    {
+      "id": "T-0010",
+      "kind": "task",
+      "lane": "mushy-support-n-engineering",
+      "title": "Support inbox: triage tool exposed over MCP",
+      "status": "parked",
+      "agent": null,
+      "reqs": [
+        "SUP-002"
+      ],
+      "blockedBy": [
+        "T-0006"
+      ],
+      "dependents": [],
+      "durationHours": 0.4,
+      "stage": "day3",
+      "area": "support",
+      "es": 2.4,
+      "ef": 2.8,
+      "lf": 183.2,
+      "ls": 182.8,
+      "slack": 180.4,
+      "critical": false
+    },
+    {
+      "id": "T-0011",
+      "kind": "task",
+      "lane": "mushy-social-media",
+      "title": "Connector interface and fake network for tests",
+      "status": "done",
+      "agent": "claude",
+      "reqs": [
+        "NET-001"
+      ],
+      "blockedBy": [
+        "T-0003"
+      ],
+      "dependents": [
+        "T-0012",
+        "T-0014",
+        "T-0015",
+        "T-0016",
+        "T-0018"
+      ],
+      "durationHours": 0.8,
+      "stage": "day1",
+      "area": "connector-core",
+      "es": 1.6,
+      "ef": 2.4,
+      "lf": 179.2,
+      "ls": 178.4,
+      "slack": 176.8,
+      "critical": false
+    },
+    {
+      "id": "T-0012",
+      "kind": "task",
+      "lane": "mushy-social-media",
+      "title": "X connector: OAuth handshake and token storage",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "NET-010",
+        "NET-011"
+      ],
+      "blockedBy": [
+        "T-0011",
+        "T-0005",
+        "HT-02"
+      ],
+      "dependents": [
+        "T-0013",
+        "T-0027"
+      ],
+      "durationHours": 0.8,
+      "stage": "day2",
+      "area": "connector-x",
+      "es": 120,
+      "ef": 120.8,
+      "lf": 180,
+      "ls": 179.2,
+      "slack": 59.2,
+      "critical": false
+    },
+    {
+      "id": "T-0013",
+      "kind": "task",
+      "lane": "mushy-social-media",
+      "title": "X connector: post, thread and media upload tools",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "NET-012",
+        "NET-013"
+      ],
+      "blockedBy": [
+        "T-0012"
+      ],
+      "dependents": [
+        "T-0017",
+        "T-0035"
+      ],
+      "durationHours": 0.8,
+      "stage": "day2",
+      "area": "connector-x",
+      "es": 120.8,
+      "ef": 121.6,
+      "lf": 180.8,
+      "ls": 180,
+      "slack": 59.2,
+      "critical": false
+    },
+    {
+      "id": "T-0014",
+      "kind": "task",
+      "lane": "mushy-social-media",
+      "title": "Instagram connector: business account link and media publish",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "NET-020",
+        "NET-021"
+      ],
+      "blockedBy": [
+        "T-0011",
+        "HT-04",
+        "T-0005"
+      ],
+      "dependents": [
+        "T-0017",
+        "T-0027",
+        "T-0035"
+      ],
+      "durationHours": 0.8,
+      "stage": "day3",
+      "area": "connector-ig",
+      "es": 180,
+      "ef": 180.8,
+      "lf": 180.8,
+      "ls": 180,
+      "slack": 0,
+      "critical": true
+    },
+    {
+      "id": "T-0015",
+      "kind": "task",
+      "lane": "mushy-social-media",
+      "title": "Facebook Pages connector: page token exchange and post tool",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "NET-030"
+      ],
+      "blockedBy": [
+        "T-0011",
+        "HT-04",
+        "T-0005"
+      ],
+      "dependents": [
+        "T-0017",
+        "T-0035"
+      ],
+      "durationHours": 0.8,
+      "stage": "day3",
+      "area": "connector-fb",
+      "es": 180,
+      "ef": 180.8,
+      "lf": 180.8,
+      "ls": 180,
+      "slack": 0,
+      "critical": true
+    },
+    {
+      "id": "T-0016",
+      "kind": "task",
+      "lane": "mushy-social-media",
+      "title": "LinkedIn connector: organisation posts",
+      "status": "needs_human",
+      "agent": null,
+      "reqs": [
+        "NET-040"
+      ],
+      "blockedBy": [
+        "T-0011",
+        "T-0005"
+      ],
+      "dependents": [],
+      "durationHours": 0.8,
+      "stage": "day3",
+      "area": "connector-li",
+      "es": 3.2,
+      "ef": 4,
+      "lf": 183.2,
+      "ls": 182.4,
+      "slack": 179.2,
+      "critical": false
+    },
+    {
+      "id": "T-0017",
+      "kind": "task",
+      "lane": "mushy-social-media",
+      "title": "Scheduler: queue posts across networks with per-network rate limits",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "SCH-001",
+        "SCH-004"
+      ],
+      "blockedBy": [
+        "T-0013",
+        "T-0014",
+        "T-0015"
+      ],
+      "dependents": [
+        "T-0019",
+        "T-0028"
+      ],
+      "durationHours": 0.8,
+      "stage": "day3",
+      "area": "scheduler",
+      "es": 180.8,
+      "ef": 181.6,
+      "lf": 181.6,
+      "ls": 180.8,
+      "slack": 0,
+      "critical": true
+    },
+    {
+      "id": "T-0018",
+      "kind": "task",
+      "lane": "mushy-social-media",
+      "title": "Post preview renderer per network",
+      "status": "claimed",
+      "agent": "codex",
+      "reqs": [
+        "SCH-010"
+      ],
+      "blockedBy": [
+        "T-0011"
+      ],
+      "dependents": [
+        "T-0025"
+      ],
+      "durationHours": 0.4,
+      "stage": "day2",
+      "area": "preview",
+      "es": 2.4,
+      "ef": 2.8,
+      "lf": 180.8,
+      "ls": 180.4,
+      "slack": 178,
+      "critical": false
+    },
+    {
+      "id": "T-0019",
+      "kind": "task",
+      "lane": "mushy-social-media",
+      "title": "Analytics: pull engagement counts nightly",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "ANL-001"
+      ],
+      "blockedBy": [
+        "T-0017"
+      ],
+      "dependents": [],
+      "durationHours": 0.8,
+      "stage": "day4",
+      "area": "analytics",
+      "es": 181.6,
+      "ef": 182.4,
+      "lf": 183.2,
+      "ls": 182.4,
+      "slack": 0.8,
+      "critical": false
+    },
+    {
+      "id": "T-0021",
+      "kind": "task",
+      "lane": "mushy-website",
+      "title": "Pricing page with plan comparison table",
+      "status": "done",
+      "agent": "claude",
+      "reqs": [
+        "WEB-010"
+      ],
+      "blockedBy": [
+        "T-0001"
+      ],
+      "dependents": [
+        "HT-05"
+      ],
+      "durationHours": 0.4,
+      "stage": "day1",
+      "area": "site-pricing",
+      "es": 0.8,
+      "ef": 1.2,
+      "lf": 158.8,
+      "ls": 158.4,
+      "slack": 157.6,
+      "critical": false
+    },
+    {
+      "id": "T-0022",
+      "kind": "task",
+      "lane": "mushy-website",
+      "title": "Marketing home page: hero, feature grid and footer",
+      "status": "done",
+      "agent": "codex",
+      "reqs": [
+        "WEB-001",
+        "WEB-002"
+      ],
+      "blockedBy": [
+        "T-0001"
+      ],
+      "dependents": [
+        "T-0023"
+      ],
+      "durationHours": 0.8,
+      "stage": "day1",
+      "area": "site-home",
+      "es": 0.8,
+      "ef": 1.6,
+      "lf": 179.2,
+      "ls": 178.4,
+      "slack": 177.6,
+      "critical": false
+    },
+    {
+      "id": "T-0023",
+      "kind": "task",
+      "lane": "mushy-website",
+      "title": "Sign-in flow against the OAuth server",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "WEB-020"
+      ],
+      "blockedBy": [
+        "T-0005",
+        "T-0022"
+      ],
+      "dependents": [
+        "T-0024"
+      ],
+      "durationHours": 0.8,
+      "stage": "day2",
+      "area": "site-auth",
+      "es": 3.2,
+      "ef": 4,
+      "lf": 180,
+      "ls": 179.2,
+      "slack": 176,
+      "critical": false
+    },
+    {
+      "id": "T-0024",
+      "kind": "task",
+      "lane": "mushy-website",
+      "title": "Dashboard shell: workspace switcher and navigation",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "WEB-030"
+      ],
+      "blockedBy": [
+        "T-0023"
+      ],
+      "dependents": [
+        "T-0025",
+        "T-0026",
+        "T-0027"
+      ],
+      "durationHours": 0.8,
+      "stage": "day2",
+      "area": "site-dashboard",
+      "es": 4,
+      "ef": 4.8,
+      "lf": 180.8,
+      "ls": 180,
+      "slack": 176,
+      "critical": false
+    },
+    {
+      "id": "T-0025",
+      "kind": "task",
+      "lane": "mushy-website",
+      "title": "Compose screen with live preview per network",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "WEB-040",
+        "WEB-041"
+      ],
+      "blockedBy": [
+        "T-0024",
+        "T-0018"
+      ],
+      "dependents": [
+        "T-0028"
+      ],
+      "durationHours": 0.8,
+      "stage": "day3",
+      "area": "site-compose",
+      "es": 4.8,
+      "ef": 5.6,
+      "lf": 181.6,
+      "ls": 180.8,
+      "slack": 176,
+      "critical": false
+    },
+    {
+      "id": "T-0026",
+      "kind": "task",
+      "lane": "mushy-website",
+      "title": "Billing settings: plan, invoices and customer portal link",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "WEB-050"
+      ],
+      "blockedBy": [
+        "T-0024",
+        "T-0008"
+      ],
+      "dependents": [
+        "T-0029"
+      ],
+      "durationHours": 0.4,
+      "stage": "day3",
+      "area": "site-billing",
+      "es": 72.8,
+      "ef": 73.2,
+      "lf": 182.4,
+      "ls": 182,
+      "slack": 109.2,
+      "critical": false
+    },
+    {
+      "id": "T-0027",
+      "kind": "task",
+      "lane": "mushy-website",
+      "title": "Connections page: link and unlink networks",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "WEB-060"
+      ],
+      "blockedBy": [
+        "T-0024",
+        "T-0012",
+        "T-0014"
+      ],
+      "dependents": [
+        "T-0029"
+      ],
+      "durationHours": 0.8,
+      "stage": "day3",
+      "area": "site-connections",
+      "es": 180.8,
+      "ef": 181.6,
+      "lf": 182.4,
+      "ls": 181.6,
+      "slack": 0.8,
+      "critical": false
+    },
+    {
+      "id": "T-0028",
+      "kind": "task",
+      "lane": "mushy-website",
+      "title": "Schedule calendar view",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "WEB-070"
+      ],
+      "blockedBy": [
+        "T-0025",
+        "T-0017"
+      ],
+      "dependents": [
+        "T-0029"
+      ],
+      "durationHours": 0.8,
+      "stage": "day4",
+      "area": "site-calendar",
+      "es": 181.6,
+      "ef": 182.4,
+      "lf": 182.4,
+      "ls": 181.6,
+      "slack": 0,
+      "critical": true
+    },
+    {
+      "id": "T-0029",
+      "kind": "task",
+      "lane": "mushy-website",
+      "title": "Accessibility pass: keyboard, focus order and contrast on all pages",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "WEB-090",
+        "NFR-A11Y-1"
+      ],
+      "blockedBy": [
+        "T-0028",
+        "T-0026",
+        "T-0027"
+      ],
+      "dependents": [],
+      "durationHours": 0.8,
+      "stage": "day5",
+      "area": "site-a11y",
+      "es": 182.4,
+      "ef": 183.2,
+      "lf": 183.2,
+      "ls": 182.4,
+      "slack": 0,
+      "critical": true
+    },
+    {
+      "id": "T-0031",
+      "kind": "task",
+      "lane": "mushy-docs",
+      "title": "Docs site skeleton with search",
+      "status": "done",
+      "agent": "claude",
+      "reqs": [
+        "DOC-001"
+      ],
+      "blockedBy": [
+        "T-0001"
+      ],
+      "dependents": [
+        "T-0032",
+        "T-0034"
+      ],
+      "durationHours": 0.4,
+      "stage": "day1",
+      "area": "docs-site",
+      "es": 0.8,
+      "ef": 1.2,
+      "lf": 182.4,
+      "ls": 182,
+      "slack": 181.2,
+      "critical": false
+    },
+    {
+      "id": "T-0032",
+      "kind": "task",
+      "lane": "mushy-docs",
+      "title": "MCP tool reference generated from the schema package",
+      "status": "done",
+      "agent": "codex",
+      "reqs": [
+        "DOC-010"
+      ],
+      "blockedBy": [
+        "T-0003",
+        "T-0031"
+      ],
+      "dependents": [
+        "T-0033"
+      ],
+      "durationHours": 0.4,
+      "stage": "day2",
+      "area": "docs-mcp",
+      "es": 1.6,
+      "ef": 2,
+      "lf": 182.8,
+      "ls": 182.4,
+      "slack": 180.8,
+      "critical": false
+    },
+    {
+      "id": "T-0033",
+      "kind": "task",
+      "lane": "mushy-docs",
+      "title": "Getting started: connect an AI client over MCP",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "DOC-020"
+      ],
+      "blockedBy": [
+        "T-0032",
+        "T-0006"
+      ],
+      "dependents": [],
+      "durationHours": 0.4,
+      "stage": "day2",
+      "area": "docs-guides",
+      "es": 2.4,
+      "ef": 2.8,
+      "lf": 183.2,
+      "ls": 182.8,
+      "slack": 180.4,
+      "critical": false
+    },
+    {
+      "id": "T-0034",
+      "kind": "task",
+      "lane": "mushy-docs",
+      "title": "OAuth integration guide for third-party clients",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "DOC-030"
+      ],
+      "blockedBy": [
+        "T-0005",
+        "T-0031"
+      ],
+      "dependents": [],
+      "durationHours": 0.4,
+      "stage": "day2",
+      "area": "docs-oauth",
+      "es": 3.2,
+      "ef": 3.6,
+      "lf": 183.2,
+      "ls": 182.8,
+      "slack": 179.6,
+      "critical": false
+    },
+    {
+      "id": "T-0035",
+      "kind": "task",
+      "lane": "mushy-docs",
+      "title": "Per-network connector guides",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "DOC-040"
+      ],
+      "blockedBy": [
+        "T-0013",
+        "T-0014",
+        "T-0015"
+      ],
+      "dependents": [],
+      "durationHours": 0.8,
+      "stage": "day4",
+      "area": "docs-networks",
+      "es": 180.8,
+      "ef": 181.6,
+      "lf": 183.2,
+      "ls": 182.4,
+      "slack": 1.6,
+      "critical": false
+    },
+    {
+      "id": "T-0036",
+      "kind": "task",
+      "lane": "mushy-docs",
+      "title": "A2A integration guide",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "DOC-050"
+      ],
+      "blockedBy": [
+        "T-0007"
+      ],
+      "dependents": [],
+      "durationHours": 0.4,
+      "stage": "day3",
+      "area": "docs-a2a",
+      "es": 4,
+      "ef": 4.4,
+      "lf": 183.2,
+      "ls": 182.8,
+      "slack": 178.8,
+      "critical": false
+    },
+    {
+      "id": "T-0037",
+      "kind": "task",
+      "lane": "mushy-docs",
+      "title": "Billing and plans FAQ",
+      "status": "ready",
+      "agent": null,
+      "reqs": [
+        "DOC-060"
+      ],
+      "blockedBy": [
+        "T-0009",
+        "HT-05"
+      ],
+      "dependents": [],
+      "durationHours": 0.4,
+      "stage": "day4",
+      "area": "docs-billing",
+      "es": 73.2,
+      "ef": 73.6,
+      "lf": 183.2,
+      "ls": 182.8,
+      "slack": 109.6,
+      "critical": false
+    }
+  ],
+  "criticalPath": [
+    "HT-03",
+    "HT-04",
+    "T-0014",
+    "T-0017",
+    "T-0028",
+    "T-0029"
+  ],
+  "agents": [
+    {
+      "name": "claude",
+      "state": "limited",
+      "model": "claude-opus-5-5",
+      "resetAt": "2026-10-24T16:40:12.000Z"
+    },
+    {
+      "name": "codex",
+      "state": "busy",
+      "model": "gpt-5.3-codex",
+      "task": "T-0005"
+    }
+  ],
+  "mode": "single:codex",
+  "totals": {
+    "tasks": 35,
+    "done": 9,
+    "ready": 22,
+    "claimed": 2,
+    "needsHuman": 1,
+    "parked": 1
+  },
+  "projectedFinish": "2026-10-30T23:12:00.000Z"
+}

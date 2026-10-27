@@ -1,0 +1,16 @@
+id: T-0007
+repo: mushy-website
+stage: day1
+area: website/home
+epic: waitlist-page
+title: The waitlist form tells a visitor plainly when they are sending too fast or the app is down
+reqs: [WL-6]
+spec: ["§5 Website home"]
+acceptance:
+  - "e2e: [WL-6] a 429 from the app shows Try again in a minute and disables the button until then"
+  - "e2e: [WL-6] a network error or a 5xx shows Something went wrong with a retry key, and the typed address is kept"
+blocked_by: [T-0006]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

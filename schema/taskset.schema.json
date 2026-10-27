@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "helix-loop/taskset.schema.json",
+  "title": "Helix TaskSet",
+  "description": "plan/taskset.yaml: the lanes (repositories) the loop builds and, in each, its epics in order. Each task names its epic's key in `epic`; its lane is its `repo`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "lanes"],
+  "properties": {
+    "version": { "const": 1 },
+    "stages": {
+      "type": "array",
+      "description": "Optional milestones, in order. A task names its stage in `stage`; work in a later stage waits until every earlier stage is settled. Leave this out for no stage gating.",
+      "items": {
+        "oneOf": [
+          { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key"],
+            "properties": {
+              "key": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+              "title": { "type": "string", "minLength": 1, "maxLength": 80, "description": "How the stage reads, e.g. \"Day 1: Foundation\"." }
+            }
+          }
+        ]
+      }
+    },
+    "timelines": {
+      "description": "The finish dates the loop's app shows: [code, project] (both, the default) or [project]. Project complete is when everything is done, human tasks and their lead times included; code complete is when the last builder task would merge if every human task were done when it is needed, so a wait for an account or a D-U-N-S number doesn't count against the build.",
+      "enum": [["code", "project"], ["project"]]
+    },
+    "lanes": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["repo", "epics"],
+        "properties": {
+          "repo": { "type": "string", "minLength": 1, "description": "The repository the lane builds, as tasks name it in `repo`." },
+          "epics": {
+            "type": "object",
+            "description": "The lane's epics, keyed by epic key, in the order they are built.",
+            "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["title"],
+              "properties": {
+                "title": { "type": "string", "minLength": 3, "maxLength": 80, "description": "The capability the epic delivers, in plain words." },
+                "stage": { "type": "string", "minLength": 1, "description": "Optional: the stage, one of `stages`, when every task in the epic is in it. Epics group by capability; a stage is a milestone, not a level of the hierarchy." }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/nocturne-e5497bda-ec0a-4fca-8e35-2af2d6948356/styles.css">
+<script src="_ds/nocturne-e5497bda-ec0a-4fca-8e35-2af2d6948356/_ds_bundle.js"></script>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#0f1019}a{color:var(--color-accent)}a:hover{color:var(--color-accent-300)}.dv-turn{padding:40px 44px 32px;scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:var(--color-accent);color:var(--color-bg);border-radius:4px;text-decoration:none}.dv-tname{font:500 14px/1.3 var(--font-body);color:var(--color-text)}.dv-opts{display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:var(--color-neutral-800);color:var(--color-text);border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12px/1.3 var(--font-body);color:var(--color-neutral-400)}.dv-opt:target .dv-oid{background:var(--color-accent);color:var(--color-bg)}.dv-next{margin:28px 0 0;font:12px/1.5 var(--font-body);color:var(--color-neutral-500)}.btn,.tag,.seg-opt{white-space:nowrap}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}</style>
+</helmet>
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">What opens from Home's group actions (<a class="dv-oid" href="#2a">2a</a>), and the collapsible right panels on <a class="dv-oid" href="#2a">2a</a> and <a class="dv-oid" href="#2b">2b</a></span></div>
+<div class="dv-opts" style="flex-direction:column">
+
+<div class="dv-opt" id="3a"><div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>Open checklist: your human tasks on the critical path, biggest hold-up first, each with steps, handoff prompt and evidence</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix7 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px"><sc-for list="{{ tabsHome }}" as="t" hint-placeholder-count="7"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for></div>
+    <div style="flex:1"></div>
+    <span class="tag tag-outline">Auto-pilot · Intrepid</span>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.76 0.12 150);animation:pulse 2s infinite"></span>Running · both agents</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 28px 0;color:var(--color-neutral-400)"><a style="display:flex;align-items:center;gap:4px;text-decoration:none"><i class="ph ph-arrow-left"></i>Home</a><span>/</span><span style="color:var(--color-text)">Human tasks on the critical path</span><span class="tag tag-neutral">6</span><div style="flex:1"></div><span style="font-size:12px">Esc goes back · J / K moves between items</span></div>
+  <div style="flex:1;display:grid;grid-template-columns:400px minmax(0,1fr);gap:18px;padding:14px 28px 22px;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="color:var(--color-neutral-400);flex:1">Sorted by what each one holds up</span><span style="font-size:12px;color:var(--color-neutral-400)">0 of 6 done</span></div>
+      <sc-for list="{{ htList }}" as="t" hint-placeholder-count="6"><div style="{{ t.st }}"><span style="{{ t.gs }}">{{ t.g }}</span><div style="min-width:0;flex:1"><div style="display:flex;gap:8px;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--color-neutral-400)">{{ t.id }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.title }}</span></div><div style="display:flex;align-items:center;gap:8px;margin-top:5px"><div style="height:5px;width:110px;border-radius:3px;background:var(--color-neutral-800);overflow:hidden"><div style="{{ t.bar }}"></div></div><span style="font-size:11.5px;color:var(--color-neutral-400)">{{ t.holds }}</span><span style="{{ t.lateStyle }}">{{ t.late }}</span></div></div></div></sc-for>
+      <div style="flex:1"></div>
+      <div style="padding:10px 12px;border-radius:var(--radius-md);background:var(--color-accent-900);color:var(--color-accent-200);line-height:1.45;display:flex;gap:8px"><i class="ph ph-dna" style="font-size:16px;flex:none;margin-top:1px"></i><span>Doing HT-10 and HT-22 today pulls the finish back to Sat 7 Nov. HT-39 can wait until Thursday without moving it.</span></div>
+    </div>
+    <div style="border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);padding:18px 22px;display:flex;flex-direction:column;gap:14px;min-height:0;overflow:hidden">
+      <div style="display:flex;gap:6px;align-items:center"><span class="tag tag-neutral">HT-10</span><span class="tag" style="background:oklch(0.72 0.14 35 / .16);color:oklch(0.72 0.14 35)">44 days late</span><span class="tag tag-accent">critical path</span><span class="tag tag-neutral">holds 112 tasks</span><div style="flex:1"></div><span style="color:var(--color-neutral-400);font-size:12px">Each day it waits moves the finish a day</span></div>
+      <h3 style="margin:0;line-height:1.2">Apple Developer Program as EcoEarth Enterprises, set up for Sign in with Apple</h3>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;min-height:0">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div><h6 style="color:var(--color-neutral-400)">Steps · 1 of 4</h6><div style="display:flex;flex-direction:column;gap:7px"><sc-for list="{{ htSteps }}" as="s" hint-placeholder-count="4"><label style="display:flex;gap:9px;align-items:flex-start"><input type="checkbox" defaultChecked="{{ s.done }}" style="accent-color:var(--color-accent);margin-top:3px"><span style="{{ s.ts }}">{{ s.text }}</span></label></sc-for></div></div>
+          <div style="padding:10px 12px;border-radius:var(--radius-md);box-shadow:inset 0 0 0 1px var(--color-divider)"><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-400);margin-bottom:3px">Done when</div>Enrolled as an organisation, and Sign in with Apple is configured for auth.mushymarketing.com (SEC-1).</div>
+          <div class="field"><label>Evidence (optional)</label><input class="input" placeholder="Team ID, a screenshot path, or a link"></div>
+          <div style="display:flex;gap:6px"><button class="btn btn-primary"><i class="ph ph-check"></i>Mark done</button><button class="btn btn-secondary">Mark in progress</button><button class="btn btn-ghost">Snooze to Thu</button></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+          <div style="display:flex;flex-direction:column;gap:6px;min-height:0"><div style="display:flex;align-items:center"><h6 style="color:var(--color-neutral-400);margin:0;flex:1">Handoff prompt</h6><a style="font-size:12px;display:flex;gap:4px;align-items:center"><i class="ph ph-copy"></i>Copy</a></div><div style="padding:10px 12px;border-radius:var(--radius-md);background:#11121c;box-shadow:var(--shadow-sm);font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.55;color:var(--color-neutral-300);max-height:170px;overflow:hidden">Help me enrol EcoEarth Enterprises, Inc. in the Apple Developer Program as an organisation. Its D-U-N-S number is 08-146-2297. Then configure Sign in with Apple for the services ID com.mushymarketing.auth with return URL https://auth.mushymarketing.com/apple/callback, and tell me which key to save as APPLE_SIGNIN_KEY.</div></div>
+          <div><h6 style="color:var(--color-neutral-400)">Unblocks when done</h6><div style="display:flex;flex-direction:column;gap:4px"><sc-for list="{{ htUnblocks }}" as="u" hint-placeholder-count="3"><div style="display:flex;gap:8px"><span style="color:var(--color-neutral-500)">○</span><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--color-neutral-400)">{{ u.id }}</span><span>{{ u.title }}</span></div></sc-for><div style="color:var(--color-neutral-400)">+109 more across 3 epics</div></div></div>
+          <div style="font-size:12px;color:var(--color-neutral-500)">Builders never see your evidence; they read the notes. Helix adds the Team ID to the notes of the tasks that need it.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<div class="dv-opt" id="3b"><div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a>Answer once: 23 builder questions with one cause; Helix drafts the answer from the spec and you send it to every task</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix8 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px"><sc-for list="{{ tabsHome }}" as="t" hint-placeholder-count="7"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for></div>
+    <div style="flex:1"></div>
+    <span class="tag tag-outline">Auto-pilot · Intrepid</span>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.76 0.12 150);animation:pulse 2s infinite"></span>Running · both agents</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 28px 0;color:var(--color-neutral-400)"><a style="display:flex;align-items:center;gap:4px;text-decoration:none"><i class="ph ph-arrow-left"></i>Home</a><span>/</span><span style="color:var(--color-text)">Spec questions about SU-7 help states</span><span class="tag tag-neutral">23</span><div style="flex:1"></div><span style="font-size:12px">Esc goes back · J / K moves between items</span></div>
+  <div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:18px;padding:14px 28px 22px;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:8px"><span style="color:var(--color-neutral-400);flex:1">What the builders asked · grouped by Helix because they read the same requirement</span><div class="seg"><label class="seg-opt"><input type="radio" name="qv-3b" defaultChecked="{{ true }}">Quotes</label><label class="seg-opt"><input type="radio" name="qv-3b">Tasks</label></div></div>
+      <sc-for list="{{ questions }}" as="q" hint-placeholder-count="5"><div style="border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);padding:10px 12px;display:flex;flex-direction:column;gap:5px"><div style="display:flex;align-items:center;gap:8px"><span style="width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1px var(--color-neutral-500);display:grid;place-items:center;font-size:10px">{{ q.badge }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--color-neutral-400)">{{ q.id }}</span><span style="color:var(--color-neutral-400)">{{ q.title }}</span><div style="flex:1"></div><span style="font-size:11px;color:var(--color-neutral-500)">{{ q.when }}</span></div><div style="line-height:1.45">"{{ q.text }}"</div></div></sc-for>
+      <div style="color:var(--color-neutral-400)">+18 more asking the same thing</div>
+    </div>
+    <div style="border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);padding:18px 20px;display:flex;flex-direction:column;gap:12px;min-height:0">
+      <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="color:var(--color-accent);font-size:18px"></i><span style="font-size:16px;font-weight:500;flex:1">Helix's draft answer</span><span class="tag" style="background:oklch(0.80 0.12 80 / .16);color:oklch(0.80 0.12 80)">Unsure · 54%</span></div>
+      <div style="color:var(--color-neutral-400)">The spec names the states in §14.3 but not which ones SU-7 tests. This reading matches 3 of the 4 places SU-7 is cited.</div>
+      <textarea class="input" style="min-height:170px;line-height:1.55">SU-7's "help states" are the three states of the help panel in §14.3: empty (no articles match), error (the help service didn't answer) and offline (the browser has no connection). Each needs its own copy and a browser test. Loading and partial results are out of scope for SU-7; they belong to SU-9.</textarea>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag tag-outline">§14.3 Help and empty states</span><span class="tag tag-outline">SU-7</span><span class="tag tag-outline">SU-9</span><a style="font-size:12px;align-self:center">Open the spec</a></div>
+      <div style="display:flex;flex-direction:column;gap:7px;padding-top:10px;box-shadow:inset 0 1px 0 var(--color-divider)">
+        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-400)">Where it goes</div>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)">Into the notes of all 23 tasks, then hand them back to the loop</label>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)">Into the Helix Spec as clarification SU-7.1, so new tasks read it too</label>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" style="accent-color:var(--color-accent)">Answer future questions about SU-7 this way without asking</label>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:6px;align-items:center"><button class="btn btn-primary"><i class="ph ph-paper-plane-tilt"></i>Send to 23 tasks</button><button class="btn btn-secondary">Ask Helix to revise</button><div style="flex:1"></div><span style="font-size:12px;color:var(--color-neutral-500)">⌘↩ sends</span></div>
+    </div>
+  </div>
+</div></div>
+
+<div class="dv-opt" id="3c"><div class="dv-olabel"><a class="dv-oid" href="#3c">3c</a>Accept fix: the evidence behind a Helix fix, the plan change it would make, and the alternatives it considered</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix9 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px"><sc-for list="{{ tabsHome }}" as="t" hint-placeholder-count="7"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for></div>
+    <div style="flex:1"></div>
+    <span class="tag tag-outline">Auto-pilot · Intrepid</span>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.76 0.12 150);animation:pulse 2s infinite"></span>Running · both agents</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 28px 0;color:var(--color-neutral-400)"><a style="display:flex;align-items:center;gap:4px;text-decoration:none"><i class="ph ph-arrow-left"></i>Home</a><span>/</span><span style="color:var(--color-text)">The same flaky test fails across tasks</span><span class="tag tag-neutral">41</span><div style="flex:1"></div><span style="font-size:12px">Esc goes back · J / K moves between items</span></div>
+  <div style="flex:1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;padding:14px 28px 22px;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:14px;min-height:0">
+      <div style="border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:16px;font-weight:500;flex:1">help-states.spec.ts times out at line 41</span><span style="color:var(--color-neutral-400)">96 failures · 41 tasks · since Fri 21:00</span></div>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:70px"><sc-for list="{{ failBars }}" as="b" hint-placeholder-count="36"><div style="{{ b.st }}"></div></sc-for></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--color-neutral-500)"><span>Fri 21:00</span><span>Sat</span><span>Sun</span><span>Mon</span><span>now</span></div>
+        <div style="display:flex;gap:16px;font-size:12px;color:var(--color-neutral-400)"><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:oklch(0.72 0.14 35);vertical-align:-1px"></span> failures</span><span><span style="display:inline-block;width:10px;height:3px;background:var(--color-accent);vertical-align:2px"></span> hours with 2 gates running</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+        <sc-for list="{{ evidence }}" as="e" hint-placeholder-count="3"><div style="border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);padding:12px 14px"><div style="font-size:22px;font-weight:500">{{ e.v }}</div><div style="color:var(--color-neutral-400);line-height:1.4">{{ e.l }}</div></div></sc-for>
+      </div>
+      <div style="border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-height:0;overflow:hidden">
+        <h6 style="color:var(--color-neutral-400);margin:0">Last gate output · T-0057 attempt 3</h6>
+        <div style="padding:8px 10px;border-radius:var(--radius-md);background:#11121c;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.55;color:var(--color-neutral-300);white-space:pre;overflow:hidden">  ✓ help panel opens from the header (2.1 s)
+  ✓ empty state shows when no article matches (3.4 s)
+<span style="color:oklch(0.72 0.14 35)">  ✗ error state shows when the service fails
+    TimeoutError: locator.waitFor: 30000ms exceeded
+      at help-states.spec.ts:41:18
+    waiting for getByRole('alert', { name: 'Help is unavailable' })</span>
+  - offline state (skipped after failure)</div>
+      </div>
+    </div>
+    <div style="border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);padding:18px 20px;display:flex;flex-direction:column;gap:12px;min-height:0">
+      <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="color:var(--color-accent);font-size:18px"></i><span style="font-size:16px;font-weight:500;flex:1">What Helix would change</span><span class="tag" style="background:oklch(0.76 0.12 150 / .16);color:oklch(0.76 0.12 150)">Sure · 86%</span></div>
+      <div style="display:flex;flex-direction:column;gap:2px;border-radius:var(--radius-md);background:#11121c;box-shadow:var(--shadow-sm);padding:8px 0;font-family:'JetBrains Mono',monospace;font-size:11.5px">
+        <sc-for list="{{ planDiff }}" as="d" hint-placeholder-count="5"><div style="{{ d.st }}"><span style="{{ d.ms }}">{{ d.m }}</span><span>{{ d.text }}</span></div></sc-for>
+      </div>
+      <div><h6 style="color:var(--color-neutral-400)">Or instead</h6>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label class="radio" style="align-items:flex-start"><input type="radio" name="alt-3c" defaultChecked="{{ true }}"><span class="dot" style="margin-top:2px"></span><span><span style="font-weight:500">Quarantine and fix</span> <span style="color:var(--color-neutral-400)">· Helix's pick. 41 tasks move today; the test returns when T-3201 merges.</span></span></label>
+          <label class="radio" style="align-items:flex-start"><input type="radio" name="alt-3c"><span class="dot" style="margin-top:2px"></span><span><span style="font-weight:500">Run one gate at a time</span> <span style="color:var(--color-neutral-400)">· fixes it now, but gates queue: about 40% slower merging.</span></span></label>
+          <label class="radio" style="align-items:flex-start"><input type="radio" name="alt-3c"><span class="dot" style="margin-top:2px"></span><span><span style="font-weight:500">Raise the test's timeout to 60 s</span> <span style="color:var(--color-neutral-400)">· hides the cause; Helix expects it to come back.</span></span></label>
+        </div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:6px;align-items:center"><button class="btn btn-primary"><i class="ph ph-check"></i>Accept and apply</button><button class="btn btn-secondary">Try in dry run</button><button class="btn btn-ghost">Decline</button><div style="flex:1"></div><span style="font-size:12px;color:var(--color-neutral-500)">Undo for 24 h from Helix › Incidents</span></div>
+    </div>
+  </div>
+</div></div>
+
+<div class="dv-opt" id="3d"><div class="dv-olabel"><a class="dv-oid" href="#3d">3d</a>Review diffs: approving a release that touches production, with the reviewed paths shown first and a deliberate confirm</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix10 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px"><sc-for list="{{ tabsHome }}" as="t" hint-placeholder-count="7"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for></div>
+    <div style="flex:1"></div>
+    <span class="tag tag-outline">Auto-pilot · Intrepid</span>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.76 0.12 150);animation:pulse 2s infinite"></span>Running · both agents</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 28px 0;color:var(--color-neutral-400)"><a style="display:flex;align-items:center;gap:4px;text-decoration:none"><i class="ph ph-arrow-left"></i>Home</a><span>/</span><span style="color:var(--color-text)">Releases waiting for approval</span><span class="tag tag-neutral">2</span><div style="flex:1"></div><span style="font-size:12px">Esc goes back · J / K moves between items</span></div>
+  <div style="flex:1;position:relative;min-height:0">
+    <div style="position:absolute;inset:0;background:color-mix(in srgb, var(--color-neutral-900) 55%, transparent);backdrop-filter:blur(3px)"></div>
+    <div style="position:absolute;left:50%;top:26px;transform:translateX(-50%);width:980px;bottom:26px;border-radius:var(--radius-lg);background:var(--color-surface);box-shadow:var(--shadow-lg);display:grid;grid-template-columns:280px minmax(0,1fr);overflow:hidden">
+      <div style="padding:18px 16px;display:flex;flex-direction:column;gap:12px;box-shadow:inset -1px 0 0 var(--color-divider)">
+        <div><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:oklch(0.72 0.14 35)">Deploys to production</div><div class="dialog-title" style="margin-top:4px">Approve mushy-docs v0.4</div><div style="color:var(--color-neutral-400);margin-top:4px">3 tasks since v0.3 · T-0074, T-0075, T-3160</div></div>
+        <div style="padding:10px 12px;border-radius:var(--radius-md);background:oklch(0.72 0.14 35 / .1);box-shadow:inset 0 0 0 1px oklch(0.72 0.14 35 / .4);line-height:1.45">This release changes <span style="font-family:'JetBrains Mono',monospace;font-size:12px">infra/</span>, which runs with the production DigitalOcean token. The loop never tags these on its own.</div>
+        <div><h6 style="color:var(--color-neutral-400)">Files · reviewed paths first</h6><div style="display:flex;flex-direction:column;gap:2px"><sc-for list="{{ relFiles }}" as="f" hint-placeholder-count="7"><div style="{{ f.st }}"><span style="{{ f.ds }}">{{ f.dot }}</span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.path }}</span><span style="color:var(--color-neutral-500)">{{ f.n }}</span></div></sc-for></div></div>
+        <div style="flex:1"></div>
+        <div style="font-size:12px;color:var(--color-neutral-400);line-height:1.45">Helix's read: the domain moves to docs.mushymarketing.com and the old host redirects. No secrets or permissions change.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;min-height:0">
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;box-shadow:inset 0 -1px 0 var(--color-divider)"><span style="font-family:'JetBrains Mono',monospace;font-size:12px">infra/docs/app.tf</span><span class="tag tag-neutral">reviewed path</span><div style="flex:1"></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px"><span style="color:oklch(0.76 0.12 150)">+14</span> <span style="color:oklch(0.72 0.14 35)">−3</span></span></div>
+        <div style="flex:1;padding:8px 0;background:#11121c;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.6;overflow:hidden"><sc-for list="{{ diffLines }}" as="l" hint-placeholder-count="16"><div style="{{ l.st }}"><span style="width:34px;flex:none;text-align:right;color:var(--color-neutral-600);padding-right:10px">{{ l.n }}</span><span style="width:14px;flex:none">{{ l.m }}</span><span style="white-space:pre">{{ l.text }}</span></div></sc-for></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;box-shadow:inset 0 1px 0 var(--color-divider)">
+          <label style="display:flex;gap:8px;align-items:center;flex:1"><input type="checkbox" style="accent-color:oklch(0.72 0.14 35)">I've read the changes to infra/ and .github/</label>
+          <button class="btn btn-secondary">Cancel</button><button class="btn btn-secondary" style="color:oklch(0.72 0.14 35);border-color:oklch(0.72 0.14 35)" disabled="{{ true }}"><i class="ph ph-warning"></i>Approve and tag v0.4</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: "the Review splits state" · "Add the secret flow" · "3a for a single human task opened from the map"</p>
+</section>
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Helix Loop · hi-fi v2 in Nocturne, with live helix background art and Phosphor icons</span></div>
+<div class="dv-opts" style="flex-direction:column">
+
+<!-- ═════ 2a HOME ═════ -->
+<div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Home after three days away: Helix has grouped 512 waiting items into 8 groups you can clear in batches</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix0 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px">
+      <sc-for list="{{ tabsHome }}" as="t" hint-placeholder-count="6"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for>
+    </div>
+    <div style="flex:1"></div>
+    <span class="tag tag-outline">Auto-pilot · Intrepid</span>
+    <div class="seg"><label class="seg-opt"><input type="radio" name="lp-a" defaultChecked="{{ true }}">Build</label><label class="seg-opt"><input type="radio" name="lp-a">Dry run</label></div>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.76 0.12 150);animation:pulse 2s infinite"></span>Running · both agents</div>
+  </div>
+  <div style="{{ homeGrid }}">
+    <div style="padding:16px 28px;display:flex;flex-direction:column;gap:12px;overflow:hidden">
+      <div>
+        <div style="font-size:12px;color:var(--color-neutral-400)">Welcome back, Daniel · away 3 d 4 h, on Auto-pilot</div>
+        <h2 style="margin:2px 0 4px;font-size:23px">512 things are waiting for you. Three groups unblock 71% of the held work.</h2>
+        <div style="color:var(--color-neutral-300);max-width:820px">While you were away: 214 tasks merged, 9 failed for good, and the finish moved <span style="color:oklch(0.72 0.14 35)">2 days later</span>, to Mon 9 Nov. Most of that slip comes from HT-10 and one flaky test.</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:var(--space-3)">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--radius-md);background:var(--color-accent-900);box-shadow:inset 0 0 0 1px var(--color-accent-700)"><span style="width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--color-accent),0 0 10px var(--color-accent-600)"></span><span style="color:var(--color-accent-200)">Helix grouped these by shared cause and sorted them by what each group holds up</span></div>
+        <div style="flex:1"></div>
+        <span style="color:var(--color-neutral-400)">Group by</span>
+        <div class="seg"><label class="seg-opt"><input type="radio" name="gb-a" defaultChecked="{{ true }}">Cause</label><label class="seg-opt"><input type="radio" name="gb-a">Kind</label><label class="seg-opt"><input type="radio" name="gb-a">Lane</label><label class="seg-opt"><input type="radio" name="gb-a">None</label></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="8">
+          <div style="border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);overflow:hidden">
+            <div style="display:grid;grid-template-columns:28px 44px minmax(0,1fr) 190px auto;align-items:center;gap:12px;padding:5px 14px">
+              <span style="color:var(--color-neutral-400);font-size:12px">{{ g.chev }}</span>
+              <span style="font-size:20px;font-weight:500;text-align:right">{{ g.n }}</span>
+              <div style="min-width:0"><div style="display:flex;gap:8px;align-items:center"><span style="font-weight:500;font-size:14px">{{ g.title }}</span><span class="tag tag-neutral" style="white-space:nowrap">{{ g.kind }}</span></div><div style="color:var(--color-neutral-400);margin-top:2px">{{ g.why }}</div></div>
+              <div><div style="height:6px;border-radius:3px;background:var(--color-neutral-800);overflow:hidden"><div style="{{ g.barStyle }}"></div></div><div style="font-size:11px;color:var(--color-neutral-400);margin-top:4px">{{ g.holds }}</div></div>
+              <div style="display:flex;gap:6px"><button class="btn btn-primary">{{ g.action }}</button><button class="btn btn-secondary">Review</button></div>
+            </div>
+            <sc-if value="{{ g.open }}">
+              <div style="padding:0 14px 10px 56px">
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:6px;border-radius:var(--radius-md);background:var(--color-accent-900)"><span style="color:var(--color-accent-200)">Helix's fix for all 41:</span><span>quarantine the test, add T-3201 to fix it, hand all 41 back</span><a style="font-size:12px">96 failures</a><div style="flex:1"></div><span style="font-size:12px;color:var(--color-neutral-400)">41 selected</span><button class="btn btn-ghost">Park all</button><button class="btn btn-ghost">Hand back</button><button class="btn btn-ghost">Ask Helix</button></div>
+                <div style="display:grid;grid-template-columns:28px minmax(0,1.7fr) minmax(0,.8fr) 50px minmax(0,1.6fr);align-items:center;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 60%, transparent);padding:5px;box-shadow:inset 0 -1px 0 var(--color-divider)"><span></span><span>Task</span><span>Lane</span><span>Failed</span><span>Last error</span></div><sc-for list="{{ flakyRows }}" as="r" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:28px minmax(0,1.7fr) minmax(0,.8fr) 50px minmax(0,1.6fr);align-items:center;padding:5px;box-shadow:inset 0 -1px 0 color-mix(in srgb, var(--color-text) 8%, transparent)"><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)"><span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--color-neutral-400)">{{ r.id }}</span> {{ r.title }}</span><span style="color:var(--color-neutral-400)">{{ r.lane }}</span><span>{{ r.n }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:oklch(0.72 0.14 35)">{{ r.err }}</span></div></sc-for>
+                
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+<sc-if value="{{ railClosed }}"><div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:16px 0;box-shadow:inset 1px 0 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 50%, transparent)"><button class="btn btn-ghost" style="padding:4px" title="Show panel" onClick="{{ toggleRail }}"><i class="ph ph-sidebar-simple" style="font-size:17px"></i></button><div style="display:flex;flex-direction:column;align-items:center;gap:3px" title="432 of 665 merged"><span style="width:8px;height:8px;border-radius:50%;background:oklch(0.76 0.12 150)"></span><span style="font-size:11px">65%</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--color-accent-300)" title="3 passes running"><i class="ph ph-broadcast" style="font-size:17px"></i><span style="font-size:11px">3</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--color-neutral-300)" title="312 resolved for you"><i class="ph ph-dna" style="font-size:17px"></i><span style="font-size:11px">312</span></div></div></sc-if><sc-if value="{{ railOpen }}">    <div style="padding:22px 20px;display:flex;flex-direction:column;gap:18px;box-shadow:inset 1px 0 0 var(--color-divider);overflow:hidden">
+      <div>
+        <div style="display:flex;align-items:center"><h6 style="color:var(--color-neutral-400);margin:0;flex:1">The loop</h6><button class="btn btn-ghost" style="padding:4px" title="Collapse panel" onClick="{{ toggleRail }}"><i class="ph ph-sidebar-simple" style="font-size:17px;transform:scaleX(-1)"></i></button></div>
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:26px;font-weight:500">432</span><span style="color:var(--color-neutral-400)">of 665 merged</span></div>
+        <div style="height:6px;border-radius:3px;background:var(--color-neutral-800);margin:6px 0;overflow:hidden"><div style="width:65%;height:100%;background:oklch(0.76 0.12 150)"></div></div>
+        <div style="color:var(--color-neutral-300)">Finish Mon 9 Nov 11:00 · <span style="color:oklch(0.72 0.14 35)">+2 d</span></div>
+      </div>
+      <div>
+        <h6 style="color:var(--color-neutral-400)">Running now · watch live</h6>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ passes }}" as="p" hint-placeholder-count="3"><div style="padding:8px 10px;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);display:flex;flex-direction:column;gap:3px" style-hover="box-shadow:inset 0 0 0 1px var(--color-accent-700)"><div style="display:flex;align-items:center;gap:6px"><span style="width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1px var(--color-neutral-500);display:grid;place-items:center;font-size:10px">{{ p.badge }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px">{{ p.id }}</span><span style="color:var(--color-neutral-400)">{{ p.phase }}</span><div style="flex:1"></div><span style="font-size:11px;color:var(--color-neutral-400)">{{ p.time }}</span></div><div style="color:var(--color-accent-300);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">▸ {{ p.report }}</div></div></sc-for>
+          <div style="font-size:12px;color:oklch(0.80 0.12 80)">Codex slot 2 held by weekly pace</div>
+        </div>
+      </div>
+      <div>
+        <h6 style="color:var(--color-neutral-400)">Merged per 6 h · last 3 days</h6>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:46px"><sc-for list="{{ spark }}" as="s" hint-placeholder-count="12"><div style="{{ s.st }}"></div></sc-for></div>
+      </div>
+      <div>
+        <h6 style="color:var(--color-neutral-400)">Helix decided on its own</h6>
+        <div style="color:var(--color-neutral-300)">312 HITL requests resolved that Active pilot · Prudent would have brought to you. 5 it's unsure of.</div>
+        <button class="btn btn-secondary" style="margin-top:8px">Review how it resolved them</button>
+      </div>
+    </div></sc-if>
+  </div>
+</div></div>
+
+<!-- ═════ 2b MAP ═════ -->
+<div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Map in Hybrid view: finished epics fold to one green bar; a done task opens its builder history and commits</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix1 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px"><sc-for list="{{ tabsMap }}" as="t" hint-placeholder-count="6"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for></div>
+    <div style="flex:1"></div>
+    <span class="tag tag-outline">Auto-pilot · Intrepid</span>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.76 0.12 150);animation:pulse 2s infinite"></span>Running · both agents</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:var(--space-4);padding:10px 20px">
+    <span style="color:var(--color-neutral-400)">View</span>
+    <div class="seg"><label class="seg-opt"><input type="radio" name="vw-b">Tasks</label><label class="seg-opt"><input type="radio" name="vw-b">Epics</label><label class="seg-opt"><input type="radio" name="vw-b" defaultChecked="{{ true }}">Hybrid</label></div>
+    <div class="seg"><label class="seg-opt"><input type="radio" name="sc-b" defaultChecked="{{ true }}">Frontier</label><label class="seg-opt"><input type="radio" name="sc-b">All</label><label class="seg-opt"><input type="radio" name="sc-b">Critical path</label></div>
+    <input class="input" placeholder="Find a task, epic or commit" style="width:260px">
+    <div style="flex:1"></div>
+    <div class="seg"><label class="seg-opt"><input type="radio" name="ts-b">Hours</label><label class="seg-opt"><input type="radio" name="ts-b" defaultChecked="{{ true }}">Days</label><label class="seg-opt"><input type="radio" name="ts-b">Weeks</label></div>
+  </div>
+  <div style="display:flex;gap:16px;padding:0 20px 10px;font-size:12px;color:var(--color-neutral-400)">
+    <span><span style="display:inline-block;width:18px;height:9px;border-radius:2px;background:oklch(0.76 0.12 150);vertical-align:middle"></span> ✓ done</span>
+    <span><span style="display:inline-block;width:18px;height:9px;border-radius:2px;background:repeating-linear-gradient(135deg,var(--color-accent) 0 4px,var(--color-accent-600) 4px 8px);vertical-align:middle"></span> ◐ building</span>
+    <span><span style="display:inline-block;width:18px;height:9px;border-radius:2px;box-shadow:inset 0 0 0 1px var(--color-neutral-500);vertical-align:middle"></span> ○ ready</span>
+    <span><span style="display:inline-block;width:18px;height:9px;border-radius:2px;border:1.5px dashed oklch(0.72 0.14 35);vertical-align:middle"></span> ! needs you</span>
+    <span><span style="display:inline-block;width:18px;height:9px;border-radius:2px;background:repeating-linear-gradient(135deg,oklch(0.80 0.12 80) 0 3px,transparent 3px 6px);vertical-align:middle"></span> human task</span>
+    <span>▸ folded epic: green share is merged</span>
+    <span>│ now</span>
+  </div>
+  <div style="{{ mapGrid }}">
+    <div style="position:relative;overflow:hidden;box-shadow:inset 0 1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 82%, transparent)">
+      <div style="{{ chartOverlay }}">
+        <sc-for list="{{ ticks }}" as="k" hint-placeholder-count="8"><div style="{{ k.line }}"></div></sc-for>
+        <div style="position:absolute;top:22px;bottom:0;left:40.5%;width:1px;background:var(--color-text);opacity:.7"></div>
+        <div style="position:absolute;top:4px;left:40.5%;transform:translateX(-50%);font-size:10px;padding:1px 5px;border-radius:4px;background:var(--color-text);color:var(--color-bg);z-index:2">Tue 27</div>
+      </div>
+      <div style="{{ headGrid }}">
+        <div style="height:30px;display:flex;align-items:center;gap:8px;padding:0 12px 0 14px;box-shadow:inset 0 -1px 0 var(--color-divider), inset -1px 0 0 var(--color-divider)"><span style="flex:1;font-size:11px;color:var(--color-neutral-500);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Lane › epic › task</span><label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--color-neutral-300);cursor:pointer;flex:none"><input type="checkbox" checked="{{ wrap }}" onChange="{{ toggleWrap }}" style="accent-color:var(--color-accent);margin:0">Wrap</label></div>
+        <div style="height:30px;position:relative;box-shadow:inset 0 -1px 0 var(--color-divider)"><sc-for list="{{ ticks }}" as="k" hint-placeholder-count="8"><span style="{{ k.st }}">{{ k.label }}</span></sc-for></div>
+      </div>
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="18"><div style="{{ rowGrid }}"><div style="{{ r.labelStyle }}"><span style="{{ r.glyphStyle }}">{{ r.glyph }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--color-neutral-500);flex:none">{{ r.id }}</span><span style="{{ labelText }}">{{ r.text }}</span><span style="flex:1"></span><span style="font-size:11px;color:var(--color-neutral-400);flex:none">{{ r.meta }}</span></div><div style="{{ r.rowStyle }}"><sc-if value="{{ r.hasBar }}"><div style="{{ r.barStyle }}">{{ r.barText }}</div></sc-if><sc-if value="{{ r.live }}"><div style="{{ r.liveStyle }}">{{ r.live }}</div></sc-if></div></div></sc-for>
+      <div style="{{ handleStyle }}" style-hover="background:color-mix(in srgb, var(--color-accent) 35%, transparent)" role="separator" aria-orientation="vertical" aria-label="Resize the task column" tabIndex="0" title="Drag to resize · double-click to reset" onMouseDown="{{ startDrag }}" onDoubleClick="{{ resetW }}" onKeyDown="{{ keyW }}"></div>
+    </div>
+<sc-if value="{{ drawerClosed }}"><div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:16px 0;box-shadow:inset 1px 0 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 50%, transparent)"><button class="btn btn-ghost" style="padding:4px" title="Show panel" onClick="{{ toggleDrawer }}"><i class="ph ph-sidebar-simple" style="font-size:17px"></i></button><div style="writing-mode:vertical-rl;display:flex;gap:8px;align-items:center;color:var(--color-neutral-300)"><span style="color:oklch(0.76 0.12 150)">✓</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px">T-1102</span><span style="font-size:12px">A seeded picker chooses…</span></div></div></sc-if><sc-if value="{{ drawerOpen }}">    <div style="box-shadow:inset 1px 0 0 var(--color-divider), inset 0 1px 0 var(--color-divider);padding:18px 20px;display:flex;flex-direction:column;gap:14px;overflow:hidden;background:color-mix(in srgb, var(--color-surface) 55%, var(--color-bg))">
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag" style="background:oklch(0.76 0.12 150 / .18);color:oklch(0.86 0.09 150)">✓ Merged</span><span class="tag tag-neutral">T-1102</span><span class="tag tag-neutral">Seed data &amp; allowances</span><div style="flex:1"></div><button class="btn btn-ghost" style="padding:4px" title="Collapse panel" onClick="{{ toggleDrawer }}"><i class="ph ph-sidebar-simple" style="font-size:17px;transform:scaleX(-1)"></i></button></div>
+      <div><h4 style="margin:0 0 4px;line-height:1.25">A seeded picker chooses each channel's sample posts</h4><div style="color:var(--color-neutral-400)">Merged Tue 27 Oct 14:20 by Codex · 2 attempts · 55 min in all · $3.30</div></div>
+      <div style="display:flex;gap:6px"><button class="btn btn-primary">View diff</button><button class="btn btn-secondary">Replay pass</button><button class="btn btn-secondary">Open on GitHub</button></div>
+      <div>
+        <h6 style="color:var(--color-neutral-400)">Commits on main · 3</h6>
+        <div style="display:flex;flex-direction:column">
+          <sc-for list="{{ commits }}" as="c" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:10px;padding:7px 0;box-shadow:inset 0 -1px 0 color-mix(in srgb, var(--color-text) 8%, transparent)" style-hover="background:var(--color-neutral-900)"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--color-accent-300)">{{ c.sha }}</span><div style="min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.msg }}</div><div style="font-size:11px;color:var(--color-neutral-500)">{{ c.files }}</div></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px"><span style="color:oklch(0.76 0.12 150)">{{ c.add }}</span> <span style="color:oklch(0.72 0.14 35)">{{ c.del }}</span></span></div></sc-for>
+        </div>
+      </div>
+      <div>
+        <h6 style="color:var(--color-neutral-400)">Builder history</h6>
+        <div style="display:flex;flex-direction:column;gap:0;position:relative;padding-left:16px">
+          <div style="position:absolute;left:4px;top:6px;bottom:6px;width:1px;background:var(--color-neutral-700)"></div>
+          <sc-for list="{{ history }}" as="e" hint-placeholder-count="5"><div style="position:relative;padding:5px 0"><span style="{{ e.dot }}"></span><div style="display:flex;gap:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--color-neutral-500);flex:none;width:36px">{{ e.t }}</span><div style="min-width:0"><div>{{ e.text }}</div><div style="font-size:12px;color:var(--color-neutral-400)">{{ e.sub }}</div></div><div style="flex:1"></div><a style="font-size:12px;flex:none">{{ e.link }}</a></div></div></sc-for>
+        </div>
+      </div>
+      <div style="color:var(--color-neutral-400)">Unblocked <span style="color:var(--color-text)">T-1103</span> and <span style="color:var(--color-text)">T-1104</span>, both ready now.</div>
+    </div></sc-if>
+  </div>
+</div></div>
+
+<!-- ═════ 2c LIVE ═════ -->
+<div class="dv-opt" id="2c"><div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Live: watch any running builder as it works, streamed from its event log</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix2 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px"><sc-for list="{{ tabsLive }}" as="t" hint-placeholder-count="6"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for></div>
+    <div style="flex:1"></div>
+    <div class="seg"><label class="seg-opt"><input type="radio" name="lv-c" defaultChecked="{{ true }}">Focus</label><label class="seg-opt"><input type="radio" name="lv-c">Grid of all passes</label></div>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.76 0.12 150);animation:pulse 2s infinite"></span>Running · both agents</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:14px 20px">
+    <sc-for list="{{ passTiles }}" as="p" hint-placeholder-count="4"><div style="{{ p.st }}"><div style="display:flex;align-items:center;gap:6px"><span style="width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 1px var(--color-neutral-500);display:grid;place-items:center;font-size:10px">{{ p.badge }}</span><span style="font-weight:500">{{ p.agent }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--color-neutral-400)">{{ p.id }}</span><div style="flex:1"></div><span style="font-size:11px;color:var(--color-neutral-400)">{{ p.time }}</span></div><div style="color:var(--color-neutral-300);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.title }}</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--color-accent-300);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.line }}</div></div></sc-for>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:0;min-height:0;box-shadow:inset 0 1px 0 var(--color-divider)">
+    <div style="display:flex;flex-direction:column;min-height:0">
+      <div style="padding:14px 20px;display:flex;align-items:flex-start;gap:16px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;gap:8px;align-items:center"><span class="tag tag-accent">◐ Building · attempt 2</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--color-neutral-400)">T-0063 · social-media › Seed data &amp; allowances</span></div>
+          <h4 style="margin:6px 0 2px">The integration test "[BLD-31]" passes every time, instead of failing unrelated tasks</h4>
+          <div style="color:var(--color-neutral-400)">Claude Code · claude-opus-5-5 · 18 min 42 s · 46 tool calls · 27 commands · 3 files changed · 1 failed</div>
+        </div>
+        <div style="display:flex;gap:6px;flex:none"><button class="btn btn-secondary">Note for next attempt</button><button class="btn btn-secondary">Send to Helix</button><button class="btn btn-secondary" style="color:oklch(0.72 0.14 35);border-color:oklch(0.72 0.14 35 / .6)">Stop pass</button></div>
+      </div>
+      <div style="flex:1;margin:0 20px 0;border-radius:var(--radius-md);background:#11121c;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;min-height:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 12px;font-size:12px;color:var(--color-neutral-400);box-shadow:inset 0 -1px 0 var(--color-divider)"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.76 0.12 150);animation:pulse 1.4s infinite"></span>Streaming · last event 1 s ago<div style="flex:1"></div><span>1,240 earlier</span><span>·</span><a>Search log</a><span>·</span><a>Full log</a></div>
+        <div style="flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:9px;overflow:hidden;justify-content:flex-end">
+          <sc-for list="{{ feed }}" as="f" hint-placeholder-count="8"><div style="display:grid;grid-template-columns:58px 16px minmax(0,1fr) auto;gap:8px;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--color-neutral-600)">{{ f.t }}</span><span style="{{ f.gs }}">{{ f.g }}</span><div style="min-width:0"><div style="{{ f.ts }}">{{ f.text }}</div><sc-if value="{{ f.sub }}"><div style="font-size:12px;color:var(--color-neutral-500);margin-top:1px">{{ f.sub }}</div></sc-if></div><span style="{{ f.ss }}">{{ f.state }}</span></div></sc-for>
+          <div style="display:grid;grid-template-columns:58px 16px minmax(0,1fr);gap:8px;font-family:'JetBrains Mono',monospace;font-size:12px"><span style="font-size:11px;color:var(--color-neutral-600)">14:31:40</span><span></span><span style="color:var(--color-neutral-300)">run 17 of 30 · passed in 8.9 s<span style="display:inline-block;width:7px;height:13px;margin-left:4px;background:var(--color-accent);vertical-align:middle;animation:blink 1s infinite"></span></span></div>
+        </div>
+      </div>
+      <div style="padding:10px 20px 14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="color:var(--color-neutral-400);margin-right:4px">Gate · not started</span><sc-for list="{{ gate }}" as="s" hint-placeholder-count="10"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;padding:2px 6px;border-radius:4px;box-shadow:inset 0 0 0 1px var(--color-neutral-700);color:var(--color-neutral-500)">{{ s }}</span></sc-for></div>
+    </div>
+    <div style="box-shadow:inset 1px 0 0 var(--color-divider);padding:14px 18px;display:flex;flex-direction:column;gap:16px;overflow:hidden">
+      <div>
+        <h6 style="color:var(--color-neutral-400)">Its plan · 4 of 7 done</h6>
+        <div style="display:flex;flex-direction:column;gap:6px"><sc-for list="{{ plan }}" as="s" hint-placeholder-count="7"><div style="display:flex;gap:8px"><span style="{{ s.gs }}">{{ s.g }}</span><span style="{{ s.ts }}">{{ s.text }}</span></div></sc-for></div>
+      </div>
+      <div>
+        <h6 style="color:var(--color-neutral-400)">Reported to the loop</h6>
+        <div style="display:flex;flex-direction:column;gap:6px;color:var(--color-accent-300)"><div>▸ Seed generator passes 0, 1 and 5 channels</div><div>▸ Batched allowance history: 2,943 SQL calls down to 248</div></div>
+      </div>
+      <div>
+        <h6 style="color:var(--color-neutral-400)">Helix is watching</h6>
+        <div style="padding:10px;border-radius:var(--radius-md);background:var(--color-accent-900);color:var(--color-accent-200);line-height:1.45">Attempt 1 timed out at run 19 of 30. This one is on pace to finish the 30 runs in about 4 min, well inside the hour.</div>
+      </div>
+      <div style="color:var(--color-neutral-400);font-size:12px">The view follows the newest step. Scroll up to pause it; new steps then collect behind a "3 new steps ↓" button.</div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ═════ 2d PILOT MODES ═════ -->
+<div class="dv-opt" id="2d"><div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Settings · Pilot mode: Active pilot (Cautious · Prudent · Intrepid) with ▲▼ ratings, or Auto-pilot (Intrepid · YOLO) recording every HITL request it resolved</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix3 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px"><sc-for list="{{ tabsSet }}" as="t" hint-placeholder-count="6"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for></div>
+    <div style="flex:1"></div>
+    <span class="tag tag-outline">Auto-pilot · Intrepid</span>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:200px minmax(0,1fr);min-height:0">
+    <div style="padding:20px 12px;display:flex;flex-direction:column;gap:2px;box-shadow:inset -1px 0 0 var(--color-divider)">
+      <sc-for list="{{ setNav }}" as="n" hint-placeholder-count="6"><div style="{{ n.st }}">{{ n.label }}</div></sc-for>
+    </div>
+    <div style="padding:18px 30px;display:flex;flex-direction:column;gap:12px;overflow:hidden">
+      <div><h3 style="margin:0 0 4px">Pilot mode</h3><div style="color:var(--color-neutral-400);max-width:780px">How much the loop and Helix decide without you. Builders always run inside their sandboxes; this only governs plan changes, retries and answers.</div></div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+        <div style="padding:14px 16px;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:9px">
+          <label class="radio"><input type="radio" name="pm-d"><span class="dot"></span><span style="font-size:16px;font-weight:500">Active pilot</span></label>
+          <div style="color:var(--color-neutral-400)">You're at the desk. Helix brings you HITL requests as they come up; rate each one and it learns what to stop asking.</div>
+          <div class="seg"><label class="seg-opt"><input type="radio" name="ap-d">Cautious</label><label class="seg-opt"><input type="radio" name="ap-d" defaultChecked="{{ true }}">Prudent</label><label class="seg-opt"><input type="radio" name="ap-d">Intrepid</label></div>
+          <div style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--color-neutral-400)"><div><span style="color:var(--color-text)">Cautious</span> · if in doubt, ask. Everything in Prudent, plus whenever a builder isn't sure.</div><div><span style="color:var(--color-accent-300)">Prudent</span> · everything in Intrepid, plus scope creep, architecture changes, and compromises a constraint forced.</div><div><span style="color:var(--color-text)">Intrepid</span> · only high-risk items: repeated failures, security, architectural impact.</div></div>
+        </div>
+        <div style="padding:14px 16px;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:inset 0 0 0 1px var(--color-accent), 0 0 24px -8px var(--color-accent-600);display:flex;flex-direction:column;gap:9px">
+          <label class="radio"><input type="radio" name="pm-d" defaultChecked="{{ true }}"><span class="dot"></span><span style="font-size:16px;font-weight:500">Auto-pilot</span><span class="tag tag-accent">current</span></label>
+          <div style="color:var(--color-neutral-400)">You're away. The loop keeps building and Helix resolves what it can.</div>
+          <div class="seg"><label class="seg-opt"><input type="radio" name="au-d" defaultChecked="{{ true }}">Intrepid</label><label class="seg-opt"><input type="radio" name="au-d">YOLO</label></div>
+          <div style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--color-neutral-400)"><div><span style="color:var(--color-accent-300)">Intrepid</span> · resolves everything except high-risk items, which park their task until you're back. The rest of the loop keeps going.</div><div><span style="color:var(--color-text)">YOLO</span> · resolves everything itself. Releases and approvals still wait for you.</div></div>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:2px"><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)">Record HITL invocations and resolutions<span style="font-size:12px;color:var(--color-neutral-500)">· review them under Helix › Resolved for you</span></label>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:22px;min-height:0">
+        <div>
+          <h6 style="color:var(--color-neutral-400)">When Helix asks you</h6>
+          <div style="display:grid;grid-template-columns:minmax(0,2.1fr) repeat(4,minmax(0,1fr));font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-500);padding:0 5px"><span></span><span style="grid-column:span 3;box-shadow:inset 0 -1px 0 var(--color-neutral-700);padding-bottom:2px">Active pilot</span><span style="box-shadow:inset 0 -1px 0 var(--color-accent-700);padding-bottom:2px;color:var(--color-accent-300)">Auto-pilot</span></div>
+          <div style="display:grid;grid-template-columns:minmax(0,2.1fr) repeat(4,minmax(0,1fr));align-items:center;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 60%, transparent);padding:5px;box-shadow:inset 0 -1px 0 var(--color-divider)"><span>Request</span><span>Cautious</span><span>Prudent</span><span style="color:var(--color-accent)">Intrepid</span><span>YOLO</span></div><sc-for list="{{ matrix }}" as="m" hint-placeholder-count="9"><div style="display:grid;grid-template-columns:minmax(0,2.1fr) repeat(4,minmax(0,1fr));align-items:center;box-shadow:inset 0 -1px 0 color-mix(in srgb, var(--color-text) 8%, transparent)"><span style="padding:4px 5px">{{ m.a }}</span><span style="{{ m.s0 }}">{{ m.c0 }}</span><span style="{{ m.s1 }}">{{ m.c1 }}</span><span style="{{ m.s2 }}">{{ m.c2 }}</span><span style="{{ m.s3 }}">{{ m.c3 }}</span></div></sc-for>
+          <div style="font-size:12px;color:var(--color-neutral-500);margin-top:8px">Intrepid sits in both modes. In Active pilot it asks you; in Auto-pilot it parks the task until you're back. Your ▼ ratings override this table.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+          <h6 style="color:var(--color-neutral-400);margin:0">A request in Active pilot</h6>
+          <div style="padding:12px 14px;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:6px;align-items:center"><span class="tag tag-accent">Prudent · scope creep</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--color-neutral-500)">T-1122 · Codex · 14:02</span></div>
+            <div style="font-weight:500">The task grew from one channel to three. Split it, or carry on as one?</div>
+            <div style="font-size:12px;color:var(--color-neutral-400)">Helix would split it: the email part can merge today on its own.</div>
+            <div style="display:flex;gap:6px"><button class="btn btn-primary">Split into 3</button><button class="btn btn-secondary">Carry on as one</button></div>
+            <div style="display:flex;align-items:center;gap:6px;padding-top:8px;box-shadow:inset 0 1px 0 var(--color-divider)"><span style="font-size:12px;color:var(--color-neutral-400);flex:1">Worth asking you?</span><button class="btn btn-secondary" style="padding:3px 9px;font-size:12px">▲ Keep asking</button><button class="btn btn-secondary" style="padding:3px 9px;font-size:12px">▼ Decide these yourself</button></div>
+          </div>
+          <div>
+            <h6 style="color:var(--color-neutral-400)">Learned from your ratings · 3</h6>
+            <div style="display:flex;flex-direction:column;gap:5px"><sc-for list="{{ learned }}" as="l" hint-placeholder-count="3"><div style="display:flex;gap:8px;align-items:baseline"><span style="{{ l.gs }}">{{ l.g }}</span><span style="flex:1">{{ l.text }}</span><span style="font-size:11px;color:var(--color-neutral-500)">{{ l.since }}</span><a style="font-size:12px">Undo</a></div></sc-for></div>
+          </div>
+          <div class="field"><label style="display:flex">Helix's prompt for Auto-pilot · Intrepid <span style="flex:1"></span><a>Reset to preset</a></label><textarea class="input" style="min-height:58px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.5">You run the loop while Daniel is away. Resolve every HITL request you can and record what you were asked, what you chose and why. Park a task instead of resolving it when it touches security, changes the architecture, or keeps failing.</textarea></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ═════ 2e WOULD HAVE ASKED ═════ -->
+<div class="dv-opt" id="2e"><div class="dv-olabel"><a class="dv-oid" href="#2e">2e</a>Helix · Resolved for you: the recorded HITL requests from Auto-pilot and how each was resolved, unsure first</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix4 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px"><sc-for list="{{ tabsHelix }}" as="t" hint-placeholder-count="6"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for></div>
+    <div style="flex:1"></div>
+    <span class="tag tag-outline">Auto-pilot · Intrepid</span>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:220px minmax(0,1fr);min-height:0">
+    <div style="padding:20px 12px;display:flex;flex-direction:column;gap:2px;box-shadow:inset -1px 0 0 var(--color-divider)">
+      <sc-for list="{{ helixNav }}" as="n" hint-placeholder-count="5"><div style="{{ n.st }}"><span>{{ n.label }}</span><span style="flex:1"></span><span style="font-size:12px;color:var(--color-neutral-400)">{{ n.n }}</span></div></sc-for>
+    </div>
+    <div style="padding:22px 30px;display:flex;flex-direction:column;gap:16px;overflow:hidden">
+      <div style="display:flex;align-items:flex-end;gap:20px">
+        <div style="flex:1"><h3 style="margin:0 0 4px">Resolved for you · Fri 23 Oct 18:00 to now</h3><div style="color:var(--color-neutral-400)">312 HITL requests that Active pilot · Prudent would have brought to you, recorded with how Helix resolved each. 296 held up; 11 undid themselves; 5 it marked unsure.</div></div>
+        <button class="btn btn-secondary">Agree with the 296 that held</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="seg"><label class="seg-opt"><input type="radio" name="rv-e" defaultChecked="{{ true }}">Unsure first</label><label class="seg-opt"><input type="radio" name="rv-e">By impact</label><label class="seg-opt"><input type="radio" name="rv-e">By time</label></div>
+        <span class="tag tag-neutral">Retries 141</span><span class="tag tag-neutral">Parks 38</span><span class="tag tag-neutral">Quarantines 6</span><span class="tag tag-neutral">Spec answers 97</span><span class="tag tag-neutral">Notes 30</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:120px minmax(0,1fr) 210px auto;gap:16px;align-items:center;padding:12px 14px;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm)"><div><span style="{{ d.confStyle }}">{{ d.conf }}</span><div style="font-size:11px;color:var(--color-neutral-500);margin-top:4px">{{ d.when }}</div></div><div style="min-width:0"><div style="font-weight:500">{{ d.title }}</div><div style="color:var(--color-neutral-400);margin-top:2px">{{ d.why }}</div><div style="margin-top:4px;font-size:12px;color:var(--color-neutral-500)"><span style="color:var(--color-neutral-300)">Would have asked you:</span> {{ d.ask }}</div></div><div style="{{ d.outStyle }}">{{ d.out }}</div><div style="display:flex;gap:6px"><button class="btn btn-primary">Agree</button><button class="btn btn-secondary">Undo</button><button class="btn btn-ghost">Always ask</button></div></div></sc-for>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ═════ 2f LOOP CONTROLS ═════ -->
+<div class="dv-opt" id="2f"><div class="dv-olabel"><a class="dv-oid" href="#2f">2f</a>Settings · Loop controls: each value with its live effect and its source in config.yaml; edits wait as a change set until applied</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix5 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px"><sc-for list="{{ tabsSet }}" as="t" hint-placeholder-count="6"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for></div>
+    <div style="flex:1"></div>
+    <span class="tag tag-outline">Auto-pilot · Intrepid</span>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.76 0.12 150);animation:pulse 2s infinite"></span>Running · both agents</div>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:200px minmax(0,1fr);min-height:0">
+    <div style="padding:20px 12px;display:flex;flex-direction:column;gap:2px;box-shadow:inset -1px 0 0 var(--color-divider)">
+      <sc-for list="{{ setNavLoop }}" as="n" hint-placeholder-count="7"><div style="{{ n.st }}">{{ n.label }}</div></sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;min-height:0">
+      <div style="padding:18px 28px 0;display:flex;flex-direction:column;gap:14px;flex:1;overflow:hidden">
+        <div style="display:flex;align-items:flex-end;gap:16px">
+          <div style="flex:1"><h3 style="margin:0 0 4px">Loop controls</h3><div style="color:var(--color-neutral-400)">What the loop runs with right now. Values come from <span style="font-family:'JetBrains Mono',monospace;font-size:12px">harness/config.yaml</span>; changes here are written back to it.</div></div>
+          <input class="input" placeholder="Find a setting" style="width:220px">
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:14px;padding:14px 16px;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);align-items:center">
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:10px;height:10px;border-radius:50%;background:oklch(0.76 0.12 150);box-shadow:0 0 10px oklch(0.76 0.12 150)"></span><div><div style="font-size:18px;font-weight:500">Running</div><div style="color:var(--color-neutral-400)">since Mon 09:12 · pid 26107 · 3 passes in flight</div></div></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;gap:14px"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)">Claude Code</label><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" defaultChecked="{{ true }}" style="accent-color:var(--color-accent)">Codex</label></div><div style="display:flex;align-items:center;gap:8px;color:var(--color-neutral-400)">At most <input class="input" placeholder="no cap" style="width:80px;min-height:28px;padding:3px 8px"> passes, then stop</div></div>
+          <div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn btn-secondary">Pause new passes</button><button class="btn btn-secondary">Start a dry run</button><button class="btn btn-secondary" style="color:oklch(0.72 0.14 35);border-color:oklch(0.72 0.14 35 / .6)">Stop after current passes</button></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;min-height:0">
+          <sc-for list="{{ ctlSections }}" as="sec" hint-placeholder-count="6">
+            <div style="padding:12px 14px;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 60%, var(--color-bg));box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:2px">
+              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px"><span style="font-weight:500;font-size:14px">{{ sec.title }}</span><span style="flex:1"></span><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--color-neutral-500)">{{ sec.key }}</span></div>
+              <sc-for list="{{ sec.items }}" as="it" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:4px 0;box-shadow:inset 0 -1px 0 color-mix(in srgb, var(--color-text) 7%, transparent)">
+                  <span>{{ it.label }}</span>
+                  <div style="display:flex;gap:4px;justify-content:flex-end"><div style="{{ it.valStyle }}">{{ it.val }}</div><sc-if value="{{ it.effort }}"><div style="{{ it.effortStyle }}">{{ it.effort }} ▾</div></sc-if></div>
+                  <span style="grid-column:1 / -1;font-size:11.5px;color:var(--color-neutral-500)">{{ it.note }}<span style="{{ it.effStyle }}">{{ it.eff }}</span></span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 28px;margin-top:12px;background:var(--color-accent-900);box-shadow:inset 0 1px 0 var(--color-accent-700)">
+        <span style="color:var(--color-accent-200);white-space:nowrap">3 changes not applied</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--color-neutral-300);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">agents.codex.slots 2 → 3 · limits.max_attempts 3 → 4 · limits.concurrent_gates 2 → 3</span>
+        <div style="flex:1;min-width:12px"></div>
+        <button class="btn btn-ghost" style="white-space:nowrap">Discard</button><button class="btn btn-secondary" style="white-space:nowrap">Try in dry run</button><button class="btn btn-primary" style="white-space:nowrap" title="Takes effect from the next pass; nothing in flight is cut short">Apply from the next pass</button>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ═════ 2g PLAN: SPEC + TASKSET ═════ -->
+<div class="dv-opt" id="2g"><div class="dv-olabel"><a class="dv-oid" href="#2g">2g</a>Settings · Spec and TaskSet: the offline Helix skill, this loop's Helix Spec and TaskSet, and importing a new TaskSet</div>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;position:relative;isolation:isolate;background:radial-gradient(1200px 700px at 100% 0%, color-mix(in srgb, var(--color-section) 55%, transparent), transparent 60%), radial-gradient(900px 600px at 0% 100%, color-mix(in srgb, var(--color-accent-900) 70%, transparent), transparent 70%), var(--color-bg);color:var(--color-text);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;font-size:13px">
+  {{ helix6 }}
+  <div style="display:flex;align-items:center;gap:var(--space-6);padding:10px 20px;box-shadow:inset 0 -1px 0 var(--color-divider);background:color-mix(in srgb, var(--color-bg) 62%, transparent);backdrop-filter:blur(10px)">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ph ph-dna" style="font-size:21px;color:var(--color-accent);filter:drop-shadow(0 0 6px var(--color-accent-600))"></i><span style="font-size:16px;font-weight:500;letter-spacing:-.01em">Helix Loop</span></div>
+    <div style="display:flex;gap:2px"><sc-for list="{{ tabsSet }}" as="t" hint-placeholder-count="7"><div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md);color:var(--color-neutral-400)"><i class="ph {{ t.icon }}" style="font-size:15px"></i><sc-if value="{{ t.on }}"><span style="color:var(--color-text);font-weight:500">{{ t.label }}</span></sc-if><sc-if value="{{ t.off }}"><span>{{ t.label }}</span></sc-if><sc-if value="{{ t.count }}"><span style="font-size:11px;padding:0 6px;border-radius:9px;background:var(--color-accent-800);color:var(--color-accent-100)">{{ t.count }}</span></sc-if></div></sc-for></div>
+    <div style="flex:1"></div>
+    <span class="tag tag-outline">Auto-pilot · Intrepid</span>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.76 0.12 150);animation:pulse 2s infinite"></span>Running · both agents</div>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:200px minmax(0,1fr);min-height:0">
+    <div style="padding:20px 12px;display:flex;flex-direction:column;gap:2px;box-shadow:inset -1px 0 0 var(--color-divider)">
+      <sc-for list="{{ setNavPlan }}" as="n" hint-placeholder-count="7"><div style="{{ n.st }}">{{ n.label }}</div></sc-for>
+    </div>
+  <div style="padding:18px 24px;display:flex;flex-direction:column;gap:14px;min-height:0;overflow:hidden">
+    <div><h3 style="margin:0 0 4px">Spec and TaskSet</h3><div style="color:var(--color-neutral-400);max-width:860px">A loop starts from a Helix Spec, the technical and design specification, which a harness breaks down into a Helix TaskSet: every task in Lane › Epic › Task order, with its dependencies, ready for the loop.</div></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm)">
+      <sc-for list="{{ stages }}" as="s" hint-placeholder-count="3"><div style="{{ s.st }}"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--color-neutral-500)">{{ s.n }}</span><span style="font-size:16px;font-weight:500">{{ s.title }}</span><span style="{{ s.tagStyle }}">{{ s.tag }}</span></div><div style="color:var(--color-neutral-300)">{{ s.line }}</div><div style="font-size:12px;color:var(--color-neutral-500)">{{ s.sub }}</div><div style="display:flex;gap:6px;margin-top:4px"><button class="btn btn-secondary">{{ s.a1 }}</button><button class="btn btn-ghost">{{ s.a2 }}</button></div></div></sc-for>
+    </div>
+    <div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;min-height:0">
+      <div style="padding:16px;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:inset 0 0 0 1px var(--color-accent-700), 0 0 30px -14px var(--color-accent-600);display:flex;flex-direction:column;gap:12px;min-height:0">
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <span style="width:34px;height:34px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 2px var(--color-accent),0 0 14px var(--color-accent-600)"></span>
+          <div style="flex:1"><div style="font-size:17px;font-weight:500">The Helix skill</div><div style="color:var(--color-neutral-400)">Gives any agent harness the guidelines to write a Helix Spec and break it down into a Helix TaskSet this loop can run.</div></div>
+          <span class="tag tag-neutral">v1.4 · 212 KB</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="color:var(--color-neutral-400)">For</span><div class="seg"><label class="seg-opt"><input type="radio" name="hs-g" defaultChecked="{{ true }}">Claude Code</label><label class="seg-opt"><input type="radio" name="hs-g">Codex</label><label class="seg-opt"><input type="radio" name="hs-g">OpenCode</label><label class="seg-opt"><input type="radio" name="hs-g">Any agent</label></div></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-md);background:#11121c;box-shadow:var(--shadow-sm);font-family:'JetBrains Mono',monospace;font-size:12px"><span style="color:var(--color-neutral-500)">$</span><span style="flex:1">helix-loop skill install --to ~/.claude/skills/helix</span><a style="font-family:var(--font-body)">Copy</a></div>
+        <div style="display:flex;gap:6px"><button class="btn btn-primary">Download helix-skill.zip</button><button class="btn btn-secondary">Read SKILL.md</button></div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;min-height:0">
+          <div>
+            <h6 style="color:var(--color-neutral-400)">What it asks the agent to do</h6>
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <div><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--color-accent-300)">/helix spec</span><div style="color:var(--color-neutral-400)">Interview you, then write the technical and design spec, with numbered requirements and acceptance criteria</div></div>
+              <div><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--color-accent-300)">/helix harden</span><div style="color:var(--color-neutral-400)">Find gaps and ambiguities a builder would ask about, before any task exists</div></div>
+              <div><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--color-accent-300)">/helix taskset</span><div style="color:var(--color-neutral-400)">Break it down into lanes, epics and atomic tasks, each one pass and one gate, plus the human tasks only you can do</div></div>
+              <div><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--color-accent-300)">/helix validate</span><div style="color:var(--color-neutral-400)">Check the TaskSet against the schema before you import it</div></div>
+            </div>
+          </div>
+          <div>
+            <h6 style="color:var(--color-neutral-400)">Inside the zip</h6>
+            <div style="display:flex;flex-direction:column;gap:3px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--color-neutral-300)"><sc-for list="{{ skillFiles }}" as="f" hint-placeholder-count="9"><div style="{{ f.st }}">{{ f.name }}</div></sc-for></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px;min-height:0">
+        <div style="padding:14px 16px;border-radius:var(--radius-md);background:color-mix(in srgb, var(--color-surface) 74%, transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:500">This loop's TaskSet</span><span class="tag" style="background:oklch(0.76 0.12 150 / .18);color:oklch(0.86 0.09 150)">✓ valid</span><div style="flex:1"></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--color-neutral-500)">plan/ · rev 41 · Mon 09:10</span></div>
+          <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px"><sc-for list="{{ tsStats }}" as="k" hint-placeholder-count="5"><div><div style="font-size:20px;font-weight:500">{{ k.v }}</div><div style="font-size:11px;color:var(--color-neutral-400)">{{ k.l }}</div></div></sc-for></div>
+          <div style="display:flex;flex-direction:column;gap:4px"><sc-for list="{{ checks }}" as="c" hint-placeholder-count="5"><div style="display:flex;gap:8px"><span style="{{ c.gs }}">{{ c.g }}</span><span style="color:var(--color-neutral-300)">{{ c.text }}</span></div></sc-for></div>
+        </div>
+        <div style="flex:1;padding:14px 16px;border-radius:var(--radius-md);box-shadow:inset 0 0 0 1px var(--color-divider);display:flex;flex-direction:column;gap:10px;min-height:0">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:500">Import a TaskSet</span><div style="flex:1"></div><span style="color:var(--color-neutral-400)">Drop a folder or zip, or pick one</span><button class="btn btn-secondary">Choose…</button></div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;min-height:0">
+            <div style="border-radius:var(--radius-md);background:#11121c;box-shadow:var(--shadow-sm);padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.42;color:var(--color-neutral-300);white-space:pre;overflow:hidden"><span style="color:var(--color-neutral-500)"># taskset.yaml</span><br><span style="color:var(--color-accent-300)">lanes:</span>
+  mushy-social-media:
+    repo: mushy-social-media
+    <span style="color:var(--color-accent-300)">epics:</span>
+      seed-data:
+        title: Seed data &amp; allowances
+        tasks: [T-1100, T-1102, T-0063]
+<span style="color:var(--color-neutral-500)"># tasks/T-0063.yaml</span>
+id: T-0063
+epic: seed-data
+<span style="color:var(--color-accent-300)">waits_on:</span> [T-1102, HT-10]
+requirements: [BLD-31]
+done_when: 30 runs pass in a row</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="color:var(--color-neutral-400)">Against the running plan:</div>
+              <div><span style="color:oklch(0.76 0.12 150)">+42</span> tasks in 3 new epics</div>
+              <div><span style="color:var(--color-accent-300)">~18</span> tasks with changed dependencies</div>
+              <div><span style="color:oklch(0.72 0.14 35)">−4</span> tasks removed, none started</div>
+              <div style="color:var(--color-neutral-400)">Merged and running tasks are kept as they are. Finish moves to Wed 11 Nov.</div>
+              <div style="flex:1"></div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-secondary">Try in dry run</button><button class="btn btn-primary">Apply to the loop</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: "make <a class="dv-oid" href="#2b">2b</a>'s Epics view" · "show <a class="dv-oid" href="#2c">2c</a> in the grid of all passes" · "do the feedback rules and Metrics in this style"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const OK = 'oklch(0.76 0.12 150)', WARN = 'oklch(0.80 0.12 80)', CRIT = 'oklch(0.72 0.14 35)';
+const TABS = [['Home', '512'], ['Map'], ['Live', '3'], ['Helix', '5'], ['Metrics'], ['Settings']];
+const ICONS = { Home: 'ph-house-simple', Map: 'ph-chart-bar-horizontal', Live: 'ph-broadcast', Helix: 'ph-dna', Plan: 'ph-tree-structure', Metrics: 'ph-chart-line-up', Settings: 'ph-sliders-horizontal' };
+const tabs = (a) => TABS.map(([label, count]) => ({ label, count, icon: ICONS[label], on: label === a, off: label !== a }));
+const D0 = 19, SPAN = 21;
+const pct = (d) => ((d - D0) / SPAN) * 100;
+const mono = "'JetBrains Mono',monospace";
+
+function HelixBg({ seed = 0, x = 0.8, tilt = -0.35, scale = 1, opacity = 0.5 }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    const cv = ref.current; if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const W = 1440, H = 900, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = W * dpr; cv.height = H * dpr; ctx.scale(dpr, dpr);
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let rnd = seed * 9301 + 49297; const rand = () => ((rnd = (rnd * 9301 + 49297) % 233280) / 233280);
+    const bits = Array.from({ length: 70 }, () => ({ s: rand(), o: rand() * 6.28, sp: 0.02 + rand() * 0.05, k: rand() < 0.5 ? 0 : 1, ch: rand() < 0.5 ? '0' : '1', sz: rand() }));
+    const len = 1500 * scale, A = 120 * scale, turns = 4.6, N = 260;
+    const dir = rand() * 6.283, sp = 9 + rand() * 6, roam = 260;
+    const tri = (v) => { const m = ((v % 4) + 4) % 4; return m < 2 ? m - 1 : 3 - m; };
+    let cx = W * x, cy = H * 0.5, cos = Math.cos(tilt), sin = Math.sin(tilt);
+    const P = (u, ph) => { const along = (u - 0.5) * len; const a = u * turns * 6.283 + ph; const off = Math.sin(a) * A; const z = Math.cos(a); return [cx + along * sin + off * cos, cy + along * cos - off * sin, z]; };
+    let raf, t0 = performance.now(), last = 0;
+    const draw = (now) => {
+      if (now - last < 66 && !reduce) { raf = requestAnimationFrame(draw); return; }
+      last = now; const t = reduce ? 0 : (now - t0) / 1000;
+      const ph = t * 0.035 + seed;
+      const k = (t * sp) / roam;
+      cx = W * x + tri(k * Math.cos(dir) + seed) * roam;
+      cy = H * 0.5 + tri(k * Math.sin(dir) + seed * 0.7) * roam * 0.7;
+      const tl = tilt + Math.sin(t * 0.008 + seed) * 0.25; cos = Math.cos(tl); sin = Math.sin(tl);
+      ctx.clearRect(0, 0, W, H);
+      for (let i = 0; i < N; i++) {
+        const u = i / (N - 1);
+        const a = P(u, ph), b = P(u, ph + Math.PI);
+        const edge = Math.max(0, Math.sin(u * Math.PI));
+        if (i % 3 === 0) {
+          const g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+          g.addColorStop(0, 'rgba(145,132,217,' + ((0.16 + 0.3 * (a[2] + 1) / 2) * edge).toFixed(3) + ')');
+          g.addColorStop(1, 'rgba(181,171,252,' + ((0.16 + 0.3 * (b[2] + 1) / 2) * edge).toFixed(3) + ')');
+          ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+        }
+        for (const [p, c] of [[a, '181,171,252'], [b, '145,132,217']]) {
+          const d = (p[2] + 1) / 2;
+          ctx.fillStyle = 'rgba(' + c + ',' + ((0.2 + 0.8 * d) * edge).toFixed(3) + ')';
+          ctx.beginPath(); ctx.arc(p[0], p[1], (1 + 2.6 * d) * Math.sqrt(scale), 0, 6.283); ctx.fill();
+        }
+      }
+      ctx.font = '10px JetBrains Mono, monospace';
+      for (const bt of bits) {
+        const u = (bt.s + t * bt.sp * 0.02) % 1;
+        const p = P(u, ph + (bt.k ? Math.PI : 0));
+        const drift = (Math.sin(t * 0.12 + bt.o) * 18 + 16) * Math.sqrt(scale);
+        const edge = Math.max(0, Math.sin(u * Math.PI));
+        ctx.fillStyle = 'rgba(210,206,253,' + ((0.08 + 0.3 * (p[2] + 1) / 2) * edge).toFixed(3) + ')';
+        if (bt.sz < 0.6) ctx.fillText(bt.ch, p[0] + drift * cos, p[1] - drift * sin);
+        else ctx.fillRect(p[0] + drift * cos, p[1] - drift * sin, 2, 2);
+      }
+      if (!reduce) raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return React.createElement('canvas', { ref, 'aria-hidden': true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: -1, pointerEvents: 'none', opacity, maskImage: 'radial-gradient(ellipse 110% 105% at 60% 50%, #000 45%, transparent 95%)', WebkitMaskImage: 'radial-gradient(ellipse 110% 105% at 60% 50%, #000 45%, transparent 95%)', filter: 'drop-shadow(0 0 6px rgba(145,132,217,.45))' } });
+}
+
+class Component extends DCLogic {
+  state = { rail: true, drawer: true, labelW: 330, wrap: false };
+  startDrag = (e) => {
+    e.preventDefault();
+    const box = e.currentTarget.parentElement; const k = box.getBoundingClientRect().width / box.offsetWidth || 1;
+    const x0 = e.clientX, w0 = this.state.labelW;
+    const move = (ev) => this.setState({ labelW: Math.max(200, Math.min(640, Math.round(w0 + (ev.clientX - x0) / k))) });
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.style.cursor = ''; };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up); document.body.style.cursor = 'col-resize';
+  };
+  rows() {
+    const R = [
+      { type: 'lane', text: 'Human tasks · Daniel', meta: '3 of 73', color: WARN },
+      { type: 'task', id: 'HT-10', text: 'Apple Developer Program as EcoEarth', st: 'human', s: 19, e: 27.6, meta: 'holds 112', late: true },
+      { type: 'task', id: 'HT-22', text: "Mushy Marketing's own accounts", st: 'human', s: 26, e: 29, meta: 'holds 38' },
+      { type: 'lane', text: 'mushy-social-media', meta: '61%', color: 'oklch(0.74 0.1 330)' },
+      { type: 'epic', text: 'Day 0 skeleton', st: 'epicdone', s: 19, e: 21.5, meta: '40/40', p: 1 },
+      { type: 'epic', text: 'Auth and sign-in', st: 'epicdone', s: 20.5, e: 25, meta: '24/24', p: 1 },
+      { type: 'epic', open: true, text: 'Seed data & allowances', st: 'epic', s: 24, e: 30, meta: '9/14', p: 0.64 },
+      { type: 'task', id: 'T-1100', text: 'Drafters create, edit and delete drafts', st: 'done', s: 24, e: 25.5 },
+      { type: 'task', id: 'T-1102', text: "A seeded picker chooses each channel's posts", st: 'done', s: 25.5, e: 27.2, sel: true },
+      { type: 'task', id: 'T-0063', text: 'The integration test [BLD-31] passes every time', st: 'run', s: 27.1, e: 27.9, agent: 'C', live: 'Repeating the suite · 17 of 30' },
+      { type: 'task', id: 'T-0057', text: 'Browser test [SU-7] help states', st: 'need', s: 27.5, e: 28.5 },
+      { type: 'task', id: 'T-1103', text: 'Posters schedule posts for an exact time', st: 'ready', s: 28, e: 29.5 },
+      { type: 'epic', text: 'Posting and scheduling', st: 'epic', s: 28, e: 36, meta: '3/31', p: 0.1 },
+      { type: 'lane', text: 'mushy-website', meta: '18%', color: 'var(--color-accent)' },
+      { type: 'epic', text: 'First pages', st: 'epic', s: 22, e: 31, meta: '12/18 · waits HT-25', p: 0.66 },
+      { type: 'epic', text: 'Static sites infrastructure', st: 'epic', s: 30, e: 34, meta: '0/9', p: 0 },
+      { type: 'lane', text: 'mushy-docs', meta: '78%', color: 'oklch(0.74 0.1 190)' },
+      { type: 'epic', text: 'Docs app', st: 'epicdone', s: 19, e: 26, meta: '22/22', p: 1 },
+      { type: 'epic', open: true, text: 'Domain and deploy', st: 'epic', s: 26, e: 30, meta: '2/5', p: 0.4 },
+      { type: 'task', id: 'T-0074', text: 'The docs app serves docs.mushymarketing.com', st: 'run', s: 27.3, e: 28.2, agent: 'X', live: 'working · Updated the manifest' },
+    ];
+    return R.map((r) => {
+      const H = r.type === 'lane' ? 30 : 31;
+      const indent = r.type === 'lane' ? 14 : r.type === 'epic' ? 22 : 40;
+      const done = r.st === 'done' || r.st === 'epicdone';
+      const rowBg = r.sel ? 'var(--color-accent-900)' : done ? 'oklch(0.76 0.12 150 / .05)' : 'transparent';
+      const labelStyle = { minHeight: H, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 8, padding: `0 12px 0 ${indent}px`, background: rowBg, boxShadow: (r.sel ? 'inset 2px 0 0 var(--color-accent), ' : '') + 'inset -1px 0 0 var(--color-divider)', minWidth: 0, overflow: 'hidden', color: r.type === 'lane' ? r.color : done ? 'var(--color-neutral-400)' : 'var(--color-text)', fontWeight: r.type === 'task' ? 400 : 500, fontSize: r.type === 'lane' ? 12 : 13 };
+      let glyph = '', gc = 'var(--color-neutral-400)';
+      if (r.type === 'epic') { glyph = r.open ? '▾' : '▸'; if (done) { glyph = '✓'; gc = OK; } }
+      if (r.type === 'task') ({ done: () => { glyph = '✓'; gc = OK; }, run: () => { glyph = '◐'; gc = 'var(--color-accent)'; }, need: () => { glyph = '!'; gc = CRIT; }, ready: () => { glyph = '○'; }, human: () => { glyph = '◆'; gc = r.late ? CRIT : WARN; } })[r.st]();
+      const glyphStyle = { width: 12, flex: 'none', textAlign: 'center', color: gc, fontWeight: 600 };
+      const rowStyle = { position: 'relative', minHeight: H, background: rowBg };
+      let bar = null, barText = '';
+      if (r.type !== 'lane') {
+        const L = pct(r.s), W = Math.max(pct(r.e) - L, 1.2);
+        const ep = r.type === 'epic';
+        const base = { position: 'absolute', left: L + '%', width: W + '%', top: '50%', transform: 'translateY(-50%)', height: ep ? 17 : 13, borderRadius: 3, fontSize: 10, lineHeight: (ep ? 17 : 13) + 'px', paddingLeft: 5, overflow: 'hidden', whiteSpace: 'nowrap', boxSizing: 'border-box' };
+        const fills = {
+          done: { background: OK, color: 'var(--color-bg)', fontWeight: 600 },
+          epicdone: { background: OK, color: 'var(--color-bg)', fontWeight: 600 },
+          epic: { background: `linear-gradient(to right, ${OK} ${r.p * 100}%, var(--color-neutral-800) ${r.p * 100}%)`, boxShadow: 'inset 0 0 0 1px var(--color-neutral-600)', color: 'var(--color-text)' },
+          run: { background: 'repeating-linear-gradient(135deg,var(--color-accent) 0 4px,var(--color-accent-600) 4px 8px)', boxShadow: '0 0 10px var(--color-accent-700)' },
+          need: { border: `1.5px dashed ${CRIT}`, background: 'oklch(0.72 0.14 35 / .14)', color: CRIT, fontWeight: 600 },
+          ready: { boxShadow: 'inset 0 0 0 1px var(--color-neutral-500)' },
+          human: { background: `repeating-linear-gradient(135deg,${r.late ? CRIT : WARN} 0 3px,transparent 3px 7px)`, boxShadow: `inset 0 0 0 1px ${r.late ? CRIT : WARN}` },
+        };
+        bar = { ...base, ...fills[r.st] };
+        barText = r.st === 'done' ? '✓' : r.st === 'epicdone' ? '✓ ' + r.meta : r.st === 'epic' ? r.meta : r.st === 'need' ? '!' : '';
+        if (r.type === 'task' && r.st === 'done') bar.boxShadow = r.sel ? '0 0 0 2px var(--color-accent)' : 'none';
+      }
+      const liveStyle = r.live ? { position: 'absolute', left: pct(r.e) + 0.6 + '%', top: '50%', transform: 'translateY(-50%)', fontSize: 11, padding: '1px 6px', borderRadius: 4, background: 'var(--color-accent-900)', color: 'var(--color-accent-200)', whiteSpace: 'nowrap', fontFamily: mono } : null;
+      return { id: r.id || '', text: r.text, meta: r.type === 'task' ? (r.agent ? `(${r.agent})` : r.meta || '') : r.type === 'epic' ? '' : r.meta, glyph, glyphStyle, labelStyle, rowStyle, hasBar: !!bar, barStyle: bar, barText, live: r.live || '', liveStyle };
+    });
+  }
+  renderVals() {
+    const groups = [
+      { n: 6, title: 'Human tasks on the critical path', kind: 'your tasks', why: 'HT-10, HT-22, HT-39 and 3 more. Only you can do these.', holds: 'holds 288 tasks · 3 d of finish', h: 1, action: 'Open checklist' },
+      { n: 41, title: 'The same flaky test fails across tasks', kind: 'fix ready', why: 'help-states.spec.ts times out at 30 s when two gates run at once.', holds: 'holds 112 tasks', h: 0.62, action: 'Accept fix for 41', open: true },
+      { n: 23, title: 'Spec questions about SU-7 help states', kind: 'questions', why: 'One answer covers all 23; Helix drafted it from §14.3.', holds: 'holds 64 tasks', h: 0.4, action: 'Answer once' },
+      { n: 18, title: 'STRIPE_TEST_KEY is missing in prepare', kind: 'credential', why: 'Every billing task stops at setup.', holds: 'holds 31 tasks', h: 0.22, action: 'Add the secret' },
+      { n: 34, title: 'Tasks that grew past twice their estimate', kind: 'scope', why: 'Helix proposes a split for each.', holds: 'holds 20 tasks', h: 0.14, action: 'Review splits' },
+      { n: 2, title: 'Releases waiting for approval', kind: 'release', why: 'mushy-docs v0.4 and support v0.2 change infra/.', holds: 'production', h: 0.06, action: 'Review diffs' },
+      { n: 312, title: 'HITL requests Helix resolved on Auto-pilot', kind: 'resolved', why: 'What Active pilot · Prudent would have asked, and how each was resolved. 5 unsure.', holds: 'already applied', h: 0.03, action: 'Review unsure 5' },
+      { n: 76, title: 'Low-impact notices', kind: 'noise', why: 'Slow steps, retried conflicts, one-off warnings.', holds: 'holds nothing', h: 0, action: 'Dismiss all' },
+    ].map((g) => ({ ...g, chev: g.open ? '▾' : '▸', barStyle: { width: Math.max(g.h * 100, 2) + '%', height: '100%', background: g.h > 0.5 ? CRIT : g.h > 0.1 ? WARN : 'var(--color-neutral-500)' } }));
+    const sparkV = [5, 7, 8, 6, 9, 11, 4, 2, 3, 8, 10, 9];
+    const spark = sparkV.map((v, i) => ({ st: { flex: 1, height: v * 4, borderRadius: 2, background: v < 5 ? CRIT : OK, opacity: i === sparkV.length - 1 ? 1 : 0.75 } }));
+    const ticks = [19, 21, 23, 25, 29, 31, 33, 35, 37, 39].map((d) => ({ label: d > 31 ? `Nov ${d - 31}` : `Oct ${d}`, st: { position: 'absolute', left: pct(d) + '%', top: 8, fontSize: 11, color: 'var(--color-neutral-500)', paddingLeft: 4 }, line: { position: 'absolute', left: pct(d) + '%', top: 30, bottom: 0, zIndex: 0, width: 1, background: 'color-mix(in srgb, var(--color-text) 6%, transparent)' } }));
+    const dot = (c) => ({ position: 'absolute', left: -16, top: 10, width: 9, height: 9, borderRadius: '50%', background: c, boxShadow: '0 0 0 3px var(--color-bg)' });
+    const history = [
+      { t: '14:20', text: 'Merged into main', sub: 'rebased on 3 newer commits, re-gated clean', link: 'a41f9c2', dot: dot(OK) },
+      { t: '14:12', text: 'Gate passed · 21 of 21 steps', sub: '6 min 10 s · 80-e2e 2 min 41 s', link: 'Gate log', dot: dot(OK) },
+      { t: '13:25', text: 'Attempt 2 · Codex', sub: '47 min · 38 tool calls · started from attempt 1\'s kept work', link: 'Replay', dot: dot('var(--color-accent)') },
+      { t: '12:58', text: 'Attempt 1 · gate failed at 80-e2e', sub: 'picker.spec.ts: expected 3 posts, got 2', link: 'Replay', dot: dot(CRIT) },
+      { t: '12:03', text: 'Claimed by Codex', sub: 'T-1100 merged, so it was ready', link: '', dot: dot('var(--color-neutral-500)') },
+    ];
+    const commits = [
+      { sha: 'a41f9c2', msg: "Seed picker: choose each channel's sample posts", files: '6 files · packages/testkit, apps/web', add: '+184', del: '−22' },
+      { sha: '7be20d1', msg: 'Tests: picker is deterministic for a given seed', files: '2 files · packages/testkit', add: '+96', del: '−0' },
+      { sha: 'e03c1aa', msg: 'Merge T-1102 into main', files: 'merge commit', add: '', del: '' },
+    ];
+    const passTiles = [
+      { badge: 'C', agent: 'Claude Code', id: 'T-0063', time: '18:42', title: 'The integration test [BLD-31] passes every time', line: '$ node scripts/t0063-repeat.mjs 30', sel: true },
+      { badge: 'X', agent: 'Codex', id: 'T-0074', time: '12:04', title: 'The docs app serves docs.mushymarketing.com', line: '▸ Updated the primary domain manifest' },
+      { badge: 'X', agent: 'Codex', id: 'T-1122', time: '3:10', title: 'Notifications reach members in-app and by email', line: '◆ Gate 14 of 21 · 60-integration running' },
+      { badge: 'C', agent: 'Claude Code', id: 'slot 2', time: '', title: 'Free', line: 'Waiting for a ready task', idle: true },
+    ].map((p) => ({ ...p, st: { padding: '10px 12px', borderRadius: 'var(--radius-md)', background: p.sel ? 'var(--color-accent-900)' : 'var(--color-surface)', boxShadow: p.sel ? 'inset 0 0 0 1px var(--color-accent)' : 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: 4, opacity: p.idle ? 0.55 : 1 } }));
+    const K = {
+      report: { g: '▸', gc: 'var(--color-accent)', tc: 'var(--color-accent-300)' },
+      cmd: { g: '$', gc: 'var(--color-neutral-400)', tc: 'var(--color-text)', m: true },
+      think: { g: '∴', gc: 'var(--color-neutral-500)', tc: 'var(--color-neutral-400)', i: true },
+      edit: { g: '✎', gc: 'var(--color-neutral-400)', tc: 'var(--color-text)' },
+      look: { g: '⌕', gc: 'var(--color-neutral-400)', tc: 'var(--color-neutral-300)' },
+      msg: { g: '', gc: '', tc: 'var(--color-text)' },
+    };
+    const feed = [
+      { t: '14:29:51', k: 'msg', text: 'Typecheck, lint and formatting pass. Next, one run of the target files to time them before the 30 repeats.' },
+      { t: '14:30:02', k: 'cmd', text: 'pnpm test:integration packages/testkit/src/seed-generator', sub: 'Run the seed-generator suite once with timing', state: '9.2 s', ok: true },
+      { t: '14:30:14', k: 'think', text: 'The 15-channel case is where attempt 1 hit the 30-second limit. With the batched history it should stay well under.' },
+      { t: '14:30:20', k: 'look', text: 'Read 4 files, searched 2 times' },
+      { t: '14:30:41', k: 'edit', text: 'Edited packages/core/src/allowances/meter.ts', state: '+18 −41' },
+      { t: '14:30:58', k: 'report', text: 'Batched allowance history: 2,943 SQL calls down to 248' },
+      { t: '14:31:04', k: 'cmd', text: 'node scripts/t0063-repeat.mjs 30', sub: 'Run the seed-generator and allowance tests 30 times in sequence', state: 'running', run: true },
+    ].map((f) => { const k = K[f.k]; return { ...f, g: k.g, gs: { color: k.gc, fontFamily: mono, fontSize: 12, textAlign: 'center' }, ts: { color: k.tc, fontFamily: k.m ? mono : 'inherit', fontSize: k.m ? 12 : 13, fontStyle: k.i ? 'italic' : 'normal', lineHeight: 1.45 }, ss: { fontSize: 11, fontFamily: mono, color: f.run ? 'var(--color-accent)' : f.ok ? OK : 'var(--color-neutral-400)' }, sub: f.sub || '', state: f.state || '' }; });
+    const gate = ['00-install', '10-typecheck', '15-lint', '20-format', '30-unit', '40-contract', '50-migrations', '60-integration', '70-a11y', '80-e2e', '+11'];
+    const plan = [
+      ['done', 'Reproduce the timeout on 15 channels'], ['done', 'Batch the allowance history writes'], ['done', 'Add a query-budget test'], ['done', 'Typecheck, lint, format'],
+      ['now', 'Run the suite 30 times in sequence'], ['todo', 'Update docs/seed-data.md'], ['todo', 'Commit and report'],
+    ].map(([s, text]) => ({ text, g: s === 'done' ? '✓' : s === 'now' ? '◐' : '○', gs: { color: s === 'done' ? OK : s === 'now' ? 'var(--color-accent)' : 'var(--color-neutral-600)', width: 14, flex: 'none' }, ts: { color: s === 'done' ? 'var(--color-neutral-400)' : s === 'now' ? 'var(--color-text)' : 'var(--color-neutral-500)' } }));
+    const cell = (v) => ({ asks: ['Asks you', { color: 'var(--color-text)' }], park: ['Parks, waits', { color: WARN }], dec: ['Decides', { color: OK }], always: ['Always asks', { color: WARN }], you: ['Only you', { color: 'var(--color-neutral-500)' }] })[v];
+    const matrix = [
+      ["A builder isn't sure how to proceed", 'asks', 'dec', 'dec', 'dec'],
+      ['Spec question the spec answers plainly', 'asks', 'dec', 'dec', 'dec'],
+      ['Scope creep: a task grew', 'asks', 'asks', 'dec', 'dec'],
+      ['Compromise forced by a constraint', 'asks', 'asks', 'dec', 'dec'],
+      ['Change to the architecture', 'asks', 'asks', 'park', 'dec'],
+      ['Repeated failures or a flaky test', 'asks', 'asks', 'park', 'dec'],
+      ['Anything touching security', 'asks', 'asks', 'park', 'dec'],
+      ['Release or approve a tag', 'always', 'always', 'always', 'always'],
+      ['Mark a human task done', 'you', 'you', 'you', 'you'],
+    ].map(([a, ...cs]) => { const o = { a }; cs.forEach((c, i) => { let [t, s] = cell(c); if (i === 2 && c === 'park') t = 'Asks you · parks on Auto'; o['c' + i] = t; o['s' + i] = { padding: '4px 5px', alignSelf: 'stretch', display: 'flex', alignItems: 'center', fontSize: 12.5, ...s, ...(i === 2 ? { background: 'var(--color-accent-900)' } : {}) }; }); return o; });
+    const learned = [
+      ['▼', 'Lockfile-only merge conflicts: Helix decides', 'since Tue'],
+      ['▼', 'Renaming a test file to match its subject: Helix decides', 'since Wed'],
+      ['▲', 'Any change to apps/auth: keep asking, even on Intrepid', 'since Mon'],
+    ].map(([g, text, since]) => ({ g, text, since, gs: { color: g === '▲' ? OK : CRIT, fontSize: 11, width: 12, flex: 'none' } }));
+    const sideItem = (label, on, n) => ({ label, n: n || '', st: { display: 'flex', alignItems: 'center', padding: '7px 10px', borderRadius: 'var(--radius-md)', color: on ? 'var(--color-text)' : 'var(--color-neutral-400)', background: on ? 'var(--color-neutral-900)' : 'transparent', boxShadow: on ? 'inset 2px 0 0 var(--color-accent)' : 'none' } });
+    const setNav = ['Pilot mode', 'Builder feedback', 'Agents', 'Helix', 'Releases', 'Spec and TaskSet'].map((l, i) => sideItem(l, i === 0));
+    const helixNav = [['Resolved for you', '312'], ['Fixes to approve', '5'], ['Incidents', '2'], ['Conversations', '7'], ['Ask Helix', '']].map(([l, n], i) => sideItem(l, i === 0, n));
+    const chip = (c) => ({ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: c === 'lo' ? 'oklch(0.72 0.14 35 / .16)' : c === 'mid' ? 'oklch(0.80 0.12 80 / .16)' : 'oklch(0.76 0.12 150 / .16)', color: c === 'lo' ? CRIT : c === 'mid' ? WARN : OK });
+    const decisions = [
+      { conf: 'Unsure · 54%', c: 'lo', when: 'Sat 02:14', title: 'Answered 23 spec questions on SU-7 the same way', why: 'Read "help states" as the empty, error and offline states in §14.3.', ask: 'Which help states does SU-7 cover?', out: '19 merged since · 4 still building', oc: OK },
+      { conf: 'Unsure · 61%', c: 'lo', when: 'Sat 11:40', title: 'Parked T-2133 after 3 conflicts in apps/auth/routes.ts', why: 'Splitting the file needs your call, so it parked rather than retry.', ask: 'Split routes.ts, or serialise these tasks?', out: 'Still parked · holds 6', oc: WARN },
+      { conf: 'Sure · 82%', c: 'mid', when: 'Sun 09:03', title: 'Quarantined help-states.spec.ts on 5 tasks', why: 'Same 30 s timeout on 96 runs, only with two gates at once.', ask: 'Quarantine the test and add a task to fix it?', out: 'Undid itself: failures continued', oc: CRIT },
+      { conf: 'Sure · 93%', c: 'hi', when: 'Sun 16:22', title: 'Retried T-1845 with a note about Apple\'s sandbox host', why: 'The builder used the production host; the spec names the sandbox.', ask: 'Retry with a note pointing at the sandbox?', out: 'Merged on attempt 2', oc: OK },
+      { conf: 'Sure · 95%', c: 'hi', when: 'Mon 07:50', title: 'Retried 12 passes after Codex hit its limit', why: 'Limit reset at 07:45; work was kept.', ask: 'Retry the 12 limited passes?', out: '12 merged', oc: OK },
+    ].map((d) => ({ ...d, confStyle: chip(d.c), outStyle: { color: d.oc, fontSize: 13 } }));
+    const passes = [
+      { badge: 'C', id: 'T-0063', phase: 'repeating', time: '18:42', report: 'Run 17 of 30 · all passed so far' },
+      { badge: 'X', id: 'T-0074', phase: 'working', time: '12:04', report: 'Updated the primary domain manifest' },
+      { badge: 'X', id: 'T-1122', phase: 'gating', time: '3:10', report: 'Gate 14 of 21 · 60-integration' },
+    ];
+    const flakyRows = [
+      { id: 'T-0057', title: 'Browser test [SU-7] help states', lane: 'social-media', n: '3×', err: 'help-states.spec.ts:41 timeout 30000ms' },
+      { id: 'T-0061', title: 'Help panel opens from every page', lane: 'social-media', n: '3×', err: 'help-states.spec.ts:41 timeout 30000ms' },
+      { id: 'T-2310', title: 'The web app installs on phones', lane: 'website', n: '2×', err: 'help-states.spec.ts:88 timeout 30000ms' },
+          ];
+    const setNavPlan = ['Pilot mode', 'Loop controls', 'Builder feedback', 'Agents', 'Helix', 'Releases', 'Spec and TaskSet'].map((l, i) => sideItem(l, i === 6));
+    const setNavLoop = ['Pilot mode', 'Loop controls', 'Builder feedback', 'Agents', 'Helix', 'Releases', 'Spec and TaskSet'].map((l, i) => sideItem(l, i === 1));
+    const v = (val, o = {}) => ({ val, valStyle: { textAlign: 'right', minWidth: 84, whiteSpace: 'nowrap', fontFamily: mono, fontSize: 12, padding: '3px 8px', borderRadius: 6, background: o.changed ? 'var(--color-accent-900)' : 'var(--color-surface)', boxShadow: o.changed ? 'inset 0 0 0 1px var(--color-accent)' : 'inset 0 0 0 1px var(--color-divider)', color: o.changed ? 'var(--color-accent-200)' : 'var(--color-text)' } });
+    const it = (label, val, note, eff, o = {}) => ({ label, note, eff: eff ? (note ? ' · ' : '') + eff : '', effort: o.effort || '', effortStyle: { fontFamily: mono, fontSize: 12, padding: '3px 8px', borderRadius: 6, boxShadow: 'inset 0 0 0 1px var(--color-divider)', background: 'var(--color-surface)', color: 'var(--color-text)', whiteSpace: 'nowrap' }, effStyle: { color: o.warn ? WARN : o.changed ? 'var(--color-accent-300)' : 'var(--color-neutral-400)' }, ...v(val, o) });
+    const ctlSections = [
+      { title: 'Agents and slots', key: 'agents.*', items: [
+        it('Claude Code slots', '2', 'Weekly target 85%', 'pace allows 2 now'),
+        it('Codex slots', '3', 'Weekly target 90%', 'pace allows 1 now, so the 3rd waits', { changed: true, warn: true }),
+        it('Claude Code build', 'opus-5-5 ▾', 'Model and effort; design, plan and review use xhigh', '', { effort: 'high' }),
+        it('Codex build', 'gpt-6.1-sol ▾', 'Design, plan and review use gpt-6-astra · xhigh', '', { effort: 'high' }),
+      ] },
+      { title: 'Passes', key: 'limits.*', items: [
+        it('Pass timeout', '60 min', 'Longest pass today 55 min', '1 timed out this week', { warn: true }),
+        it('Attempts before needs-you', '4', 'Then the task comes to you or Helix', 'was 3', { changed: true }),
+        it('Conflicts before needs-you', '3', "A conflict doesn't use an attempt", ''),
+        it('Prompt budget', '40 KB', 'Largest prompt today 31 KB', ''),
+      ] },
+      { title: 'Gate', key: 'limits.gate_*', items: [
+        it('Gate timeout', '30 min', 'Median gate 6 min 10 s', ''),
+        it('Gates at once', '3', 'Heavy local work: browser tests', '2 gates at once caused the flaky timeouts', { changed: true, warn: true }),
+        it('Browser test runs at once', '2', 'e2e_runner.concurrency', ''),
+        it('Browser test timeout', '20 min', '', ''),
+      ] },
+      { title: 'Spend', key: 'limits.daily_budget_usd', items: [
+        it('Claude Code per day', '$1,600', 'Notional list price; stops a runaway', '$173 today'),
+        it('Codex per day', '$1,600', '', '$49 today'),
+        it('Unknown reset backoff', '5–60 min', 'When a limit gives no reset time', ''),
+        it('Suspension threshold', '30 s', 'Detects a sleeping laptop', ''),
+      ] },
+      { title: 'Merge and push', key: 'push, union_merge_paths', items: [
+        it('Push after each merge', 'on', 'Once the repo has a remote', ''),
+        it('Union-merged files', '4 paths', 'AGENTS.md, docs/architecture.md…', ''),
+        it('Relock on conflict', 'pnpm-lock', 'Rebuilt from merged manifests', ''),
+        it('JSON merge', 'package.json', 'Key by key, then prettier', ''),
+      ] },
+      { title: 'Safety and releases', key: 'forbidden_paths, release', items: [
+        it('Forbidden paths', '7 globs', '.env, keys, agent configs', 'refused 2 passes this week'),
+        it('Network allowlist', '10 hosts', 'Claude Code sandbox only', ''),
+        it('Release every', '150 merged', 'Or when a stage closes', ''),
+        it('Review before tagging', '2 globs', '.github/**, infra/**', 'always asks, at every pilot level', { warn: true }),
+      ] },
+    ];
+    const tg = (c) => ({ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: c === 'ok' ? 'oklch(0.76 0.12 150 / .18)' : 'var(--color-accent-800)', color: c === 'ok' ? 'oklch(0.86 0.09 150)' : 'var(--color-accent-100)' });
+    const stages = [
+      { n: '01', title: 'Helix Spec', tag: 'hardened', c: 'ok', line: 'Technical + design spec · 22 sections · 318 requirements', sub: 'spec/ · last hardened Fri 23 Oct · 0 open questions', a1: 'Open spec', a2: 'Re-harden' },
+      { n: '02', title: 'Helix TaskSet', tag: 'valid', c: 'ok', line: '5 lanes · 48 epics · 665 tasks · 73 human tasks', sub: 'plan/ · rev 41 · every requirement covered', a1: 'Open on map', a2: 'Export' },
+      { n: '03', title: "Helix Loop", tag: 'running', c: 'acc', line: '432 of 665 merged · finish Mon 9 Nov', sub: 'Builds from the TaskSet; changes come back as new revisions', a1: 'Loop controls', a2: 'History' },
+    ].map((s, i) => ({ ...s, tagStyle: tg(s.c), st: { padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: i < 2 ? 'inset -1px 0 0 var(--color-divider)' : 'none' } }));
+    const skillFiles = [['SKILL.md', 0], ['guides/', 0], ['spec-technical.md', 1], ['spec-design.md', 1], ['decompose.md', 1], ['atomic-tasks.md', 1], ['human-tasks.md', 1], ['schema/', 0], ['taskset · task · human .schema.json', 1], ['examples/', 0], ['mini-taskset/', 1], ['scripts/validate.mjs', 0]].map(([name, d]) => ({ name, st: { paddingLeft: d * 16, color: name.endsWith('/') ? 'var(--color-neutral-500)' : 'var(--color-neutral-300)' } }));
+    const tsStats = [['5', 'lanes'], ['48', 'epics'], ['665', 'tasks'], ['73', 'human tasks'], ['1,912', 'dependencies']].map(([v, l]) => ({ v, l }));
+    const checks = [
+      ['ok', 'Every task sits in a lane and an epic'], ['ok', 'No dependency cycles; 31 tasks on the critical path'], ['ok', 'Every requirement maps to at least one task'],
+      ['ok', 'Every task fits one pass (estimate under the 60 min timeout)'], ['warn', '3 tasks name no acceptance test'],
+    ].map(([k, text]) => ({ text, g: k === 'ok' ? '✓' : '!', gs: { color: k === 'ok' ? OK : WARN, width: 12, flex: 'none', fontWeight: 600 } }));
+    const HX = [[0.78, -0.95, 2.6, 0.5], [0.7, 0.95, 2.6, 0.3], [0.75, -1.0, 2.6, 0.32], [0.75, 0.9, 2.6, 0.45], [0.78, -0.95, 2.6, 0.45], [0.75, 0.9, 2.6, 0.4], [0.78, -0.9, 2.6, 0.5], [0.8, 0.9, 2.6, 0.4], [0.75, -0.95, 2.6, 0.4], [0.78, 0.9, 2.6, 0.35], [0.7, -0.9, 2.6, 0.3]];
+    const hx = {}; HX.forEach(([x, tilt, scale, opacity], i) => { hx['helix' + i] = this._hx?.[i] || React.createElement(HelixBg, { key: 'hx' + i, seed: i * 1.7, x, tilt, scale, opacity }); });
+    this._hx = Object.values(hx);
+    const { rail, drawer, labelW, wrap } = this.state;
+    const rowGrid = { display: 'grid', gridTemplateColumns: labelW + 'px minmax(0,1fr)' };
+    const headGrid = { ...rowGrid, position: 'relative', zIndex: 1, background: 'color-mix(in srgb, var(--color-bg) 70%, transparent)' };
+    const chartOverlay = { position: 'absolute', top: 0, bottom: 0, left: labelW, right: 0, pointerEvents: 'none' };
+    const handleStyle = { position: 'absolute', top: 0, bottom: 0, left: labelW - 3, width: 6, cursor: 'col-resize', zIndex: 3, background: 'transparent' };
+    const labelText = wrap ? { whiteSpace: 'normal', lineHeight: 1.35, padding: '6px 0', minWidth: 0 } : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 };
+    const gridOf = (open, w) => ({ flex: 1, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) ' + (open ? w : '44px'), minHeight: 0 });
+    const htList = [
+      ['HT-10', 'Apple Developer Program as EcoEarth', 112, '44 d late', true],
+      ['HT-22', "Mushy Marketing's own accounts", 38, '15 d late'],
+      ['HT-39', 'Static-sites infrastructure for Day 0', 31, 'due Thu'],
+      ['HT-12', 'GitHub: the four product repositories', 27, '2 d late'],
+      ['HT-18', 'Stripe: set up the Mushy account', 22, 'due Fri'],
+      ['HT-56', 'See the first pages live before applying', 14, 'due Mon'],
+    ].map(([id, title, n, late, sel]) => ({ id, title, holds: 'holds ' + n, late, g: '○', gs: { color: sel ? 'var(--color-accent)' : 'var(--color-neutral-500)', fontSize: 15, flex: 'none', width: 16 }, lateStyle: { fontSize: 11.5, color: late.includes('late') ? CRIT : WARN }, bar: { width: (n / 112 * 100) + '%', height: '100%', background: n > 50 ? CRIT : WARN }, st: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 'var(--radius-md)', background: sel ? 'var(--color-accent-900)' : 'color-mix(in srgb, var(--color-surface) 60%, transparent)', boxShadow: sel ? 'inset 0 0 0 1px var(--color-accent)' : 'var(--shadow-sm)' } }));
+    const htSteps = [[true, 'Get a D-U-N-S number for EcoEarth Enterprises, Inc.'], [false, 'Enrol in the Apple Developer Program as an organisation'], [false, 'Create the services ID and return URL for auth.mushymarketing.com'], [false, 'Save the Sign in with Apple key to the keychain as APPLE_SIGNIN_KEY']].map(([done, text]) => ({ done, text, ts: { color: done ? 'var(--color-neutral-500)' : 'var(--color-text)', textDecoration: done ? 'line-through' : 'none' } }));
+    const htUnblocks = [['T-1827', 'Continue with Apple signs people in'], ['T-1845', 'Contract test: Apple accepts the production client'], ['T-1828', 'Sensitive actions ask for a fresh passkey']].map(([id, title]) => ({ id, title }));
+    const questions = [
+      ['X', 'T-0057', 'Browser test [SU-7] help states', 'Sat 02:10', 'SU-7 says "help states" but §14.3 lists five. Which ones does this test cover?'],
+      ['C', 'T-0061', 'Help panel opens from every page', 'Sat 03:41', 'Is the loading state a help state for SU-7, or only empty and error?'],
+      ['X', 'T-2310', 'The web app installs on phones', 'Sat 09:15', 'Does offline count as a help state here? The install flow can go offline.'],
+      ['C', 'T-3112', 'Workspace chooser and invitation page', 'Sun 11:02', 'SU-7 is cited for the chooser\'s empty list. Should it use the help-panel copy?'],
+      ['X', 'T-1104', 'Drafts submitted for approval wait', 'Mon 06:30', 'Which help states need their own copy, and which share one?'],
+    ].map(([badge, id, title, when, text]) => ({ badge, id, title, when, text }));
+    const failV = [0,1,0,0,2,3,1,0,0,0,4,5,3,1,0,0,0,2,6,7,4,0,0,0,1,5,8,6,2,0,0,3,7,9,5,2];
+    const gates2 = [4,5,6,10,11,12,17,18,19,20,25,26,27,28,31,32,33,34,35];
+    const failBars = failV.map((v, i) => ({ st: { flex: 1, height: Math.max(v * 7, 2), borderRadius: 2, background: v ? CRIT : 'var(--color-neutral-800)', boxShadow: gates2.includes(i) ? '0 3px 0 0 var(--color-accent)' : 'none' } }));
+    const evidence = [['94 of 96', 'failures came while two gates ran at once'], ['0 of 212', 'runs failed with one gate running'], ['3.1 s', 'median time of the same step when it passes']].map(([v, l]) => ({ v, l }));
+    const dl = (m, text, c) => ({ m, text, st: { display: 'flex', gap: 8, padding: '2px 14px', background: m === '+' ? 'oklch(0.76 0.12 150 / .08)' : 'transparent', color: c || 'var(--color-neutral-300)' }, ms: { color: m === '+' ? OK : m === '~' ? 'var(--color-accent)' : 'var(--color-neutral-500)', width: 10, flex: 'none' } });
+    const planDiff = [dl('+', 'quarantine help-states.spec.ts:41 until T-3201 merges'), dl('+', 'T-3201 Stabilise the help-states test · support › Test infrastructure · ~40 min'), dl('~', '41 tasks handed back with a note: the test is quarantined'), dl('~', 'T-3201 unquarantines the test when its gate passes'), dl(' ', 'limits.concurrent_gates stays at 2', 'var(--color-neutral-500)')];
+    const relFiles = [['infra/docs/app.tf', '+14 −3', true], ['infra/docs/dns.tf', '+6 −2', true], ['.github/workflows/deploy-docs.yml', '+2 −1', true], ['apps/docs/next.config.ts', '+8 −2'], ['apps/docs/public/robots.txt', '+3 −1'], ['docs/architecture.md', '+5 −0'], ['AGENTS.md', '+2 −0']].map(([path, n, rev], i) => ({ path, n, dot: rev ? '!' : '·', ds: { color: rev ? CRIT : 'var(--color-neutral-500)', width: 10, flex: 'none', fontWeight: 600 }, st: { display: 'flex', gap: 8, padding: '4px 8px', borderRadius: 6, fontFamily: mono, fontSize: 11.5, background: i === 0 ? 'var(--color-neutral-900)' : 'transparent', color: rev ? 'var(--color-text)' : 'var(--color-neutral-400)' } }));
+    const diffSrc = [[' ', 'resource "digitalocean_app" "docs" {'], [' ', '  spec {'], [' ', '    name   = "mushy-docs"'], [' ', '    region = "fra"'], ['-', '    domain { name = "docs.mushy.app" }'], ['+', '    domain {'], ['+', '      name = "docs.mushymarketing.com"'], ['+', '      type = "PRIMARY"'], ['+', '    }'], ['+', '    domain {'], ['+', '      name = "docs.mushy.app"'], ['+', '      type = "ALIAS"'], ['+', '    }'], [' ', '    static_site {'], [' ', '      name          = "docs"'], ['-', '      output_dir    = "out"'], ['+', '      output_dir    = "apps/docs/out"'], [' ', '    }']];
+    const diffLines = diffSrc.map(([m, text], i) => ({ m: m === ' ' ? '' : m, text, n: String(12 + i), st: { display: 'flex', padding: '0 14px 0 0', background: m === '+' ? 'oklch(0.76 0.12 150 / .1)' : m === '-' ? 'oklch(0.72 0.14 35 / .12)' : 'transparent', color: m === '+' ? 'oklch(0.86 0.09 150)' : m === '-' ? 'oklch(0.82 0.1 35)' : 'var(--color-neutral-300)' } }));
+    return { ...hx, homeGrid: gridOf(rail, '340px'), rowGrid, headGrid, chartOverlay, handleStyle, labelText, wrap, toggleWrap: () => this.setState((s) => ({ wrap: !s.wrap })), startDrag: this.startDrag, resetW: () => this.setState({ labelW: 330 }), keyW: (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); this.setState((s) => ({ labelW: Math.max(200, Math.min(640, s.labelW + (e.key === 'ArrowRight' ? 16 : -16))) })); } }, mapGrid: gridOf(drawer, '400px'), railOpen: rail, railClosed: !rail, drawerOpen: drawer, drawerClosed: !drawer, toggleRail: () => this.setState((s) => ({ rail: !s.rail })), toggleDrawer: () => this.setState((s) => ({ drawer: !s.drawer })), htList, htSteps, htUnblocks, questions, failBars, evidence, planDiff, relFiles, diffLines, stages, skillFiles, tsStats, checks, setNavLoop, setNavPlan, ctlSections, tabsHome: tabs('Home'), tabsMap: tabs('Map'), tabsLive: tabs('Live'), tabsSet: tabs('Settings'), tabsHelix: tabs('Helix'), tabsPlan: tabs('Plan'), groups, flakyRows, passes, spark, rows: this.rows(), ticks, history, commits, passTiles, feed, gate, plan, matrix, learned, setNav, helixNav, decisions };
+  }
+}
+</script>
+</body>
+</html>

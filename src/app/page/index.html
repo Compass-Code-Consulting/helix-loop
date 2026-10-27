@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="helix-token" content="{{TOKEN}}">
+<title>Helix Loop</title>
+<link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/nocturne.css">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<canvas id="helix-bg" aria-hidden="true"></canvas>
+<header class="topbar">
+  <a class="brand" href="#home" aria-label="Helix Loop, Home"><i data-icon="dna" class="mark"></i><span>Helix Loop</span><span class="loopname" id="loopname"></span></a>
+  <button type="button" class="menu btn btn-ghost" id="menu" aria-label="Menu" aria-expanded="false"><i data-icon="list"></i></button>
+  <nav class="tabs" id="tabs" aria-label="Sections">
+    <a href="#home" data-tab="home"><i data-icon="house-simple"></i><span>Home</span><b class="count" id="n-home"></b></a>
+    <a href="#map" data-tab="map"><i data-icon="chart-bar-horizontal"></i><span>Map</span></a>
+    <a href="#live" data-tab="live"><i data-icon="broadcast"></i><span>Live</span><b class="count" id="n-live"></b></a>
+    <a href="#helix" data-tab="helix"><i data-icon="dna"></i><span>Helix</span><b class="count" id="n-helix"></b></a>
+    <a href="#metrics" data-tab="metrics"><i data-icon="chart-line-up"></i><span>Metrics</span></a>
+    <a href="#settings" data-tab="settings"><i data-icon="sliders-horizontal"></i><span>Settings</span></a>
+  </nav>
+  <span class="grow"></span>
+  <a class="tag tag-outline pilot" id="pilot" href="#settings/pilot" title="Pilot mode: who decides what the loop would ask you"></a>
+  <div class="seg" id="roots" role="group" aria-label="Which loop">
+    <button type="button" data-root="real" aria-pressed="true">Build</button>
+    <button type="button" data-root="dry" aria-pressed="false">Dry run</button>
+  </div>
+  <a class="loopstate" id="loopstate" href="#settings/loop"><i class="dot"></i><span></span></a>
+  <span class="conn" id="conn" hidden>reconnecting…</span>
+</header>
+<main id="main"></main>
+<dialog id="dialog"><form method="dialog" class="dialog"><div class="dialog-title" id="dlg-title"></div><div class="dialog-body" id="dlg-body"></div><div class="dialog-actions" id="dlg-foot"></div></form></dialog>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<script src="/icons.js"></script>
+<script src="/helix-bg.js"></script>
+<script src="/core.js"></script>
+<script src="/home.js"></script>
+<script src="/screens.js"></script>
+<script src="/map.js"></script>
+<script src="/live.js"></script>
+<script src="/helixtab.js"></script>
+<script src="/settings.js"></script>
+<script src="/boot.js"></script>
+</body>
+</html>

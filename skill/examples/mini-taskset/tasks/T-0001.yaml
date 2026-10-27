@@ -1,0 +1,20 @@
+id: T-0001
+repo: mushy-social-media
+stage: day1
+area: core/waitlist
+epic: waitlist-core
+title: A visitor joins the waitlist with an email address and gets a pending sign-up
+reqs: [WL-1, WL-3]
+spec: ["§4 Waitlist", "§4 Requirements"]
+acceptance:
+  - "integration: [WL-1] waitlist.join stores a pending sign-up with the address normalised to lower case"
+  - "integration: [WL-3] joining twice with the same address keeps one sign-up and answers as if it were new"
+  - "e2e: [WL-1] POST /api/v1/public/waitlist answers 202 for a valid address and 400 with the field error for an invalid one"
+blocked_by: []
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []
+notes: |
+  A vertical slice: the migration for waitlist_signups, the waitlist.join operation, its public route and the test that calls the route.
+  Answer 202 for a repeat address too, so the endpoint never tells anyone whether an address is already on the list.

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "helix-loop/human.schema.json",
+  "title": "Human Implementation Plan task",
+  "description": "A step only Daniel can do, sign or pay for. Never holds a secret value. Mirrors HumanTask in harness/src/types.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "done_check", "lead_time_days", "agent_can_help", "blocked_by", "status"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^HT-\\d+$" },
+    "title": { "type": "string", "minLength": 8 },
+    "done_check": { "type": "string", "minLength": 8 },
+    "lead_time_days": { "type": "number", "minimum": 0 },
+    "agent_can_help": { "enum": ["yes", "partly", "no"] },
+    "handoff_prompt": { "type": "string" },
+    "tools": { "type": "array", "items": { "type": "string" } },
+    "secrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "stored_in"],
+        "properties": { "name": { "type": "string" }, "stored_in": { "type": "string" } }
+      }
+    },
+    "blocked_by": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^(T-\\d{4}|HT-\\d+)$" } },
+    "status": { "enum": ["todo", "in_progress", "done"] },
+    "notes": { "type": "string", "description": "What Daniel recorded: the evidence a step is done, or why it waits." }
+  }
+}

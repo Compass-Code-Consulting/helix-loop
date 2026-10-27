@@ -1,0 +1,8 @@
+id: HT-2
+title: Approve the waitlist form and confirmation page copy before the website goes live
+done_check: "The owner's approval of the copy is recorded in DECISIONS.md with the commit it approved"
+lead_time_days: 0.5
+agent_can_help: "no"
+blocked_by: [T-0007, T-0008]
+status: todo
+notes: A judgment only the owner can make; the build does not wait on it, the release does.

@@ -1,0 +1,16 @@
+id: T-0003
+repo: mushy-social-media
+stage: day1
+area: api/rate-limits
+epic: waitlist-core
+title: Joining the waitlist is limited to 5 attempts a minute per client address
+reqs: [WL-4]
+spec: ["§4 Requirements"]
+acceptance:
+  - "e2e: [WL-4] the sixth join from one client address within a minute answers 429 with a Retry-After header"
+  - "unit: [WL-4] the limiter's window slides on the injected clock, so a client is admitted again after 60 seconds"
+blocked_by: [T-0001]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

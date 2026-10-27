@@ -1,0 +1,18 @@
+id: T-0008
+repo: mushy-website
+stage: day1
+area: website/waitlist-confirmed
+epic: waitlist-page
+title: The confirmation page thanks the visitor and says what happens next
+reqs: [WL-7]
+spec: ["§5 Waitlist confirmation page"]
+acceptance:
+  - "e2e: [WL-7] /waitlist/confirmed says You're on the list and when invitations go out, with no serious axe violations"
+  - "e2e: [WL-7] the page reads well at 390 px wide, with no horizontal scroll"
+blocked_by: []
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []
+notes: |
+  A static page, so it waits on nothing; T-0002 redirects to it.

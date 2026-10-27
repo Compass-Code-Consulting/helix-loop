@@ -1,0 +1,18 @@
+id: T-0006
+repo: mushy-website
+stage: day1
+area: website/home
+epic: waitlist-page
+title: The home page's waitlist form posts to the app and shows that the address is on the list
+reqs: [WL-6]
+spec: ["§5 Website home"]
+acceptance:
+  - "e2e: [WL-6] submitting a valid address shows Check your inbox, with no serious axe violations"
+  - "e2e: [WL-6] an invalid address shows the field error next to the input and keeps what was typed"
+blocked_by: [T-0001]
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []
+notes: |
+  The form posts to the app's public waitlist endpoint (T-0001, another lane); in tests, point it at a stand-in that answers 202 and 400 as T-0001 does.

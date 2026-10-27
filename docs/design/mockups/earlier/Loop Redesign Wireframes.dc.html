@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#f0eee9;font-family:Kalam,system-ui,sans-serif;color:#1b2330}a{color:#1d5bb8}a:hover{color:#123f82}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.55)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5)}</style>
+</helmet>
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Loop control room: the jobs, then four home directions and one pass at every other screen</span></div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;max-width:1500px;margin:0 0 36px">
+  <div style="background:#fff;border:1.5px solid #1b2330;border-radius:10px;padding:22px 24px">
+    <div style="font:700 22px Kalam;margin-bottom:4px">What Daniel does when managing a loop</div>
+    <div style="font:13px/1.4 system-ui;color:#5b6571;margin-bottom:16px">Grouped by job and ranked by how often each happens. Every screen below is built so the top rows take one click from home.</div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 22px;font:15px/1.35 Kalam">
+      <div><div style="font-weight:700;color:#c2410c">1 · Unblock the loop (many times a day)</div><div>Do a human task, ordered by what it holds up · mark it done with evidence · copy its handoff prompt · answer a builder's spec question · hand back a needs-human task with a note</div></div>
+      <div><div style="font-weight:700;color:#1d5bb8">2 · Act on the monitor's fixes (daily)</div><div>Accept, edit or decline a proposed fix: retry with a note, park, split, add a dependency, quarantine a flaky test · dismiss as noise</div></div>
+      <div><div style="font-weight:700">3 · Check it's moving (all day, at a glance)</div><div>Running or stopped · what each agent is on · finish date and how far it moved · throughput · anything stuck too long</div></div>
+      <div><div style="font-weight:700">4 · Steer the plan (weekly)</div><div>Reprioritise a branch · add or cut a dependency · split a task that grew · edit notes · ask the Helix to make a plan change</div></div>
+      <div><div style="font-weight:700">5 · Watch or step into a pass</div><div>Watch an agent live · read the gate result · stop a runaway pass · send its feedback to the monitor</div></div>
+      <div><div style="font-weight:700">6 · Run, release, stay healthy</div><div>Start, stop, dry run · approve and tag a release · sign in or install an agent · check quota and pace</div></div>
+    </div>
+  </div>
+  <div style="background:#fff;border:1.5px solid #1b2330;border-radius:10px;padding:22px 24px">
+    <div style="font:700 22px Kalam;margin-bottom:4px">How builder feedback reaches Daniel</div>
+    <div style="font:13px/1.4 system-ui;color:#5b6571;margin-bottom:16px">Two agents, one inbox. The Health monitor watches the loop; the Helix answers Daniel and changes the plan.</div>
+    <div style="display:flex;flex-direction:column;gap:8px;font:15px/1.3 Kalam">
+      <div style="display:flex;gap:10px;align-items:center"><div style="flex:none;width:118px;border:1.5px dashed #1b2330;border-radius:8px;padding:6px 8px;text-align:center">Builders report</div><div>spec question · gate failed · flaky test · blocked on HT · missing credential · scope grew · conflict</div></div>
+      <div style="padding-left:56px;color:#5b6571">↓ routed by your feedback rules (<a class="dv-oid" href="#1k">1k</a>)</div>
+      <div style="display:flex;gap:10px;align-items:center"><div style="flex:none;width:118px;border:1.5px solid #1d5bb8;color:#1d5bb8;border-radius:8px;padding:6px 8px;text-align:center">Health monitor</div><div>groups repeats into one incident, finds the common cause, writes one fix</div></div>
+      <div style="padding-left:56px;color:#5b6571">↓ applies it or asks, per autonomy level (<a class="dv-oid" href="#1j">1j</a>)</div>
+      <div style="display:flex;gap:10px;align-items:center"><div style="flex:none;width:118px;border:1.5px solid #c2410c;color:#c2410c;border-radius:8px;padding:6px 8px;text-align:center">Needs you</div><div>one card: what happened, how often, what it holds up, the fix · Accept / Edit / Decline</div></div>
+    </div>
+  </div>
+</div>
+
+<div style="font:600 12px system-ui;color:rgba(0,0,0,.55);margin:0 0 12px;text-transform:uppercase;letter-spacing:.06em">Home: four directions</div>
+<div class="dv-opts" style="margin-bottom:40px">
+
+<!-- 1a -->
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Triage queue: "needs you" fills the page, the loop sits in a rail</div>
+<div class="dv-card" style="width:700px;font-family:Kalam">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1.5px solid #1b2330;font-size:14px">
+    <b style="font-size:17px">Helix's Loop</b><span style="border:1.5px solid #1d5bb8;color:#1d5bb8;border-radius:20px;padding:0 8px">Running · both agents</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 6px">Build | Dry run</span><span style="flex:1"></span><span>Finish Fri 7 Nov · <span style="color:#c2410c">+6 h since yesterday</span></span>
+  </div>
+  <div style="display:flex;gap:14px;padding:10px 14px;border-bottom:1px solid #d7dbd5;font-size:14px"><b style="border-bottom:2px solid #1b2330">Needs you 7</b><span>Map</span><span>Agents</span><span>Assistant</span><span>Metrics</span></div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 200px">
+    <div style="padding:14px;display:flex;flex-direction:column;gap:12px;border-right:1px solid #d7dbd5">
+      <div style="font-size:13px;color:#5b6571">YOUR TASKS · biggest hold-up first</div>
+      <div style="border:1.5px solid #c2410c;border-radius:8px;padding:8px 10px;display:flex;gap:10px;align-items:center">
+        <div style="flex:1"><div><b>HT-10</b> Apple Developer Program as EcoEarth</div><div style="display:flex;gap:6px;align-items:center;font-size:13px;color:#5b6571"><div style="height:7px;width:120px;background:#c2410c;border-radius:4px"></div>holds 112 tasks · 41 h of critical path · 44 days late</div></div>
+        <span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px;font-size:13px">Handoff</span><span style="background:#1b2330;color:#fff;border-radius:6px;padding:0 8px;font-size:13px">Mark done</span>
+      </div>
+      <div style="border:1.5px solid #1b2330;border-radius:8px;padding:8px 10px;display:flex;gap:10px;align-items:center">
+        <div style="flex:1"><div><b>HT-22</b> Mushy Marketing's own accounts</div><div style="display:flex;gap:6px;align-items:center;font-size:13px;color:#5b6571"><div style="height:7px;width:48px;background:#c2410c;border-radius:4px"></div>holds 38 tasks · 9 h</div></div>
+        <span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px;font-size:13px">Handoff</span><span style="background:#1b2330;color:#fff;border-radius:6px;padding:0 8px;font-size:13px">Mark done</span>
+      </div>
+      <div style="font-size:13px;color:#5b6571">FIXES TO APPROVE · from the Health monitor</div>
+      <div style="border:1.5px solid #1d5bb8;border-radius:8px;padding:8px 10px">
+        <div><b>80-e2e fails the same way on 5 tasks</b> <span style="font-size:13px;color:#5b6571">· 11 times since 09:00</span></div>
+        <div style="font-size:13px;color:#5b6571">Same flaky test: help-states.spec.ts. Fix: quarantine it and add T-new "Stabilise help-states" ahead of the 5.</div>
+        <div style="display:flex;gap:6px;margin-top:6px;font-size:13px"><span style="background:#1d5bb8;color:#fff;border-radius:6px;padding:0 8px">Accept</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Edit</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Decline</span></div>
+      </div>
+      <div style="font-size:13px;color:#5b6571">QUESTIONS · RELEASES</div>
+      <div style="border:1.5px solid #1b2330;border-radius:8px;padding:6px 10px;font-size:14px">T-0057 spec question from Codex: "SU-7: which help states?" <span style="color:#1d5bb8">Answer ›</span></div>
+      <div style="border:1.5px dashed #c2410c;border-radius:8px;padding:6px 10px;font-size:14px">mushy-docs v0.4 touches infra/ · <span style="color:#c2410c">Review and approve ›</span></div>
+    </div>
+    <div style="padding:14px;display:flex;flex-direction:column;gap:10px;font-size:14px">
+      <div style="font-size:13px;color:#5b6571">THE LOOP</div>
+      <div><b>218 / 665</b> done</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="border:1px solid #d7dbd5;border-radius:6px;padding:5px 7px">(C) Claude ■■ <div style="font-size:12px;color:#5b6571">T-0063 · gating 4 min</div></div>
+        <div style="border:1px solid #d7dbd5;border-radius:6px;padding:5px 7px">(X) Codex ■□ <div style="font-size:12px;color:#5b6571">T-0074 · working · pace 1/2</div></div>
+      </div>
+      <div style="font-size:13px;color:#5b6571">HEALTH</div>
+      <div>Merge rate 68% <span style="color:#c2410c">↓</span></div>
+      <div>1 open incident</div>
+      <div style="font-size:13px;color:#5b6571">FRONTIER</div>
+      <div>2 running · 437 ready · 7 blocked on you</div>
+      <div style="color:#1d5bb8">Open map ›</div>
+    </div>
+  </div>
+</div></div>
+
+<!-- 1b -->
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Cockpit: three equal columns, you · health · live</div>
+<div class="dv-card" style="width:700px;font-family:Kalam">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1.5px solid #1b2330;font-size:14px"><b style="font-size:17px">Helix's Loop</b><span style="border:1.5px solid #1d5bb8;color:#1d5bb8;border-radius:20px;padding:0 8px">Running</span><span style="flex:1"></span><span>218/665 · finish Fri 7 Nov</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 6px">Map ›</span></div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-height:340px">
+    <div style="padding:12px;border-right:1px solid #d7dbd5;display:flex;flex-direction:column;gap:8px">
+      <div style="font-weight:700;color:#c2410c">Waiting on you · 7</div>
+      <div style="border:1.5px solid #c2410c;border-radius:8px;padding:6px 8px;font-size:14px"><b>HT-10</b> Apple Dev Program<div style="font-size:12px;color:#5b6571">holds 112 tasks</div></div>
+      <div style="border:1.5px solid #1b2330;border-radius:8px;padding:6px 8px;font-size:14px"><b>HT-22</b> Marketing accounts<div style="font-size:12px;color:#5b6571">holds 38</div></div>
+      <div style="border:1.5px solid #1b2330;border-radius:8px;padding:6px 8px;font-size:14px">T-0057 spec question</div>
+      <div style="border:1.5px dashed #c2410c;border-radius:8px;padding:6px 8px;font-size:14px">Approve docs v0.4</div>
+      <div style="font-size:13px;color:#5b6571">+3 more</div>
+    </div>
+    <div style="padding:12px;border-right:1px solid #d7dbd5;display:flex;flex-direction:column;gap:8px">
+      <div style="font-weight:700;color:#1d5bb8">Health · monitor on "Ask"</div>
+      <div style="display:flex;gap:4px;align-items:end;height:40px"><div style="width:10px;height:30px;background:#2f7a3a"></div><div style="width:10px;height:34px;background:#2f7a3a"></div><div style="width:10px;height:22px;background:#2f7a3a"></div><div style="width:10px;height:12px;background:#c2410c"></div><div style="width:10px;height:18px;background:#2f7a3a"></div><div style="width:10px;height:26px;background:#2f7a3a"></div><span style="font-size:12px;color:#5b6571">merged / 6 h</span></div>
+      <div style="border:1.5px solid #1d5bb8;border-radius:8px;padding:6px 8px;font-size:14px"><b>Flaky 80-e2e</b> · 5 tasks · 11×<div style="font-size:12px;color:#5b6571">Fix ready: quarantine + new task</div></div>
+      <div style="border:1.5px solid #1b2330;border-radius:8px;padding:6px 8px;font-size:14px"><b>Conflicts in AGENTS.md</b> · 3×<div style="font-size:12px;color:#5b6571">watching</div></div>
+      <div style="font-size:13px;color:#5b6571">Resolved today: 2</div>
+    </div>
+    <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-weight:700">Live · 2 of 4 slots</div>
+      <div style="border:1px solid #d7dbd5;border-radius:8px;padding:6px 8px;font-size:14px">(C) T-0063 · gating 4 min<div style="font-size:12px;color:#1d5bb8">▸ Running the integration suite</div></div>
+      <div style="border:1px solid #d7dbd5;border-radius:8px;padding:6px 8px;font-size:14px">(X) T-0074 · working 12 min<div style="font-size:12px;color:#1d5bb8">▸ Updated the docs domain</div></div>
+      <div style="border:1px dashed #9a6a00;border-radius:8px;padding:6px 8px;font-size:13px;color:#9a6a00">(X) slot 2 held by weekly pace</div>
+      <div style="font-size:13px;color:#5b6571">Ended today: 9 merged, 3 failed</div>
+    </div>
+  </div>
+</div></div>
+
+<!-- 1c -->
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Briefing: the two agents write what changed, with the actions inline</div>
+<div class="dv-card" style="width:700px;font-family:Kalam">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1.5px solid #1b2330;font-size:14px"><b style="font-size:17px">Helix's Loop</b><span style="border:1.5px solid #1d5bb8;color:#1d5bb8;border-radius:20px;padding:0 8px">Running</span><span style="flex:1"></span><span>Needs you 7</span><span>Map</span><span>Agents</span></div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 180px">
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:22px;font-weight:700">Since you looked at 11:40</div>
+      <div style="font-size:15px">14 merged, 3 failed. The finish moved <span style="color:#c2410c">6 h later</span>, all of it from HT-10, which now holds 112 tasks.</div>
+      <div style="border:1.5px solid #c2410c;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;font-size:14px"><div style="flex:1"><b>HT-10</b> Apple Developer Program · 44 days late</div><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Handoff</span><span style="background:#1b2330;color:#fff;border-radius:6px;padding:0 8px">Mark done</span></div>
+      <div style="font-size:15px"><span style="color:#1d5bb8">Health monitor:</span> five tasks failed 80-e2e on the same test. I'd quarantine it and add a task to stabilise it first.</div>
+      <div style="display:flex;gap:6px;font-size:13px"><span style="background:#1d5bb8;color:#fff;border-radius:6px;padding:0 8px">Accept fix</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">See evidence</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Decline</span></div>
+      <div style="font-size:15px"><span style="color:#1d5bb8">Codex</span> asked on T-0057 which help states SU-7 means.</div>
+      <div style="border:1.5px solid #1b2330;border-radius:8px;padding:8px 10px;font-size:14px;color:#5b6571">Ask the Helix… "split T-1122 by channel"</div>
+    </div>
+    <div style="padding:14px;border-left:1px solid #d7dbd5;display:flex;flex-direction:column;gap:8px;font-size:14px">
+      <div style="font-size:13px;color:#5b6571">AT A GLANCE</div>
+      <div><b>218/665</b> done</div><div>Fri 7 Nov 16:00</div><div>(C) gating · (X) working</div><div style="color:#c2410c">1 incident</div>
+      <div style="font-size:13px;color:#5b6571;margin-top:6px">QUEUE</div><div>2 human tasks</div><div>1 fix</div><div>1 question</div><div>1 release</div>
+    </div>
+  </div>
+</div></div>
+
+<!-- 1d -->
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Flow board: where work is piling up, with your stage first</div>
+<div class="dv-card" style="width:700px;font-family:Kalam">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1.5px solid #1b2330;font-size:14px"><b style="font-size:17px">Helix's Loop</b><span style="border:1.5px solid #1d5bb8;color:#1d5bb8;border-radius:20px;padding:0 8px">Running</span><span style="flex:1"></span><span>finish Fri 7 Nov · +6 h</span></div>
+  <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;padding:14px;font-size:14px;text-align:center">
+    <div style="border:2px solid #c2410c;border-radius:8px;padding:8px 4px;background:#fdf1ea"><div style="font-size:24px;font-weight:700;color:#c2410c">7</div>Waiting on you<div style="font-size:12px;color:#5b6571">holds 150 tasks</div></div>
+    <div style="border:1.5px solid #1b2330;border-radius:8px;padding:8px 4px"><div style="font-size:24px;font-weight:700">437</div>Ready</div>
+    <div style="border:1.5px solid #1b2330;border-radius:8px;padding:8px 4px"><div style="font-size:24px;font-weight:700">2</div>Building<div style="font-size:12px;color:#9a6a00">2 slots idle by pace</div></div>
+    <div style="border:1.5px solid #1b2330;border-radius:8px;padding:8px 4px"><div style="font-size:24px;font-weight:700">1</div>Gating<div style="font-size:12px;color:#c2410c">31% fail today</div></div>
+    <div style="border:1.5px solid #1b2330;border-radius:8px;padding:8px 4px"><div style="font-size:24px;font-weight:700">218</div>Merged</div>
+  </div>
+  <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:6px;font-size:14px">
+    <div style="font-size:13px;color:#5b6571">WAITING ON YOU · by what it holds up</div>
+    <div style="display:grid;grid-template-columns:70px minmax(0,1fr) 150px 90px;gap:8px;align-items:center;border-bottom:1px solid #d7dbd5;padding:4px 0"><b>HT-10</b><span>Apple Developer Program</span><div style="height:7px;background:#c2410c;border-radius:4px"></div><span style="text-align:right">Mark done</span></div>
+    <div style="display:grid;grid-template-columns:70px minmax(0,1fr) 150px 90px;gap:8px;align-items:center;border-bottom:1px solid #d7dbd5;padding:4px 0"><b>Fix</b><span>Quarantine flaky 80-e2e</span><div style="height:7px;width:60%;background:#1d5bb8;border-radius:4px"></div><span style="text-align:right">Accept</span></div>
+    <div style="display:grid;grid-template-columns:70px minmax(0,1fr) 150px 90px;gap:8px;align-items:center;border-bottom:1px solid #d7dbd5;padding:4px 0"><b>HT-22</b><span>Marketing accounts</span><div style="height:7px;width:34%;background:#c2410c;border-radius:4px"></div><span style="text-align:right">Mark done</span></div>
+    <div style="display:grid;grid-template-columns:70px minmax(0,1fr) 150px 90px;gap:8px;align-items:center;padding:4px 0"><b>T-0057</b><span>Spec question</span><div style="height:7px;width:10%;background:#1b2330;border-radius:4px"></div><span style="text-align:right">Answer</span></div>
+    <div style="font-size:13px;color:#5b6571">Click any stage to list it here; lanes and stages fold inside.</div>
+  </div>
+</div></div>
+</div>
+
+<div style="font:600 12px system-ui;color:rgba(0,0,0,.55);margin:0 0 12px;text-transform:uppercase;letter-spacing:.06em">Every other screen: one direction each</div>
+<div class="dv-opts">
+
+<!-- 1e Map -->
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Map: lane › stage › task, folded; the frontier stays open</div>
+<div class="dv-card" style="width:560px;font-family:Kalam;font-size:14px">
+  <div style="display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid #d7dbd5;align-items:center"><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 6px">Frontier | All | Critical</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 6px;color:#5b6571;flex:1">Find a task…</span><span>Days ▾</span></div>
+  <div style="display:grid;grid-template-columns:210px minmax(0,1fr)">
+    <div style="border-right:1px solid #d7dbd5">
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px;font-weight:700;color:#a8721a">▾ Human tasks · 3/73</div>
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px 0 24px;color:#c2410c">◆ HT-10 holds 112</div>
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px 0 24px">◆ HT-22 holds 38</div>
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px;font-weight:700;color:#8b3d8a">▾ social-media · 61%</div>
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px 0 24px">▸ day0 · 40/40 ✓</div>
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px 0 24px">▾ day1 · 22/58</div>
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px 0 38px;background:#fff6d6">◐ T-0063 (C) gating</div>
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px 0 38px">! T-0057 needs you</div>
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px 0 38px;color:#5b6571">○ 34 ready ›</div>
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px;font-weight:700;color:#1d5bb8">▸ website · 18%</div>
+      <div style="height:26px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px;font-weight:700;color:#2b7a6a">▸ docs · 44%</div>
+    </div>
+    <div style="position:relative;padding:5px 0">
+      <div style="position:absolute;left:22%;top:0;bottom:0;border-left:1.5px solid #1b2330"></div>
+      <div style="position:absolute;left:78%;top:0;bottom:0;border-left:1.5px dashed #c2410c"></div>
+      <div style="height:26px"></div>
+      <div style="height:26px;display:flex;align-items:center"><div style="margin-left:6%;width:15%;height:10px;border:1.5px solid #c2410c;background:repeating-linear-gradient(45deg,#c2410c 0 2px,transparent 2px 6px)"></div><span style="font-size:12px;color:#c2410c;margin-left:4px">late 44 d</span></div>
+      <div style="height:26px;display:flex;align-items:center"><div style="margin-left:20%;width:10%;height:10px;border:1.5px solid #1b2330"></div></div>
+      <div style="height:26px;display:flex;align-items:center"><div style="margin-left:4%;width:60%;height:12px;background:#d7dbd5;border-radius:3px;overflow:hidden"><div style="width:61%;height:100%;background:#8b3d8a"></div></div></div>
+      <div style="height:26px;display:flex;align-items:center"><div style="margin-left:4%;width:15%;height:10px;background:#5b6571"></div></div>
+      <div style="height:26px;display:flex;align-items:center"><div style="margin-left:18%;width:40%;height:12px;background:#d7dbd5;border-radius:3px;overflow:hidden"><div style="width:38%;height:100%;background:#8b3d8a"></div></div></div>
+      <div style="height:26px;display:flex;align-items:center"><div style="margin-left:21%;width:4%;height:10px;background:#1d5bb8"></div><span style="font-size:12px;color:#1d5bb8;margin-left:4px">▸ integration suite</span></div>
+      <div style="height:26px;display:flex;align-items:center"><div style="margin-left:22%;width:4%;height:10px;border:1.5px dashed #c2410c"></div></div>
+      <div style="height:26px;display:flex;align-items:center"><div style="margin-left:24%;width:30%;height:8px;background:#eceee9"></div></div>
+      <div style="height:26px;display:flex;align-items:center"><div style="margin-left:30%;width:45%;height:12px;background:#d7dbd5;border-radius:3px"></div></div>
+      <div style="height:26px;display:flex;align-items:center"><div style="margin-left:10%;width:55%;height:12px;background:#d7dbd5;border-radius:3px"></div></div>
+    </div>
+  </div>
+  <div style="padding:8px 12px;border-top:1px solid #d7dbd5;font-size:13px;color:#5b6571">Folded rows show a progress bar. "Frontier" opens only stages with running, ready-next or blocked work, so 5,000 tasks read as a dozen rows.</div>
+</div></div>
+
+<!-- 1f Task detail -->
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Task detail: a drawer that leads with why it's stuck</div>
+<div class="dv-card" style="width:380px;font-family:Kalam;font-size:14px">
+  <div style="padding:12px 14px;border-bottom:1px solid #d7dbd5"><div style="font-size:12px;color:#5b6571">T-0057 · social-media › day1 · ! needs you</div><div style="font-size:18px;font-weight:700;line-height:1.2">The browser test "[SU-7] Help states the…"</div></div>
+  <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+    <div style="border:1.5px solid #c2410c;border-radius:8px;padding:8px 10px"><b style="color:#c2410c">Why it stopped</b><div>3 attempts failed at 80-e2e. Codex asked: "which help states does SU-7 mean?"</div><div style="font-size:12px;color:#5b6571">holds 6 tasks · 2 h slack left</div></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:13px"><span style="background:#1b2330;color:#fff;border-radius:6px;padding:0 8px">Answer and hand back</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Park</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Split…</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Ask Helix</span></div>
+    <div style="font-size:12px;color:#5b6571">NOTES FOR THE NEXT BUILDER</div>
+    <div style="border:1.5px solid #d7dbd5;border-radius:6px;height:54px"></div>
+    <div style="font-size:12px;color:#5b6571">WAITS ON · UNBLOCKS</div>
+    <div>✓ T-0056 · ○ T-0058, T-0059 +4</div>
+    <div style="font-size:12px;color:#5b6571">ATTEMPTS 3 · THREADS 1 · DETAILS ▸</div>
+  </div>
+</div></div>
+
+<!-- 1g Health monitor -->
+<div class="dv-opt" id="1g"><div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>Health monitor: incidents, each with evidence and one fix</div>
+<div class="dv-card" style="width:460px;font-family:Kalam;font-size:14px">
+  <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #d7dbd5"><b style="font-size:17px;color:#1d5bb8">Health monitor</b><span style="font-size:13px">on Codex</span><span style="flex:1"></span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 6px;font-size:13px">Autonomy: Ask ▾</span></div>
+  <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+    <div style="border:1.5px solid #1d5bb8;border-radius:8px;padding:8px 10px">
+      <div style="display:flex;gap:6px"><b style="flex:1">Flaky test across tasks</b><span style="font-size:12px">11× · 5 tasks</span></div>
+      <div style="display:flex;gap:3px;margin:4px 0"><span>|</span><span>|</span><span>|</span><span style="color:#c2410c">|||</span><span>|</span><span style="color:#c2410c">|||||</span></div>
+      <div style="font-size:13px;color:#5b6571">help-states.spec.ts times out at 30 s under two parallel gates. T-0057, T-0061, T-1102, T-1103, T-1104</div>
+      <div style="border-top:1px dashed #d7dbd5;margin-top:6px;padding-top:6px"><b>Fix:</b> quarantine the test, add T-new "Stabilise help-states" before the 5</div>
+      <div style="display:flex;gap:6px;margin-top:6px;font-size:13px"><span style="background:#1d5bb8;color:#fff;border-radius:6px;padding:0 8px">Accept</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Edit</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Decline</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Not an issue</span></div>
+    </div>
+    <div style="border:1.5px solid #1b2330;border-radius:8px;padding:8px 10px"><div style="display:flex"><b style="flex:1">Merge conflicts in one file</b><span style="font-size:12px">3× · watching</span></div><div style="font-size:13px;color:#5b6571">apps/auth/routes.ts. One more and I'll propose a split.</div></div>
+    <div style="border:1.5px solid #d7dbd5;border-radius:8px;padding:8px 10px;color:#5b6571"><div style="display:flex"><span style="flex:1">✓ Missing STRIPE_KEY in prepare</span><span style="font-size:12px">applied 10:12</span></div><div style="font-size:13px">Auto-fixed: added to .env.example · Undo</div></div>
+  </div>
+</div></div>
+
+<!-- 1h Agent live -->
+<div class="dv-opt" id="1h"><div class="dv-olabel"><a class="dv-oid" href="#1h">1h</a>Agent live view: kept, with step-in controls</div>
+<div class="dv-card" style="width:420px;font-family:Kalam;font-size:14px">
+  <div style="padding:10px 14px;border-bottom:1px solid #d7dbd5"><div style="display:flex;gap:8px;align-items:center"><b style="font-size:17px">(C) Claude Code</b><span style="font-size:13px">■■ 2 of 2</span><span style="flex:1"></span><span style="font-size:13px;color:#5b6571">← back</span></div><div style="display:flex;gap:6px;margin-top:6px;font-size:13px"><span style="border-bottom:2px solid #1b2330">● T-0063 gating 4m</span><span>● T-1122 working 22m</span><span style="color:#5b6571">ended ▾</span></div></div>
+  <div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;font-family:'JetBrains Mono',monospace;font-size:12px">
+    <div>$ pnpm typecheck && pnpm lint</div>
+    <div style="font-family:Kalam;font-size:14px;color:#1d5bb8">▸ Typecheck, lint and formatting pass</div>
+    <div>✎ Edited docs/seed-data.md</div>
+    <div style="color:#c2410c">$ node t0063-repeat.mjs 30 · failed</div>
+    <div>◆ Gate: 20 of 21 · <span style="color:#c2410c">80-e2e failed</span></div>
+  </div>
+  <div style="display:flex;gap:6px;padding:10px 14px;border-top:1px solid #d7dbd5;font-size:13px"><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Send to monitor</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Add a note for next attempt</span><span style="border:1.5px solid #c2410c;color:#c2410c;border-radius:6px;padding:0 8px">Stop pass</span></div>
+</div></div>
+
+<!-- 1i Assistant -->
+<div class="dv-opt" id="1i"><div class="dv-olabel"><a class="dv-oid" href="#1i">1i</a>Assistant: one conversation surface, two agents</div>
+<div class="dv-card" style="width:440px;font-family:Kalam;font-size:14px">
+  <div style="display:flex;gap:12px;padding:10px 14px;border-bottom:1px solid #d7dbd5"><b>All</b><span>Helix</span><span style="color:#1d5bb8">Health monitor</span><span style="flex:1"></span><span style="color:#c2410c">2 your turn</span></div>
+  <div style="display:grid;grid-template-columns:150px minmax(0,1fr)">
+    <div style="border-right:1px solid #d7dbd5;font-size:13px">
+      <div style="padding:6px 10px;background:#f5f6f3"><b>T-1122</b> split by channel<div style="color:#c2410c">your turn</div></div>
+      <div style="padding:6px 10px;color:#1d5bb8"><b>Flaky 80-e2e</b><div>fix proposed</div></div>
+      <div style="padding:6px 10px"><b>T-0034</b> waits on T-0020<div style="color:#5b6571">resolved</div></div>
+    </div>
+    <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+      <div style="align-self:flex-end;background:#eef3fb;border-radius:10px;padding:6px 10px;max-width:80%">Split T-1122 by channel</div>
+      <div style="border:1.5px solid #1b2330;border-radius:10px;padding:6px 10px;max-width:90%"><div style="font-size:12px;color:#5b6571">Helix</div>Three tasks, one per channel. The email one can start now.</div>
+      <div style="border:1.5px dashed #1b2330;border-radius:8px;padding:6px 10px"><b>Proposal:</b> 3 new tasks, T-1122 retired <div style="display:flex;gap:6px;margin-top:4px;font-size:13px"><span style="background:#1b2330;color:#fff;border-radius:6px;padding:0 8px">Accept</span><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 8px">Decline</span></div></div>
+      <div style="border:1.5px solid #d7dbd5;border-radius:6px;padding:6px 10px;color:#5b6571">Reply… ⌘↩</div>
+    </div>
+  </div>
+</div></div>
+
+<!-- 1j Monitor settings -->
+<div class="dv-opt" id="1j"><div class="dv-olabel"><a class="dv-oid" href="#1j">1j</a>Settings · Health monitor autonomy, with editable prompts</div>
+<div class="dv-card" style="width:460px;font-family:Kalam;font-size:14px">
+  <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+    <b style="font-size:17px">Health monitor</b>
+    <div style="display:flex;gap:10px;align-items:center"><span style="font-size:13px;color:#5b6571">Runs on</span><span>◉ Codex ○ Claude Code</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);border:1.5px solid #1b2330;border-radius:8px;overflow:hidden;text-align:center"><span style="padding:4px">Manual</span><span style="padding:4px;background:#1b2330;color:#fff">Ask</span><span style="padding:4px;border-left:1px solid #1b2330">Auto</span><span style="padding:4px;border-left:1px solid #1b2330;color:#c2410c">Bypass</span></div>
+    <div style="font-size:13px;color:#5b6571"><b style="color:#1b2330">Ask:</b> groups problems and writes one fix for each. Changes nothing until you accept.</div>
+    <div style="display:grid;grid-template-columns:70px 1fr;gap:4px 10px;font-size:13px;color:#5b6571"><span>Manual</span><span>reports only, no fixes</span><span>Auto</span><span>applies retries, notes and parks; asks for splits and dependencies</span><span style="color:#c2410c">Bypass</span><span>applies every plan change; releases still confirm</span></div>
+    <div style="display:flex;align-items:center"><span style="font-size:12px;color:#5b6571;flex:1">SYSTEM PROMPT · Ask preset · edited</span><span style="font-size:13px;color:#1d5bb8">Reset to preset</span></div>
+    <div style="border:1.5px solid #1b2330;border-radius:6px;padding:8px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.5;color:#5b6571;height:72px;overflow:hidden">You watch the Mushy loop's passes. Group repeated failures by cause. For each group propose exactly one fix from: retry with note, park, split, add dependency, quarantine test…</div>
+    <div style="font-size:13px">Always confirm: release, approve, anything on main</div>
+  </div>
+</div></div>
+
+<!-- 1k Feedback routing -->
+<div class="dv-opt" id="1k"><div class="dv-olabel"><a class="dv-oid" href="#1k">1k</a>Settings · builder feedback rules</div>
+<div class="dv-card" style="width:560px;font-family:Kalam;font-size:14px">
+  <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;align-items:center"><b style="font-size:17px;flex:1">Builder feedback</b><span style="border:1.5px solid #1b2330;border-radius:6px;padding:0 6px;font-size:13px">Lane: all ▾</span></div>
+    <div style="display:grid;grid-template-columns:minmax(0,1.4fr) 1.3fr 70px 60px 50px;gap:6px 8px;font-size:13px;align-items:center">
+      <span style="color:#5b6571">KIND</span><span style="color:#5b6571">SEND TO</span><span style="color:#5b6571">AFTER</span><span style="color:#5b6571">PAUSE</span><span style="color:#5b6571">NOTIFY</span>
+      <span>Spec question</span><span><b>Inbox</b> · Monitor · Off</span><span>1st</span><span>☑</span><span>☑</span>
+      <span>Same gate step fails</span><span>Inbox · <b>Monitor</b> · Off</span><span>3×</span><span>☐</span><span>☐</span>
+      <span>Flaky test across tasks</span><span>Inbox · <b>Monitor</b> · Off</span><span>2 tasks</span><span>☐</span><span>☐</span>
+      <span>Blocked on a human task</span><span><b>Inbox</b> · Monitor · Off</span><span>1st</span><span>☑</span><span>☐</span>
+      <span>Credential / env missing</span><span><b>Inbox</b> · Monitor · Off</span><span>1st</span><span>☑</span><span>☑</span>
+      <span>Scope grew</span><span>Inbox · <b>Monitor</b> · Off</span><span>1st</span><span>☐</span><span>☐</span>
+      <span>Conflict / main diverged</span><span>Inbox · <b>Monitor</b> · Off</span><span>2×</span><span>☐</span><span>☐</span>
+    </div>
+    <div style="font-size:13px;color:#5b6571;border-top:1px dashed #d7dbd5;padding-top:6px">Overrides: <span style="color:#1b2330">mushy-website</span> sends "scope grew" to Inbox and notifies · + add override</div>
+  </div>
+</div></div>
+
+<!-- 1l Run & release -->
+<div class="dv-opt" id="1l"><div class="dv-olabel"><a class="dv-oid" href="#1l">1l</a>Run and release: one sheet from the status pill</div>
+<div class="dv-card" style="width:380px;font-family:Kalam;font-size:14px">
+  <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;align-items:center"><b style="font-size:20px;flex:1">Running</b><span style="border:1.5px solid #c2410c;color:#c2410c;border-radius:6px;padding:0 8px;font-size:13px">Stop after passes</span></div>
+    <div style="font-size:13px;color:#5b6571">both agents · since Mon 09:12 · no pass cap</div>
+    <div>☑ Claude Code ☑ Codex · at most [  ] passes</div>
+    <div style="border-top:1px dashed #d7dbd5;padding-top:6px;font-size:12px;color:#5b6571">RELEASES</div>
+    <div style="display:flex"><span style="flex:1">mushy-docs · 3 unreleased</span><span style="color:#c2410c">Review and approve</span></div>
+    <div style="display:flex"><span style="flex:1">mushy-website</span><span style="color:#9a6a00">waits for HT-25</span></div>
+    <div style="border-top:1px dashed #d7dbd5;padding-top:6px;font-size:12px;color:#5b6571">PLAN ✓ valid · COMMANDS 2 running ▸</div>
+  </div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: "go with <a class="dv-oid" href="#1a">1a</a> but borrow the briefing line from <a class="dv-oid" href="#1c">1c</a>" · "push <a class="dv-oid" href="#1d">1d</a> further" · "take <a class="dv-oid" href="#1a">1a</a> + <a class="dv-oid" href="#1e">1e</a>–<a class="dv-oid" href="#1l">1l</a> to hi-fi in Nocturne"</p>
+</section>
+</x-dc>
+</body>
+</html>

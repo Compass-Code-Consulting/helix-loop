@@ -1,0 +1,19 @@
+id: T-0004
+repo: mushy-social-media
+stage: day1
+area: web/admin-waitlist
+epic: waitlist-core
+title: An Admin downloads the confirmed sign-ups as a CSV file from the admin screen
+reqs: [WL-5]
+spec: ["§4 Waitlist", "§4 Requirements"]
+acceptance:
+  - "e2e: [WL-5] an Admin downloads waitlist.csv holding every confirmed address with its confirmation time, with no serious axe violations"
+  - "e2e: [WL-5] a member below Admin gets not-found for the export and does not see its key"
+blocked_by: [T-0002]
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []
+notes: |
+  Build from design-reference/screenshots/12-admin-waitlist.png.
+  Empty state: "No one has confirmed yet", with the export key disabled.

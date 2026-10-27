@@ -1,0 +1,22 @@
+{
+  "name": "mushy-harness",
+  "private": true,
+  "type": "module",
+  "description": "The Mushy build loop: scheduler, agent adapters, gate and merge queue.",
+  "engines": { "node": ">=26" },
+  "bin": { "helix-loop": "./bin/helix-loop.ts", "mushy-loop": "./bin/mushy-loop.ts" },
+  "scripts": {
+    "loop": "node bin/helix-loop.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --test 'test/**/*.test.ts'",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2"
+  }
+}

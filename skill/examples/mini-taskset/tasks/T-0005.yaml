@@ -1,0 +1,18 @@
+id: T-0005
+repo: mushy-social-media
+stage: day1
+area: ci/contract
+epic: waitlist-core
+title: A nightly contract test sends a real confirmation email and finds it in the test inbox
+reqs: [WL-8]
+spec: ["§4 Requirements"]
+acceptance:
+  - "integration: [WL-8] the contract run sends a confirmation through the real provider and reads it from the test inbox within 2 minutes"
+blocked_by: [T-0002, HT-1]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []
+notes: |
+  Runs only where EMAIL_PROVIDER_API_KEY is set (CI's contract-tests environment) and skips with a clear message elsewhere.
+  Never print the key; read it from the environment.

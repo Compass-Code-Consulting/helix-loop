@@ -1,0 +1,21 @@
+# Example Helix TaskSet: a product waitlist, built in two lanes.
+# The app lane takes sign-ups and sends the confirmation; the website lane shows the form.
+# The lane and repo names are the Mushy loop's, because this loop's task schema lists its repositories
+# and stages; a TaskSet for another product uses its own.
+version: 1
+# Both finish dates: project complete counts the human tasks' lead times (HT-1 waits up to two days on
+# domain verification); code complete leaves them out.
+timelines: [code, project]
+lanes:
+  mushy-social-media:
+    repo: mushy-social-media
+    epics:
+      waitlist-core:
+        title: Waitlist sign-up, confirmation and export
+        stage: day1
+  mushy-website:
+    repo: mushy-website
+    epics:
+      waitlist-page:
+        title: Waitlist form and confirmation page
+        stage: day1

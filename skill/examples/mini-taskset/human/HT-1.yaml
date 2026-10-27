@@ -1,0 +1,21 @@
+id: HT-1
+title: Open the email provider account, verify the sending domain and store its API key for the contract tests
+done_check: "The provider's dashboard shows mail.example.com verified, and gh secret list --env contract-tests lists EMAIL_PROVIDER_API_KEY"
+lead_time_days: 2
+agent_can_help: partly
+handoff_prompt: |
+  You are the owner's agent for the waitlist build. Ground rules: the owner confirms every account and payment before you act; never print, paste or log a secret value.
+  Goal: the app can send real email from mail.example.com, and CI's contract-tests environment holds the provider's API key.
+  Steps:
+  1. With the owner watching, create the provider account on the owner's sign-in, on the free plan.
+  2. Add the sending domain mail.example.com and create the DNS records the provider asks for (SPF, DKIM, the return path) in the domain's DNS.
+  3. Wait for verification; it can take up to 48 hours. Check every few hours and report when it passes.
+  4. Create an API key with send-only access and pipe it straight into: gh secret set EMAIL_PROVIDER_API_KEY --env contract-tests
+  5. Create the test inbox waitlist-test@example.com and record its address as the variable CONTRACT_TEST_INBOX.
+  The owner supplies: the provider sign-in and DNS access.
+  Report back: the domain's verification status, the secret and variable names you set (never their values), and the key's scope.
+tools: [gh, browser agent on the owner's sign-in, DNS provider CLI]
+secrets:
+  - { name: EMAIL_PROVIDER_API_KEY, stored_in: "GitHub environment contract-tests; source: the email provider's dashboard" }
+blocked_by: []
+status: todo
