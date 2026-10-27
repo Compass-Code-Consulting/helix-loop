@@ -157,7 +157,8 @@ main { position: relative; z-index: 1; height: calc(100% - var(--top-h)); overfl
 .group { overflow: hidden; }
 .group .head { display: grid; grid-template-columns: 28px 52px minmax(0, 1fr) 190px auto; align-items: center; gap: 12px; padding: 6px 14px; cursor: pointer; }
 .group .head:hover { background: color-mix(in srgb, var(--color-text) 3%, transparent); }
-.group .chev { color: var(--color-neutral-400); font-size: 12px; background: none; border: 0; cursor: pointer; padding: 0; }
+.group .chev { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-sm); color: var(--color-neutral-300); font-size: 15px; background: none; border: 0; cursor: pointer; padding: 0; }
+.group .chev:hover, .group .chev:focus-visible { color: var(--color-text); background: color-mix(in srgb, var(--color-text) 8%, transparent); }
 .group .n { font-size: 20px; font-weight: 500; text-align: right; }
 .group .t { font-weight: 500; font-size: 14px; }
 .group .why { color: var(--color-neutral-400); margin-top: 2px; }

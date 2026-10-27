@@ -135,7 +135,7 @@
     const sel = selection(g);
     const el = h('div', { class: `group glass${open ? ' sel' : ''}` },
       h('div', { class: 'head', tabindex: '0', 'data-jk': '', onclick: (e) => !e.target.closest('button') && toggle(g), onkeydown: (e) => e.key === 'Enter' && !e.target.closest('button') && primary(g)() },
-        h('button', { type: 'button', class: 'chev', 'aria-label': open ? 'Close' : 'Open', 'aria-expanded': String(open), onclick: () => toggle(g) }, open ? '▾' : '▸'),
+        h('button', { type: 'button', class: 'chev', 'aria-label': open ? 'Close' : 'Open', 'aria-expanded': String(open), onclick: () => toggle(g) }, HX.icon(open ? 'caret-down' : 'caret-right')),
         h('span', { class: 'n' }, F.n(g.members.length)),
         h('div', { style: { minWidth: 0 } },
           h('div', { class: 'row' }, h('span', { class: 't ell' }, g.title), HX.tag(KIND_LABEL[g.kind] ?? g.kind, g.kind === 'ask' ? 'tag-accent' : 'tag-neutral'), g.groupedBy === 'helix' ? h('span', { class: 'tiny t-acc' }, 'grouped by Helix') : null),
