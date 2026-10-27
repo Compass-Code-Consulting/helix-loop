@@ -1,0 +1,5 @@
+# Helix Loop's working files: the loop's runs, the product repos it clones, and its passes' worktrees.
+runs/
+repos/
+worktrees/
+app.yaml

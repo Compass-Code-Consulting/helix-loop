@@ -8,14 +8,14 @@ import type { HumanTask, RepoName } from './types.ts';
 
 // Release tags (Compass & Code's convention): v<YYYY>.<MM>.<DD>.<N>, annotated, where N counts that
 // day's releases of the repo from 1. A release is cut every `every_merged_tasks` merges, whenever a §21
-// stage closes with unreleased work, and on `helix-loop release <repo>`; all three go through
+// stage closes with unreleased work, and on `helix-loop release run <repo>`; all three go through
 // releaseRepo, with the same holds. A tag is what deploys: today straight to production; later the
 // same tag promotes through test, then staging, then production.
 //
 // Production's secrets reach whatever a v* tag runs: the workflows and actions under .github/, and the
 // OpenTofu code under infra/ that the deploy job applies (release.review_paths). The loop never tags a
 // release that changes those since the previous release (or the root commit). It writes
-// runs/approvals/<repo>-<tag>.json instead, and `helix-loop approve-release` tags exactly that commit
+// runs/approvals/<repo>-<tag>.json instead, and `helix-loop release approve` tags exactly that commit
 // once the owner has read the diff. Later releases of the repo wait behind it, because each would carry
 // the same unreviewed change.
 
@@ -84,7 +84,7 @@ export function releaseTagName(existing: string[], now: number): string {
 }
 
 // Tasks merged into a repo that no release has carried yet, oldest first. Each release lists what it
-// carries, so a release approved after more merges (approve-release) leaves those merges unreleased.
+// carries, so a release approved after more merges (release approve) leaves those merges unreleased.
 export function unreleased(ledgerFile: string, repo: string): string[] {
   let pending: string[] = [];
   for (const e of readLedger(ledgerFile)) {
@@ -181,7 +181,7 @@ export async function releaseRepo(r: ReleaseRequest): Promise<ReleaseOutcome> {
       since,
       paths: changed.split('\n'),
       review: `git -C ${quote(r.dir)} diff ${since} ${commit} -- ${specs.map(quote).join(' ')}`,
-      approve: `helix-loop approve-release ${r.repo} ${tag}`,
+      approve: `helix-loop release approve ${r.repo} ${tag}`,
       reason: r.reason,
       tasks: r.tasks,
       requestedAt: new Date(r.now).toISOString(),
@@ -220,7 +220,7 @@ export interface ApproveInput {
   now: number;
 }
 
-// `helix-loop approve-release`: tags exactly the reviewed commit with exactly the recorded name, pushes
+// `helix-loop release approve`: tags exactly the reviewed commit with exactly the recorded name, pushes
 // it, records the release, and removes the approval. A push that fails is retried like any release
 // tag's: before the repo's next release, and when the loop starts.
 export async function approveRelease(input: ApproveInput): Promise<{ approval: Approval; pushed: boolean | 'skipped' }> {

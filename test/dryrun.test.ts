@@ -8,7 +8,7 @@ import { parse, stringify } from 'yaml';
 import { claudeAdapter } from '../src/agents/claude.ts';
 import { codexAdapter } from '../src/agents/codex.ts';
 import { VirtualClock } from '../src/clock.ts';
-import { CONTROL_PLANE, loadConfig, paths, type Config } from '../src/config.ts';
+import { BIN, type Config, configPath, loadConfig, logFile, paths } from '../src/config.ts';
 import { readLedger, type LedgerEvent } from '../src/ledger.ts';
 import { EXIT, runLoop } from '../src/loop.ts';
 import { fakeConfig, seedControlPlane, seedRepos } from '../src/dryrun.ts';
@@ -16,6 +16,7 @@ import { startApp } from '../src/app/server.ts';
 import { renderDependencyMap } from '../src/map/render.ts';
 import type { Approval } from '../src/release.ts';
 import type { HumanTask, MapModel, Task } from '../src/types.ts';
+import { FIXTURE } from './fixture.ts';
 
 // The dry run (handoff "definition of ready"): the real loop, the real adapters and real git
 // repositories, with scripted fake `claude` and `codex` executables in place of the CLIs.
@@ -66,12 +67,12 @@ function setup(
   lastLog = [];
   const root = mkdtempSync(join(tmpdir(), 'mushy-dryrun-'));
   const p = paths(root);
-  seedControlPlane(root);
+  seedControlPlane(root, FIXTURE);
   const add = (list: Partial<Task>[]) =>
     list.forEach((t, i) => {
       const id = t.id ?? `T-${String(i + 1).padStart(4, '0')}`;
       const full: Task = {
-        id, repo: 'mushy-social-media', stage: 'day1', area: `area-${id.toLowerCase()}`, title: `Dry-run task ${id}`, reqs: ['PB-14'],
+        id, repo: 'acme-app', stage: 'day1', area: `area-${id.toLowerCase()}`, title: `Dry-run task ${id}`, reqs: ['PB-14'],
         spec: ['PB-14'], acceptance: [`unit: [PB-14] dry-run behaviour of ${id}`], blocked_by: [], estimate_passes: 1,
         status: 'ready', claimed_by: null, attempts: [], ...t,
       };
@@ -83,13 +84,13 @@ function setup(
   };
   add(tasks);
   humans.forEach(human);
-  seedRepos(p.repos, Object.keys(loadConfig().repos));
+  seedRepos(p.repos, Object.keys(loadConfig(FIXTURE).repos));
   const scenarioFile = join(root, 'scenario.json');
   writeFileSync(scenarioFile, JSON.stringify(scenario));
   process.env.HELIX_FAKE_SCENARIO = scenarioFile;
   process.env.HELIX_FAKE_STATE = join(root, 'fake-state');
 
-  const config = fakeConfig(loadConfig(), root);
+  const config = fakeConfig(loadConfig(FIXTURE), root);
   // No loop app in a scenario unless it starts one: a builder never reports to an app Daniel has open.
   delete config.app;
   // One pass per agent unless a scenario asks for more, so the order of passes stays predictable.
@@ -127,7 +128,7 @@ function setup(
     ledger,
     modes: () => ledger().flatMap((e) => (e.kind === 'mode' ? [e.mode] : [])),
     passes: (id) => ledger().filter((e): e is Extract<LedgerEvent, { kind: 'pass' }> => e.kind === 'pass' && (!id || e.task === id)),
-    main: (repo = 'mushy-social-media') => execFileSync('git', ['log', '--format=%s', 'main'], { cwd: join(p.repos, repo) }).toString().trim().split('\n'),
+    main: (repo = 'acme-app') => execFileSync('git', ['log', '--format=%s', 'main'], { cwd: join(p.repos, repo) }).toString().trim().split('\n'),
     notes,
     maps,
     add,
@@ -142,9 +143,8 @@ function setup(
       return bare;
     },
     cli: (...args) => {
-      mkdirSync(join(root, 'harness'), { recursive: true });
-      writeFileSync(join(root, 'harness', 'config.yaml'), stringify({ ...config, root: undefined }));
-      const r = spawnSync('node', [join(CONTROL_PLANE, 'harness', 'bin', 'mushy-loop.ts'), ...args, '--root', root], { encoding: 'utf8' });
+          writeFileSync(configPath(root), stringify({ ...config, root: undefined }));
+      const r = spawnSync('node', [BIN, ...args, '--root', root], { encoding: 'utf8' });
       return { code: r.status ?? -1, out: `${r.stdout}${r.stderr}` };
     },
   };
@@ -160,7 +160,7 @@ scenario('both agents in parallel; the loop commits a dirty tree and accepts an 
   const log = s.main();
   assert.ok(log.some((m) => m === 'T-0001: implement the task'));
   assert.ok(log.some((m) => m === 'T-0002: committed by the agent itself'));
-  assert.ok(existsSync(join(s.root, 'plan', 'Mushy.LoopEngineering.DependencyMap.html')));
+  assert.ok(existsSync(join(paths(s.root).plan, 'DependencyMap.html')));
 });
 
 scenario('Claude at its session limit: single-threaded on Codex, then Claude resumes after the reset', async () => {
@@ -223,7 +223,7 @@ scenario('a merge conflict between the two agents sends the later task back with
   const seen = carriedSeen(s, t, 2);
   assert.match(seen.status, new RegExp(`^\\?\\? src/${t.id}\\.ts$`, 'm'));
   assert.match(seen.shared, new RegExp(`^<<<<<<< HEAD\\nwritten by T-\\d+ via \\w+\\n\\|{7} [0-9a-f]+\\noriginal\\n=======\\nwritten by ${t.id} via \\w+\\n>>>>>>> ${kept}\\n$`));
-  const shared = s.git('mushy-social-media', 'show', 'main:shared.txt');
+  const shared = s.git('acme-app', 'show', 'main:shared.txt');
   assert.match(shared, /^written by T-\d+ via \w+\nwritten by T-\d+ via \w+$/);
   // The second attempt was told of the conflicts git left; the third, that its last attempt failed the gate.
   const prompt2 = readFileSync(join(s.root, 'fake-state', `${t.id}.prompt-2.md`), 'utf8');
@@ -233,7 +233,7 @@ scenario('a merge conflict between the two agents sends the later task back with
   assert.match(prompt3, new RegExp(`Your last attempt's work failed the gate; the end of its output is below\\. The loop has merged that work, kept on branch \`${second}\``));
   assert.match(prompt3, /The end of the last failed attempt's output:\n\n```text\nconflict markers are left in shared\.txt/);
   assert.ok(lastLog.some((l) => l.includes(`${t.id}: starts from the work kept on ${kept}, with conflicts in shared.txt`)), 'the loop logged the carry');
-  assert.equal(s.git('mushy-social-media', 'branch', '--list', 'task/*'), '', 'the kept branch went once the task merged');
+  assert.equal(s.git('acme-app', 'branch', '--list', 'task/*'), '', 'the kept branch went once the task merged');
 });
 
 scenario('work that fails the gate only on the new main is kept, and the next attempt finishes it', async () => {
@@ -249,7 +249,7 @@ scenario('work that fails the gate only on the new main is kept, and the next at
   const prompt = readFileSync(join(s.root, 'fake-state', `${t.id}@${t.attempts[1]!.agent}.prompt.md`), 'utf8');
   assert.match(prompt, /## Your earlier work on this task is in your worktree/);
   assert.doesNotMatch(prompt, /Git left these conflicts/);
-  const onMain = s.git('mushy-social-media', 'ls-tree', '-r', '--name-only', 'main').split('\n');
+  const onMain = s.git('acme-app', 'ls-tree', '-r', '--name-only', 'main').split('\n');
   assert.ok(onMain.includes(`src/${t.id}.ts`) && !onMain.includes(`CLASH_${t.id}`), onMain.join(', '));
 });
 
@@ -282,16 +282,16 @@ scenario('every pass records where its time went, what failed and what it starte
   assert.equal(merged.failedStep, undefined);
   assert.equal(merged.kept, undefined);
   // One version per pass, each kept as written, listed in versions.json, versions.js and index.html.
-  const dir = join(s.root, 'runs', 'metrics');
+  const dir = join(paths(s.root).runs, 'metrics');
   const versions = JSON.parse(readFileSync(join(dir, 'versions.json'), 'utf8')) as { file: string; passes: number }[];
   assert.deepEqual(versions.map((v) => v.passes), [1, 2]);
-  assert.match(versions[0]!.file, /^Mushy\.LoopEngineering\.Metrics\.2026-10-24\.0001\.html$/);
+  assert.match(versions[0]!.file, /^Metrics\.2026-10-24\.0001\.html$/);
   const model = (file: string) => JSON.parse(/<script type="application\/json" id="data">(.*?)<\/script>/s.exec(readFileSync(join(dir, file), 'utf8'))![1]!);
   assert.deepEqual(model(versions[0]!.file).versions.map((v: { passes: number }) => v.passes), [1], 'the first version knew only itself');
   assert.match(readFileSync(join(dir, 'versions.js'), 'utf8'), /^window\.HELIX_METRICS_VERSIONS = \[.*"passes":1.*"passes":2.*\];\n$/s);
   const index = readFileSync(join(dir, 'index.html'), 'utf8');
   assert.ok(index.indexOf(versions[1]!.file) < index.lastIndexOf(versions[0]!.file), 'the index lists the newest first');
-  assert.match(lastLog.join('\n'), /metrics: wrote Mushy\.LoopEngineering\.Metrics\.2026-10-24\.0002\.html, after 2 passes/);
+  assert.match(lastLog.join('\n'), /metrics: wrote Metrics\.2026-10-24\.0002\.html, after 2 passes/);
   const m = model(versions[1]!.file);
   assert.equal(m.kpi.done, 1);
   assert.equal(m.kpi.total, 1);
@@ -302,7 +302,7 @@ scenario('every pass records where its time went, what failed and what it starte
   // The command writes a version on demand; one for the same passes replaces it.
   const cli = s.cli('metrics');
   assert.equal(cli.code, 0, cli.out);
-  assert.match(cli.out.trim(), /runs\/metrics\/Mushy\.LoopEngineering\.Metrics\.\d{4}-\d{2}-\d{2}\.0002\.html$/);
+  assert.match(cli.out.trim(), /runs\/metrics\/Metrics\.\d{4}-\d{2}-\d{2}\.0002\.html$/);
 });
 
 scenario('a test that fails passes of two different tasks gets a fix-first task, filed by the loop and built next', async () => {
@@ -319,7 +319,7 @@ scenario('a test that fails passes of two different tasks gets a fix-first task,
   assert.match(fix.notes ?? '', /^- T-0001 attempt 1 /m);
   assert.match(fix.notes ?? '', /^- T-0002 attempt 1 /m);
   assert.ok(lastLog.some((l) => /^🔧 filed T-0003, fix first: a test failed (T-0001 and T-0002|T-0002 and T-0001):/.test(l)), lastLog.join('\n'));
-  assert.equal(s.notes.filter((n) => n.title === 'Mushy loop filed a fix').length, 1, 'filed once');
+  assert.equal(s.notes.filter((n) => n.title === 'The loop filed a fix').length, 1, 'filed once');
 });
 
 scenario('two passes per agent run at once, while the gates take turns', async () => {
@@ -382,7 +382,7 @@ scenario('a rebase that conflicts only in a lockfile regenerates it, and both ta
   assert.equal(await s.run(), EXIT.allDone);
   assert.deepEqual([...s.task('T-0001').attempts, ...s.task('T-0002').attempts].map((a) => a.outcome), ['merged', 'merged']);
   assert.ok(lastLog.some((l) => /the rebase conflicted only in deps\.lock; manifests merged key by key, lockfiles regenerated/.test(l)), 'the second merge regenerated the lockfile');
-  const lock = execFileSync('git', ['show', 'main:deps.lock'], { cwd: join(s.root, 'repos', 'mushy-social-media') }).toString();
+  const lock = execFileSync('git', ['show', 'main:deps.lock'], { cwd: join(paths(s.root).repos, 'acme-app') }).toString();
   assert.equal(lock, 'T-0001\nT-0002\n');
 });
 
@@ -391,7 +391,7 @@ scenario('two tasks adding dependencies to one manifest both merge: the manifest
   assert.equal(await s.run(), EXIT.allDone);
   assert.deepEqual([...s.task('T-0001').attempts, ...s.task('T-0002').attempts].map((a) => a.outcome), ['merged', 'merged']);
   assert.ok(lastLog.some((l) => /the rebase conflicted only in manifest\.json, manifest\.lock/.test(l)), lastLog.join('\n'));
-  const show = (f: string) => execFileSync('git', ['show', `main:${f}`], { cwd: join(s.root, 'repos', 'mushy-social-media') }).toString();
+  const show = (f: string) => execFileSync('git', ['show', `main:${f}`], { cwd: join(paths(s.root).repos, 'acme-app') }).toString();
   assert.deepEqual(JSON.parse(show('manifest.json')), { name: 'fake', dependencies: { 't-0001': '1.0.0', 't-0002': '1.0.0' } });
   assert.equal(show('manifest.lock'), 't-0001\nt-0002\n');
 });
@@ -499,10 +499,10 @@ async function until(what: string, ok: () => boolean, ms = 20_000): Promise<void
   for (const end = Date.now() + ms; !ok() && Date.now() < end; ) await new Promise((r) => setTimeout(r, 100));
   assert.ok(ok(), what);
 }
-const live = (s: Setup) => JSON.parse(readFileSync(join(s.root, 'runs', 'live.json'), 'utf8')) as { paused?: boolean; passes: { task: string; stopping?: boolean }[] };
+const live = (s: Setup) => JSON.parse(readFileSync(join(paths(s.root).runs, 'live.json'), 'utf8')) as { paused?: boolean; passes: { task: string; stopping?: boolean }[] };
 // Writes a stop request as the loop app does: whole, by rename.
 function askToStop(s: Setup, task: string, request: Record<string, unknown>): string {
-  const dir = join(s.root, 'runs', 'stop-pass');
+  const dir = join(paths(s.root).runs, 'stop-pass');
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${task}.json`);
   writeFileSync(`${file}.tmp`, JSON.stringify({ at: new Date().toISOString(), ...request }));
@@ -512,8 +512,8 @@ function askToStop(s: Setup, task: string, request: Record<string, unknown>): st
 
 scenario('runs/PAUSE: no pass starts while it exists, the loop waits instead of exiting, and passes run once it goes', async () => {
   const s = setup([{}, {}], {});
-  const pause = join(s.root, 'runs', 'PAUSE');
-  mkdirSync(join(s.root, 'runs'), { recursive: true });
+  const pause = join(paths(s.root).runs, 'PAUSE');
+  mkdirSync(join(paths(s.root).runs), { recursive: true });
   writeFileSync(pause, '');
   const exit = s.run();
   let exited = false;
@@ -539,11 +539,11 @@ scenario('runs/PAUSE mid-run lets the pass in flight finish and starts no other;
   });
   const exit = s.run();
   await until('the first pass starts', () => lastLog.some((l) => l.includes('T-0001 → ')));
-  writeFileSync(join(s.root, 'runs', 'PAUSE'), '');
+  writeFileSync(join(paths(s.root).runs, 'PAUSE'), '');
   await until('the loop sees the pause while the pass runs', () => lastLog.includes('paused (runs/PAUSE): no new passes start until it is removed'));
   await until('the pass in flight finishes, and the loop waits', () => lastLog.includes('paused with no pass in flight; waiting for runs/PAUSE to be removed'));
   assert.deepEqual(s.passes().map((x) => [x.task, x.outcome]), [['T-0001', 'merged']]);
-  writeFileSync(join(s.root, 'runs', 'STOP'), '');
+  writeFileSync(join(paths(s.root).runs, 'STOP'), '');
   assert.equal(await exit, EXIT.stopped);
   assert.equal(s.task('T-0002').status, 'ready', 'no pass started while paused');
   assert.deepEqual(s.ledger().flatMap((e) => (e.kind === 'loop' ? [e.event] : [])), ['start', 'pause', 'exit']);
@@ -606,7 +606,7 @@ scenario('a task handed back by a person runs again without a restart', async ()
   for (let i = 0; i < 100 && s.task('T-0001').status !== 'needs_human'; i++) await new Promise((r) => setTimeout(r, 100));
   assert.equal(s.task('T-0001').status, 'needs_human');
   // Hand it back the way a person would: set it ready in its file while the loop runs.
-  const file = join(s.root, 'plan', 'tasks', 'T-0001.yaml');
+  const file = join(paths(s.root).plan, 'tasks', 'T-0001.yaml');
   writeFileSync(file, readFileSync(file, 'utf8').replace('status: needs_human', 'status: ready'));
   assert.equal(await exit, EXIT.allDone);
   assert.equal(s.task('T-0001').status, 'done');
@@ -620,7 +620,7 @@ scenario('a task the loop is not running can be revised on disk while it runs; a
     for (let i = 0; i < 150 && !ok(); i++) await new Promise((r) => setTimeout(r, 100));
     assert.ok(ok(), what);
   };
-  const file = (id: string) => join(s.root, 'plan', 'tasks', `${id}.yaml`);
+  const file = (id: string) => join(paths(s.root).plan, 'tasks', `${id}.yaml`);
   await until('both agents hold a task', () => s.task('T-0001').status === 'claimed' && s.task('T-0002').status === 'claimed');
   // Park the task that waits on T-0001, and retitle T-0002 during its pass.
   writeFileSync(file('T-0003'), readFileSync(file('T-0003'), 'utf8').replace('status: ready', 'status: parked'));
@@ -674,7 +674,7 @@ scenario('a mascot task pinned to Codex in the design role runs on Astra; the re
 
 scenario('release tags: every N merges in a repo, and when a stage closes; workflows only from ci-area tasks', async () => {
   const s = setup(
-    [{}, {}, {}, { repo: 'mushy-docs' }, { area: 'ci', stage: 'day2' }, { stage: 'day2' }],
+    [{}, {}, {}, { repo: 'acme-docs' }, { area: 'ci', stage: 'day2' }, { stage: 'day2' }],
     { 'T-0006': ['ciwrite', 'implement'], 'T-0005': ['ciwrite'] },
     (c) => {
       c.release.every_merged_tasks = 2;
@@ -682,10 +682,10 @@ scenario('release tags: every N merges in a repo, and when a stage closes; workf
   );
   assert.equal(await s.run(), EXIT.allDone);
   const releases = s.ledger().filter((e): e is Extract<LedgerEvent, { kind: 'release' }> => e.kind === 'release');
-  const app = releases.filter((r) => r.repo === 'mushy-social-media');
+  const app = releases.filter((r) => r.repo === 'acme-app');
   assert.ok(app.some((r) => r.reason.startsWith('Checkpoint')), JSON.stringify(releases));
-  assert.ok(releases.some((r) => r.repo === 'mushy-docs' && r.reason === 'Stage day1 closed' && r.tasks.includes('T-0004')), JSON.stringify(releases));
-  const tags = execFileSync('git', ['tag', '--list', 'v*'], { cwd: join(s.root, 'repos', 'mushy-social-media') }).toString().trim().split('\n');
+  assert.ok(releases.some((r) => r.repo === 'acme-docs' && r.reason === 'Stage day1 closed' && r.tasks.includes('T-0004')), JSON.stringify(releases));
+  const tags = execFileSync('git', ['tag', '--list', 'v*'], { cwd: join(paths(s.root).repos, 'acme-app') }).toString().trim().split('\n');
   assert.ok(tags.length >= 2 && tags.every((t) => /^v\d{4}\.\d{2}\.\d{2}\.\d+$/.test(t)), tags.join(','));
   assert.equal(s.task('T-0006').attempts[0]!.outcome, 'forbidden_paths');
   assert.equal(s.task('T-0005').attempts[0]!.outcome, 'merged');
@@ -697,7 +697,7 @@ scenario('a stop file ends a wait for an agent to be back at once, not at its re
   // Both agents are at their limits for ten hours (36 seconds here): the loop waits for the first reset.
   const deadline = Date.now() + 20_000;
   while (!lastLog.some((l) => /^waiting until /.test(l)) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
-  writeFileSync(join(s.root, 'runs', 'STOP'), '');
+  writeFileSync(join(paths(s.root).runs, 'STOP'), '');
   const stopped = Date.now();
   assert.equal(await run, EXIT.stopped);
   assert.ok(Date.now() - stopped < 10_000, `the loop took ${Date.now() - stopped} ms to stop`);
@@ -709,7 +709,7 @@ scenario('an agent with nothing to take while the other is out says so', async (
   const s = setup([{ attempts: [failed, failed] }], { 'T-0001@codex': ['limit:120', 'implement'] });
   assert.equal(await s.run(), EXIT.allDone);
   assert.ok(lastLog.some((l) => /^waiting until .* for codex; claude has nothing it can take$/.test(l)), 'the log says why');
-  assert.ok(s.notes.some((n) => n.title === 'Mushy loop idle' && /^claude has nothing it can take until codex is back at /.test(n.message)), JSON.stringify(s.notes));
+  assert.ok(s.notes.some((n) => n.title === 'The loop is idle' && /^claude has nothing it can take until codex is back at /.test(n.message)), JSON.stringify(s.notes));
   assert.equal(s.task('T-0001').attempts.at(-1)!.agent, 'codex');
 });
 
@@ -727,7 +727,7 @@ scenario('someone pushes to origin mid-run: main catches up first, the task is r
     c.push = true;
     c.release.every_merged_tasks = 2;
   });
-  const origin = s.origin('mushy-social-media');
+  const origin = s.origin('acme-app');
   assert.equal(await s.run(), EXIT.allDone);
   assert.deepEqual(s.task('T-0001').attempts.map((a) => a.outcome), ['merged']);
   assert.equal(s.task('T-0002').status, 'done');
@@ -736,8 +736,8 @@ scenario('someone pushes to origin mid-run: main catches up first, the task is r
   assert.equal(merges.find((e) => e.task === 'T-0001')?.regated, true, 'main moved under the task, so it was re-gated');
   assert.ok(lastLog.some((l) => l.includes('main caught up with origin/main')));
   assert.ok(s.passes().every((x) => !x.note?.includes('push failed')));
-  assert.equal(execFileSync('git', ['rev-parse', 'main'], { cwd: origin }).toString().trim(), s.git('mushy-social-media', 'rev-parse', 'main'));
-  const releases = releasesOf(s, 'mushy-social-media');
+  assert.equal(execFileSync('git', ['rev-parse', 'main'], { cwd: origin }).toString().trim(), s.git('acme-app', 'rev-parse', 'main'));
+  const releases = releasesOf(s, 'acme-app');
   assert.equal(releases.length, 1);
   assert.equal(releases[0]!.pushed, true);
   assert.equal(execFileSync('git', ['tag', '--list', 'v*'], { cwd: origin }).toString().trim(), releases[0]!.tag);
@@ -745,14 +745,14 @@ scenario('someone pushes to origin mid-run: main catches up first, the task is r
 
 scenario('origin rewritten mid-run: nothing merges into that repo, the task keeps its branch and waits, and runs once main and origin agree', async () => {
   const s = setup(
-    [{}, { repo: 'mushy-docs' }],
-    { 'T-0001': ['diverge', 'implement'], 'T-0002': ['reconcile:mushy-social-media'] },
+    [{}, { repo: 'acme-docs' }],
+    { 'T-0001': ['diverge', 'implement'], 'T-0002': ['reconcile:acme-app'] },
     (c) => {
       c.push = true;
       c.agents.codex.enabled = false; // one agent, so the passes run in a known order
     },
   );
-  const origin = s.origin('mushy-social-media');
+  const origin = s.origin('acme-app');
   // Without the hold the loop would retry T-0001 forever (the attempts are not counted); the cap makes that fail fast.
   assert.equal(await s.run({ maxPasses: 10 }), EXIT.allDone);
   // T-0001 ranks first, yet its repo took no task while it was held; T-0002's pass reconciled it.
@@ -765,54 +765,54 @@ scenario('origin rewritten mid-run: nothing merges into that repo, the task keep
   // The refused work was kept, the retry started from it, and its branch went once the task merged.
   assert.equal(t1.attempts[0]!.kept, 'task/T-0001-claude-1');
   assert.ok(lastLog.some((l) => l === 'T-0001: starts from the work kept on task/T-0001-claude-1'), 'the retry carried it');
-  assert.equal(s.git('mushy-social-media', 'branch', '--list', 'task/*'), '');
+  assert.equal(s.git('acme-app', 'branch', '--list', 'task/*'), '');
   assert.ok(s.ledger().some((e) => e.kind === 'warning' && e.task === 'T-0001' && e.detail.includes('have diverged')));
-  assert.deepEqual(s.notes.map((n) => n.title).filter((t) => t.includes('diverged')), ['Mushy: mushy-social-media has diverged from origin']);
-  assert.ok(lastLog.some((l) => l.includes('mushy-social-media: main and origin/main agree again')));
-  assert.equal(execFileSync('git', ['rev-parse', 'main'], { cwd: origin }).toString().trim(), s.git('mushy-social-media', 'rev-parse', 'main'));
+  assert.deepEqual(s.notes.map((n) => n.title).filter((t) => t.includes('diverged')), ['acme-app has diverged from origin']);
+  assert.ok(lastLog.some((l) => l.includes('acme-app: main and origin/main agree again')));
+  assert.equal(execFileSync('git', ['rev-parse', 'main'], { cwd: origin }).toString().trim(), s.git('acme-app', 'rev-parse', 'main'));
 });
 
 scenario('no release is pushed into a repo whose origin was rewritten after its last merge; other repos release as usual', async () => {
-  const s = setup([{}, { repo: 'mushy-docs', blocked_by: ['T-0001'] }], { 'T-0002': ['diverge:mushy-social-media'] }, (c) => {
+  const s = setup([{}, { repo: 'acme-docs', blocked_by: ['T-0001'] }], { 'T-0002': ['diverge:acme-app'] }, (c) => {
     c.push = true;
   });
-  const origin = s.origin('mushy-social-media');
+  const origin = s.origin('acme-app');
   assert.equal(await s.run(), EXIT.allDone);
   // T-0001 merged and was pushed; then origin/main was rewritten, and the stage closed.
-  assert.deepEqual(s.tags('mushy-social-media'), []);
+  assert.deepEqual(s.tags('acme-app'), []);
   assert.equal(execFileSync('git', ['tag', '--list'], { cwd: origin }).toString().trim(), '', 'no tag republished the dropped commit');
-  const [held] = heldOf(s, 'mushy-social-media');
+  const [held] = heldOf(s, 'acme-app');
   assert.deepEqual(held?.tasks, ['T-0001']);
   assert.match(held?.detail ?? '', /^while main \(\w{12}\) and origin\/main \(\w{12}\) have diverged/);
-  assert.deepEqual(s.notes.map((n) => n.title).filter((t) => t.includes('diverged')), ['Mushy: mushy-social-media has diverged from origin']);
-  assert.equal(s.tags('mushy-docs').length, 1);
+  assert.deepEqual(s.notes.map((n) => n.title).filter((t) => t.includes('diverged')), ['acme-app has diverged from origin']);
+  assert.equal(s.tags('acme-docs').length, 1);
 });
 
 scenario('a repo released only after its human step: held until HT-25 is done, then the next release carries the held tasks', async () => {
   const s = setup(
-    [{ repo: 'mushy-website' }, { repo: 'mushy-website' }, {}],
+    [{ repo: 'acme-website' }, { repo: 'acme-website' }, {}],
     {},
     (c) => {
       c.release.every_merged_tasks = 2;
-      c.release.hold_until = { 'mushy-website': 'HT-25' };
+      c.release.hold_until = { 'acme-website': 'HT-25' };
     },
     [{ id: 'HT-25', status: 'in_progress' }],
   );
   assert.equal(await s.run(), EXIT.allDone);
-  const held = heldOf(s, 'mushy-website');
+  const held = heldOf(s, 'acme-website');
   assert.deepEqual(held.map((e) => e.reason), ['Checkpoint every 2 tasks', 'Stage day1 closed']);
   assert.ok(held.every((e) => e.detail === 'until HT-25 is done (it is in_progress)'), JSON.stringify(held));
-  assert.deepEqual(s.tags('mushy-website'), []);
-  assert.equal(s.tags('mushy-social-media').length, 1, 'other repos release as usual');
-  assert.match(s.cli('status').out, /mushy-website: releases held until HT-25 is done \(in_progress\)/);
+  assert.deepEqual(s.tags('acme-website'), []);
+  assert.equal(s.tags('acme-app').length, 1, 'other repos release as usual');
+  assert.match(s.cli('status').out, /acme-website: releases held until HT-25 is done \(in_progress\)/);
 
   s.human({ id: 'HT-25', status: 'done' });
-  s.add([{ id: 'T-0004', repo: 'mushy-website', stage: 'day2' }]);
+  s.add([{ id: 'T-0004', repo: 'acme-website', stage: 'day2' }]);
   assert.equal(await s.run(), EXIT.allDone);
-  const [release, ...more] = releasesOf(s, 'mushy-website');
+  const [release, ...more] = releasesOf(s, 'acme-website');
   assert.equal(more.length, 0);
   assert.deepEqual([...release!.tasks].sort(), ['T-0001', 'T-0002', 'T-0004']);
-  assert.deepEqual(s.tags('mushy-website'), [release!.tag]);
+  assert.deepEqual(s.tags('acme-website'), [release!.tag]);
 });
 
 scenario('a release that changes CI workflows waits for approval; later ones wait behind it, then are named and filled right', async () => {
@@ -824,8 +824,8 @@ scenario('a release that changes CI workflows waits for approval; later ones wai
       c.release.every_merged_tasks = 2;
     },
   );
-  const repo = 'mushy-social-media';
-  const approvals = join(s.root, 'runs', 'approvals');
+  const repo = 'acme-app';
+  const approvals = join(paths(s.root).runs, 'approvals');
   assert.equal(await s.run(), EXIT.allDone);
   // One approval, from the first checkpoint; the next checkpoint and the stage release wait behind it.
   const files = readdirSync(approvals);
@@ -842,15 +842,15 @@ scenario('a release that changes CI workflows waits for approval; later ones wai
   assert.ok(held.every((e) => e.tag === approval.tag && e.approval === `runs/approvals/${files[0]}`), JSON.stringify(held));
   assert.match(held[0]!.detail, /^for approval: /);
   assert.ok(held.slice(1).every((e) => e.detail.startsWith(`behind ${approval.tag}`)));
-  assert.deepEqual(s.notes.filter((n) => n.title === 'Mushy release needs your approval').length, 1);
+  assert.deepEqual(s.notes.filter((n) => n.title === 'A release needs your approval').length, 1);
   const status = s.cli('status').out;
   assert.match(status, new RegExp(`${repo} ${approval.tag.replace(/\./g, '\\.')} waits for approval: it changes \\.github/workflows/ci\\.yml since the root commit`));
-  assert.ok(status.includes(`approve: node harness/bin/mushy-loop.ts approve-release ${repo} ${approval.tag}`), status);
+  assert.ok(status.includes(`approve: helix-loop release approve ${repo} ${approval.tag}`), status);
 
-  const wrong = s.cli('approve-release', repo, 'v1999.01.01.1');
+  const wrong = s.cli('release', 'approve', repo, 'v1999.01.01.1');
   assert.equal(wrong.code, 1);
-  assert.match(wrong.out, /No release of mushy-social-media waits for approval as v1999\.01\.01\.1/);
-  const approved = s.cli('approve-release', repo, approval.tag);
+  assert.match(wrong.out, /No release of acme-app waits for approval as v1999\.01\.01\.1/);
+  const approved = s.cli('release', 'approve', repo, approval.tag);
   assert.equal(approved.code, 0, approved.out);
   assert.equal(s.git(repo, 'rev-parse', `${approval.tag}^{commit}`), approval.commit);
   assert.deepEqual(readdirSync(approvals), []);
@@ -868,8 +868,8 @@ scenario('a release that changes CI workflows waits for approval; later ones wai
   assert.equal(heldOf(s, repo).length, held.length, 'no hold after the approval');
 });
 
-scenario('mushy-loop release says what holds a repo and releases it once the hold lifts; a failed tag push is retried by the next release and at loop start', async () => {
-  const repo = 'mushy-website';
+scenario('helix-loop release run says what holds a repo and releases it once the hold lifts; a failed tag push is retried by the next release and at loop start', async () => {
+  const repo = 'acme-website';
   const s = setup([{ repo }], {}, (c) => {
     c.push = true;
     c.release.hold_until = { [repo]: 'HT-25' };
@@ -878,7 +878,7 @@ scenario('mushy-loop release says what holds a repo and releases it once the hol
   const originTags = () => execFileSync('git', ['tag', '--list'], { cwd: origin }).toString().trim().split('\n').filter(Boolean);
   assert.equal(await s.run(), EXIT.allDone); // T-0001 is merged and pushed; its release is held at the stage close
 
-  let out = s.cli('release', repo);
+  let out = s.cli('release', 'run', repo);
   assert.equal(out.code, 10, out.out);
   assert.ok(out.out.includes(`${repo} is not released: held until HT-25 is done (it is todo).\nTo lift the hold: mark HT-25 done in plan/human/HT-25.yaml once it is.`), out.out);
   assert.deepEqual(s.tags(repo), []);
@@ -886,7 +886,7 @@ scenario('mushy-loop release says what holds a repo and releases it once the hol
   // HT-25 is done, but origin can't be reached: the tag is made and its push fails.
   s.human({ id: 'HT-25', status: 'done' });
   renameSync(origin, `${origin}.away`);
-  out = s.cli('release', repo);
+  out = s.cli('release', 'run', repo);
   renameSync(`${origin}.away`, origin);
   assert.equal(out.code, 1, out.out);
   const [tag] = s.tags(repo) as [string];
@@ -896,7 +896,7 @@ scenario('mushy-loop release says what holds a repo and releases it once the hol
 
   // The next release pushes it first. Main has nothing new, and a tag that is not a release tag stays local.
   s.git(repo, 'tag', 'scratch');
-  out = s.cli('release', repo);
+  out = s.cli('release', 'run', repo);
   assert.equal(out.code, 0, out.out);
   assert.ok(out.out.includes(`Pushed ${tag} to origin; an earlier push had failed.\n${repo}: main (`), out.out);
   assert.ok(out.out.includes(`) is already released as ${tag}; nothing new to release.`), out.out);
@@ -911,20 +911,20 @@ scenario('mushy-loop release says what holds a repo and releases it once the hol
 });
 
 scenario('a change under infra/ alone waits for approval, and an ordinary change does not', async () => {
-  const repo = 'mushy-social-media';
+  const repo = 'acme-app';
   const s = setup([{}, { blocked_by: ['T-0001'] }], { 'T-0002': ['infrawrite'] }, (c) => {
     c.release.every_merged_tasks = 1;
   });
   assert.equal(await s.run(), EXIT.allDone);
   const releases = releasesOf(s, repo);
   assert.deepEqual(releases.map((r) => r.tasks), [['T-0001']], 'the ordinary change was released at its checkpoint');
-  const [file, ...more] = readdirSync(join(s.root, 'runs', 'approvals'));
+  const [file, ...more] = readdirSync(join(paths(s.root).runs, 'approvals'));
   assert.equal(more.length, 0);
-  const approval = JSON.parse(readFileSync(join(s.root, 'runs', 'approvals', file!), 'utf8')) as Approval;
+  const approval = JSON.parse(readFileSync(join(paths(s.root).runs, 'approvals', file!), 'utf8')) as Approval;
   assert.deepEqual([approval.paths, approval.tasks.map((t) => t.id), approval.since], [['infra/main.tf'], ['T-0002'], releases[0]!.tag]);
   assert.match(execSync(approval.review).toString(), /^\+resource "digitalocean_app" "web" \{\}$/m);
   // `release` says what holds it, and what to run.
-  const out = s.cli('release', repo);
+  const out = s.cli('release', 'run', repo);
   assert.equal(out.code, 10, out.out);
   assert.ok(out.out.includes(`held behind ${approval.tag}, which waits for approval of its changes to infra/main.tf.`), out.out);
   assert.ok(out.out.includes(`To lift the hold: read the diff with ${approval.review}, then run ${approval.approve}.`), out.out);
@@ -960,7 +960,7 @@ scenario('builders inherit nothing from a parent Claude Code or Codex session: o
 
 const node = (m: MapModel, id: string) => m.nodes.find((n) => n.id === id)!;
 const mapOnDisk = (s: Setup): MapModel => {
-  const html = readFileSync(join(s.root, 'plan', 'Mushy.LoopEngineering.DependencyMap.html'), 'utf8');
+  const html = readFileSync(join(paths(s.root).plan, 'DependencyMap.html'), 'utf8');
   return JSON.parse(/<script type="application\/json" id="model">([\s\S]*?)<\/script>/.exec(html)![1]!) as MapModel;
 };
 
@@ -984,38 +984,38 @@ scenario('after every pass the dependency map shows each task\'s status and summ
     ['needs_human', 'blocked: the spec contradicts itself on this point; a person must decide.'],
     ['done', 'implement the task'],
   ]);
-  assert.deepEqual(readdirSync(join(s.root, 'plan')).filter((f) => f.includes('.tmp-')), [], 'written by rename, with no temp file left behind');
+  assert.deepEqual(readdirSync(join(paths(s.root).plan)).filter((f) => f.includes('.tmp-')), [], 'written by rename, with no temp file left behind');
   // The summary lives in the task file; the attempt notes the next prompt reads are untouched.
   assert.equal(s.task('T-0002').summary, 'blocked: the spec contradicts itself on this point; a person must decide.');
   assert.equal(s.task('T-0002').attempts[0]!.note, 'BLOCKED: the spec contradicts itself on this point; a person must decide.');
-  assert.ok(existsSync(join(s.root, s.task('T-0002').attempts[0]!.log)), 'the blocked attempt points at its compressed log');
+  assert.ok(existsSync(logFile(s.root, s.task('T-0002').attempts[0]!.log)), 'the blocked attempt points at its compressed log');
 });
 
 scenario('plan commits carry the task files after each merge, and the dependency map only when a stage closes', async () => {
   const s = setup([{}, { blocked_by: ['T-0001'] }], {});
   // A control plane under git, like the real one, where Daniel is editing a plan document.
   const cp = (...args: string[]) => execFileSync('git', args, { cwd: s.root }).toString().trim();
-  writeFileSync(join(s.root, '.gitignore'), ['runs/', 'repos/', 'worktrees/', 'fake-state/', 'codex-home/', 'scenario.json', ''].join('\n'));
-  writeFileSync(join(s.root, 'plan', 'notes.md'), 'a draft\n');
+  writeFileSync(join(s.root, '.gitignore'), ['.helix/runs/', '.helix/repos/', '.helix/worktrees/', 'fake-state/', 'codex-home/', 'scenario.json', ''].join('\n'));
+  writeFileSync(join(paths(s.root).plan, 'notes.md'), 'a draft\n');
   cp('init', '-q', '-b', 'main');
   cp('add', '-A');
   cp('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', 'control plane');
-  writeFileSync(join(s.root, 'plan', 'notes.md'), 'a draft, being edited\n');
+  writeFileSync(join(paths(s.root).plan, 'notes.md'), 'a draft, being edited\n');
   assert.equal(await s.run(), EXIT.allDone);
   const commits = cp('log', '--format=%x00%s', '--name-only').split('\0').filter(Boolean).map((c) => {
     const [subject, ...files] = c.trim().split('\n');
     return { subject: subject!, files: files.filter(Boolean) };
   });
-  const map = 'plan/Mushy.LoopEngineering.DependencyMap.html';
+  const map = '.helix/plan/DependencyMap.html';
   const first = commits.find((c) => c.subject.startsWith('plan: T-0001 done'))!;
   const closing = commits.find((c) => c.subject.startsWith('plan: T-0002 done'))!;
-  assert.ok(first.files.includes('plan/tasks/T-0001.yaml') && !first.files.includes(map), JSON.stringify(first));
+  assert.ok(first.files.includes('.helix/plan/tasks/T-0001.yaml') && !first.files.includes(map), JSON.stringify(first));
   assert.match(closing.subject, /; stage day1 closed$/);
-  assert.ok(closing.files.includes('plan/tasks/T-0002.yaml') && closing.files.includes(map), JSON.stringify(closing));
+  assert.ok(closing.files.includes('.helix/plan/tasks/T-0002.yaml') && closing.files.includes(map), JSON.stringify(closing));
   // The snapshot shows the stage done; the loop never commits anything else under plan/.
   const snapshot = JSON.parse(/<script type="application\/json" id="model">([\s\S]*?)<\/script>/.exec(cp('show', `HEAD:${map}`))![1]!) as MapModel;
   assert.deepEqual(['T-0001', 'T-0002'].map((id) => node(snapshot, id).status), ['done', 'done']);
-  assert.equal(cp('status', '--porcelain', '--', 'plan/notes.md'), 'M plan/notes.md');
+  assert.equal(cp('status', '--porcelain', '--', '.helix/plan/notes.md'), 'M .helix/plan/notes.md');
 });
 
 scenario('with the loop app up, builders report over MCP; their issues go into the attempt\'s note, and live.json empties at the end', async () => {
@@ -1028,13 +1028,13 @@ scenario('with the loop app up, builders report over MCP; their issues go into t
   } finally {
     await app.close();
   }
-  const reports = readFileSync(join(s.root, 'runs', 'reports.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { pass: string; kind: string; issue?: string });
+  const reports = readFileSync(join(paths(s.root).runs, 'reports.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { pass: string; kind: string; issue?: string });
   assert.ok(reports.some((r) => r.pass.startsWith('T-0001:') && r.kind === 'progress'), 'T-0001 reported progress');
   assert.ok(reports.some((r) => r.pass.startsWith('T-0002:') && r.kind === 'progress'), 'T-0002 reported progress');
   assert.deepEqual(reports.filter((r) => r.kind === 'issue').map((r) => [r.pass.split(':')[0], r.issue]), [['T-0001', 'spec_question']]);
   assert.match(s.task('T-0001').attempts[0]!.note ?? '', /The builder reported:\n- spec_question: /);
   assert.doesNotMatch(s.task('T-0002').attempts[0]!.note ?? '', /The builder reported/);
-  const live = JSON.parse(readFileSync(join(s.root, 'runs', 'live.json'), 'utf8')) as { passes: unknown[] };
+  const live = JSON.parse(readFileSync(join(paths(s.root).runs, 'live.json'), 'utf8')) as { passes: unknown[] };
   assert.deepEqual(live.passes, []);
 });
 

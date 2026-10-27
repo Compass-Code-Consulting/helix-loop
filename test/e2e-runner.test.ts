@@ -5,11 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { promisify } from 'node:util';
-import { CONTROL_PLANE } from '../src/config.ts';
+import { asset } from '../src/config.ts';
 import { E2ERunner } from '../src/e2e-runner.ts';
+import { FIXTURE } from './fixture.ts';
 
 const exec = promisify(execFile);
-const CLIENT = join(CONTROL_PLANE, 'harness', 'clients', 'e2e-client.mjs');
+const CLIENT = asset('clients', 'e2e-client.mjs');
 
 test('the e2e runner runs the worktree script for a registered pass and returns its exit code', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'mushy-e2e-'));

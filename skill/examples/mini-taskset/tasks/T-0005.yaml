@@ -1,5 +1,5 @@
 id: T-0005
-repo: mushy-social-media
+repo: acme-app
 stage: day1
 area: ci/contract
 epic: waitlist-core

@@ -28,7 +28,7 @@ Builders read it a section at a time, like the rest of the spec, and they never 
 
 ### Screens
 
-One table, one row per screen (the example row is from the Mushy spec):
+One table, one row per screen (the example row is from a real spec, for a social media product):
 
 | Screen | Opens with | Built from |
 | --- | --- | --- |

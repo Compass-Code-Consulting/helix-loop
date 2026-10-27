@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { stringify } from 'yaml';
-import { loadConfig, monitorModel, monitorOf, paths, type Config } from '../src/config.ts';
+import { type Config, configPath, loadConfig, monitorModel, monitorOf, paths } from '../src/config.ts';
 import { seedControlPlane } from '../src/dryrun.ts';
 import { loadPlan } from '../src/plan/store.ts';
 import { validateGraph } from '../src/plan/validate.ts';
@@ -26,6 +26,7 @@ import { diffTaskSet, initTaskSet, loadTaskSet } from '../src/app/taskset.ts';
 import { triage } from '../src/app/triage.ts';
 import type { Report } from '../src/app/state.ts';
 import type { LedgerEvent } from '../src/ledger.ts';
+import { FIXTURE } from './fixture.ts';
 
 // Helix Loop (spec: Helix Loop - App Spec 2026-10-27): the board and its projection, Home's groups, pilot mode,
 // incidents, config change sets, batch edits and undo, the TaskSet, and the endpoints that drive them, each
@@ -36,7 +37,7 @@ const DAY = 24 * HOUR;
 const NOW = Date.parse('2026-10-27T12:00:00Z');
 
 function task(t: Partial<Task> & { id: string }): Task {
-  return { repo: 'mushy-social-media', stage: 'day1', area: `area-${t.id.toLowerCase()}`, title: `Helix test task ${t.id}`, reqs: ['PB-14'], spec: ['PB-14'], acceptance: [`unit: [PB-14] behaviour of ${t.id}`], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...t };
+  return { repo: 'acme-app', stage: 'day1', area: `area-${t.id.toLowerCase()}`, title: `Helix test task ${t.id}`, reqs: ['PB-14'], spec: ['PB-14'], acceptance: [`unit: [PB-14] behaviour of ${t.id}`], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...t };
 }
 function human(h: Partial<HumanTask> & { id: string }): HumanTask {
   return { title: `Helix test human step ${h.id}`, done_check: 'Daniel says it is done', lead_time_days: 1, agent_can_help: 'no', blocked_by: [], status: 'todo', ...h };
@@ -45,12 +46,11 @@ const planOf = (tasks: Task[], humans: HumanTask[] = []): Plan => ({ tasks: new 
 
 function controlPlane(tasks: Task[] = [], humans: HumanTask[] = [], git = false): string {
   const root = mkdtempSync(join(tmpdir(), 'helix-'));
-  seedControlPlane(root);
+  seedControlPlane(root, FIXTURE);
   const p = paths(root);
   for (const t of tasks) writeFileSync(join(p.tasks, `${t.id}.yaml`), stringify(t));
   for (const h of humans) writeFileSync(join(p.human, `${h.id}.yaml`), stringify(h));
-  mkdirSync(join(root, 'harness'), { recursive: true });
-  writeFileSync(join(root, 'harness', 'config.yaml'), `# The test loop's config.\n${stringify({ ...loadConfig(), root: undefined, push: false })}`);
+  writeFileSync(configPath(root), `# The test loop's config.\n${stringify({ ...loadConfig(FIXTURE), root: undefined, push: false })}`);
   mkdirSync(p.runs, { recursive: true });
   if (git) {
     const g = (...a: string[]) => execFileSync('git', a, { cwd: root, stdio: 'pipe' });
@@ -84,7 +84,7 @@ test('the projection runs tasks as the loop would pick them: by rank, one pass p
 
 test('a task that needs Daniel is projected as handed back now, and costs the finish what its wait costs', () => {
   const plan = planOf([task({ id: 'T-0001', status: 'needs_human', attempts: [] }), task({ id: 'T-0002', blocked_by: ['T-0001'] })]);
-  const config = loadConfig();
+  const config = loadConfig(FIXTURE);
   const input = { plan, events: [] as LedgerEvent[], taskset: loadTaskSet(mkdtempSync(join(tmpdir(), 'helix-ts-')), plan), agents: [], running: [], config, now: NOW };
   const board = buildBoard(input);
   assert.ok(board.projection.tasks.has('T-0002'), 'what waits behind it still gets a date');
@@ -99,7 +99,7 @@ test('code complete leaves out human tasks\' lead times that project complete co
   const tasks = [task({ id: 'T-0001' }), task({ id: 'T-0002', blocked_by: ['HT-10'] }), task({ id: 'T-0003', blocked_by: ['T-0002'] })];
   const humans = [human({ id: 'HT-10', title: 'Apple Developer Program, after the D-U-N-S number', lead_time_days: 44 })];
   const plan = planOf(tasks, humans);
-  const config = loadConfig();
+  const config = loadConfig(FIXTURE);
   const board = buildBoard({ plan, events: [] as LedgerEvent[], taskset: loadTaskSet(mkdtempSync(join(tmpdir(), 'helix-ts-')), plan), agents: [], running: [], config, now: NOW });
   assert.deepEqual(board.timelines, ['code', 'project'], 'without a TaskSet file, both');
   assert.ok(board.finish - NOW >= 44 * 24 * HOUR, 'project complete waits for the account');
@@ -112,7 +112,7 @@ test('code complete leaves out human tasks\' lead times that project complete co
   assert.ok(after.codeFinish! - NOW < 24 * HOUR, 'code complete does not');
 
   const root = controlPlane(tasks, humans);
-  writeFileSync(join(root, 'plan', 'taskset.yaml'), stringify({ version: 1, timelines: ['project'], lanes: { 'mushy-social-media': { repo: 'mushy-social-media', epics: { core: { title: 'The core' } } } } }));
+  writeFileSync(paths(root).taskset, stringify({ version: 1, timelines: ['project'], lanes: { 'acme-app': { repo: 'acme-app', epics: { core: { title: 'The core' } } } } }));
   const app = await startApp({ root, port: 0 });
   try {
     const state = await (await fetch(`${app.url}/api/state`)).json();
@@ -137,7 +137,7 @@ test('without plan/taskset.yaml, epics are derived per lane and feature, not per
   const { file, changed } = initTaskSet(root, plan);
   assert.equal(changed.length, 3);
   assert.equal(changed.find((t) => t.id === 'T-0003')!.epic, 'foundation');
-  assert.deepEqual(Object.keys(file.lanes['mushy-social-media']!.epics), ['foundation', 'publishing-team-and-settings']);
+  assert.deepEqual(Object.keys(file.lanes['acme-app']!.epics), ['foundation', 'publishing-team-and-settings']);
   assert.deepEqual(file.stages, [{ key: 'day0', title: 'Day 0' }, { key: 'day1', title: 'Day 1' }, { key: 'day2', title: 'Day 2' }]);
 });
 
@@ -147,7 +147,7 @@ test('stages are optional: a plan whose tasks name none has no stage gating, and
   assert.deepEqual(plan.stages, []);
   assert.equal(openStage(plan), undefined);
   assert.deepEqual(validateGraph(plan), []);
-  writeFileSync(join(root, 'plan', 'taskset.yaml'), stringify({ version: 1, stages: ['alpha', { key: 'beta-ready', title: 'Beta: ready for users' }], lanes: {} }));
+  writeFileSync(paths(root).taskset, stringify({ version: 1, stages: ['alpha', { key: 'beta-ready', title: 'Beta: ready for users' }], lanes: {} }));
   plan = loadPlan(paths(root).tasks, paths(root).human);
   assert.deepEqual(plan.stages, ['alpha', 'beta-ready']);
   assert.deepEqual(plan.stageTitles, { alpha: 'Alpha', 'beta-ready': 'Beta: ready for users' });
@@ -158,13 +158,13 @@ test('stages are optional: a plan whose tasks name none has no stage gating, and
 test('an imported TaskSet keeps merged, running and attempted tasks as they are, and removes only untouched ones', () => {
   const current = planOf([task({ id: 'T-0001', status: 'done' }), task({ id: 'T-0002' }), task({ id: 'T-0003', attempts: [{ agent: 'claude', outcome: 'gate_failed', at: 'x', log: 'l' }] })]);
   const incoming = planOf([task({ id: 'T-0001', title: 'Renamed in the import, but done already' }), task({ id: 'T-0004' })]);
-  const { diff, plan } = diffTaskSet(current, incoming, new Set(), { version: 1, lanes: { 'mushy-social-media': { repo: 'mushy-social-media', epics: { new: { title: 'New epic' } } } } });
+  const { diff, plan } = diffTaskSet(current, incoming, new Set(), { version: 1, lanes: { 'acme-app': { repo: 'acme-app', epics: { new: { title: 'New epic' } } } } });
   assert.deepEqual(diff.added, ['T-0004']);
   assert.deepEqual(diff.removed, ['T-0002']);
   assert.ok(diff.kept.includes('T-0001'));
   assert.equal(plan.tasks.get('T-0001')!.status, 'done');
   assert.ok(plan.tasks.has('T-0003'), 'an attempted task is never removed');
-  assert.deepEqual(diff.epicsAdded, ['mushy-social-media/new']);
+  assert.deepEqual(diff.epicsAdded, ['acme-app/new']);
 });
 
 // ---- pilot mode ----
@@ -184,7 +184,7 @@ test('pilot mode: the table by level, Intrepid parking on Auto-pilot, rules over
 
 // ---- incidents and Home's groups ----
 
-const pass = (task: string, at: string, failing: string, outcome = 'gate_failed'): LedgerEvent => ({ kind: 'pass', at, task, repo: 'mushy-social-media', agent: 'codex', model: 'm', attempt: 1, outcome, durationMs: 1, costUsd: 0, tokens: { input: 0, cachedInput: 0, output: 0 }, log: `runs/logs/x/${task}-codex-1.log`, failing });
+const pass = (task: string, at: string, failing: string, outcome = 'gate_failed'): LedgerEvent => ({ kind: 'pass', at, task, repo: 'acme-app', agent: 'codex', model: 'm', attempt: 1, outcome, durationMs: 1, costUsd: 0, tokens: { input: 0, cachedInput: 0, output: 0 }, log: `runs/logs/x/${task}-codex-1.log`, failing });
 
 test('incidents: a named test failing several tasks is one shared cause; a timeout is each task\'s own; reports group by variable and requirement', () => {
   const plan = planOf([task({ id: 'T-0001' }), task({ id: 'T-0002' }), task({ id: 'T-0003' })]);
@@ -208,10 +208,10 @@ test('Home: human tasks that hold work, stopped tasks by why they stopped, each 
     task({ id: 'T-0003', blocked_by: ['HT-1'] }),
     task({ id: 'T-0004', status: 'parked' }),
   ], [human({ id: 'HT-1', lead_time_days: 5 })]);
-  const config = loadConfig();
+  const config = loadConfig(FIXTURE);
   const input = { plan, events: [pass('T-0001', '2026-10-27T10:00:00Z', 'the pass ran past its timeout', 'timeout')], taskset: loadTaskSet(mkdtempSync(join(tmpdir(), 'helix-ts-')), plan), agents: [], running: [], config, now: NOW };
   const board = buildBoard(input);
-  const groups = triage({ plan, board, events: input.events, incidents: incidents({ plan, events: input.events, reports: [], stored: [], now: NOW }), approvals: [{ repo: 'mushy-docs', tag: 'v1', paths: ['infra/x.tf'], since: 'v0', requestedAt: '' }], hitl: { records: [], ratings: new Map(), raised: [] }, config, dismissed: new Set(), now: NOW });
+  const groups = triage({ plan, board, events: input.events, incidents: incidents({ plan, events: input.events, reports: [], stored: [], now: NOW }), approvals: [{ repo: 'acme-docs', tag: 'v1', paths: ['infra/x.tf'], since: 'v0', requestedAt: '' }], hitl: { records: [], ratings: new Map(), raised: [] }, config, dismissed: new Set(), now: NOW });
   const kinds = groups.map((g) => g.kind);
   assert.ok(kinds.includes('your_tasks'));
   assert.ok(kinds.includes('release'));
@@ -227,7 +227,7 @@ test('Home: human tasks that hold work, stopped tasks by why they stopped, each 
 
 test('a config change set is written into the file with its comments kept, checked as the loop loads it, and committed', async () => {
   const root = controlPlane([task({ id: 'T-0001' })], [], true);
-  const before = readFileSync(join(root, 'harness', 'config.yaml'), 'utf8');
+  const before = readFileSync(configPath(root), 'utf8');
   const text = applyToText(before, [{ key: 'agents.codex.slots', value: 3 }, { key: 'agents.claude.weekly_target', value: 80 }, { key: 'agents.codex.models.build', value: { model: 'gpt-6.1-sol', effort: 'xhigh' } }]);
   assert.match(text, /^# The test loop's config\./, 'the comment survives');
   const config = checkConfig(root, text) as Config;
@@ -236,18 +236,18 @@ test('a config change set is written into the file with its comments kept, check
   assert.equal(config.agents.codex.models.build.effort, 'xhigh');
   assert.throws(() => applyToText(before, [{ key: 'release.review_paths', value: [] }]), ConfigEditError);
   assert.throws(() => applyToText(before, [{ key: 'agents.codex.slots', value: 99 }]), /between 0 and 6/);
-  assert.throws(() => applyToText(before, [{ key: 'repos.mushy-docs.gate', value: 'rm -rf /' }]), /isn't a setting the app changes/);
+  assert.throws(() => applyToText(before, [{ key: 'repos.acme-docs.gate', value: 'rm -rf /' }]), /isn't a setting the app changes/);
   await applyChangeSet(root, [{ key: 'limits.max_attempts', value: 4 }]);
   assert.equal(loadConfig(root).limits.max_attempts, 4);
-  assert.equal(gitLog(root), 'Config: limits.max_attempts (Daniel, in Helix Loop)');
+  assert.equal(gitLog(root), 'Config: limits.max_attempts (Sam, in Helix Loop)');
 });
 
 // ---- batch edits and undo ----
 
 test('a batch lands as one commit and can be undone for a day, unless something later touched its tasks', async () => {
   const root = controlPlane([task({ id: 'T-0001', status: 'needs_human' }), task({ id: 'T-0002', status: 'needs_human' }), task({ id: 'T-0003' })], [], true);
-  const r = await applyChanges(root, [{ op: 'hand_back', task: 'T-0001', note: 'Use the sandbox host.' }, { op: 'hand_back', task: 'T-0002' }, { op: 'add_dep', task: 'T-0003', on: 'T-0001' }], { what: 'hand back 2 tasks', by: 'Daniel' });
-  assert.equal(gitLog(root), 'Plan: hand back 2 tasks (Daniel, in Helix Loop)');
+  const r = await applyChanges(root, [{ op: 'hand_back', task: 'T-0001', note: 'Use the sandbox host.' }, { op: 'hand_back', task: 'T-0002' }, { op: 'add_dep', task: 'T-0003', on: 'T-0001' }], { what: 'hand back 2 tasks', by: 'Sam' });
+  assert.equal(gitLog(root), 'Plan: hand back 2 tasks (Sam, in Helix Loop)');
   const plan = () => loadPlan(paths(root).tasks, paths(root).human);
   assert.equal(plan().tasks.get('T-0001')!.status, 'ready');
   assert.equal(plan().tasks.get('T-0001')!.notes, 'Use the sandbox host.');
@@ -302,7 +302,7 @@ test("the monitor's levels: light runs only on what needs judgment, standard add
   assert.deepEqual(runs('standard'), [true, false, false, true, false, true]);
   assert.deepEqual(runs('thorough'), [true, true, true, true, true, true]);
 
-  const config = loadConfig();
+  const config = loadConfig(FIXTURE);
   const with_ = (monitor: object): Config => ({ ...config, helix: { monitor } });
   // Off and light until Daniel says otherwise; light has no heartbeat and no reads of running passes.
   assert.deepEqual(monitorOf(config), { enabled: false, level: 'light', budgetUsd: 5, budgetSet: false, everyMinutes: undefined, everyPass: false, passReads: false });
@@ -365,7 +365,7 @@ test("the monitor's schedule: triggers coalesce to one turn a minute, and the he
   const events: LedgerEvent[] = [{ kind: 'loop', at: '2026-10-26T12:00:00Z', event: 'start' }];
   for (let i = 0; i < 200; i++) events.push(pass(`T-${String(1000 + i)}`, new Date(now - DAY + 1000 + i * 7 * MIN).toISOString(), '', 'merged'));
   events.push(pass('T-0001', new Date(now - HOUR).toISOString(), 'x'), pass('T-0001', new Date(now - 30 * MIN).toISOString(), 'x'));
-  const est = estimateLevels({ config: loadConfig(), agent: 'claude', events, reports: [], costs: new Map([['claude-opus-5-5 high', { usd: 1, n: 2 }]]), now });
+  const est = estimateLevels({ config: loadConfig(FIXTURE), agent: 'claude', events, reports: [], costs: new Map([['claude-opus-5-5 high', { usd: 1, n: 2 }]]), now });
   const [light, , thorough] = est.levels;
   assert.equal(est.passes, 202);
   assert.deepEqual([light!.turns, light!.usdPerTurn, light!.measured, light!.capped], [1, 0.06, 0, false]);
@@ -378,7 +378,7 @@ test("the monitor's digest asks for reads of running passes only at the levels t
   const lock = () => writeFileSync(paths(root).lock, String(process.pid));
   lock();
   assert.doesNotMatch(digest(root, undefined), /note_pass/);
-  const file = join(root, 'harness', 'config.yaml');
+  const file = configPath(root);
   writeFileSync(file, `${readFileSync(file, 'utf8')}\nhelix: { monitor: { level: standard } }\n`);
   assert.match(digest(root, undefined), /Running: T-0001\. Give each a one-line read with note_pass/);
   writeFileSync(file, `${readFileSync(file, 'utf8')}`.replace('level: standard', 'level: heavy'));
@@ -399,7 +399,7 @@ test("Settings › Helix: the monitor's level and cap apply at once, a cap can g
     const monitor = async () => (await (await fetch(`${app.url}/api/state`)).json()).helix.monitor;
     assert.deepEqual([(await monitor()).level, (await monitor()).budgetUsd], ['light', 5]);
     await post({ monitorLevel: 'standard', monitorBudget: 8 });
-    assert.equal(gitLog(root), 'Config: helix.monitor.level, helix.monitor.daily_budget_usd (Daniel, in Helix Loop)');
+    assert.equal(gitLog(root), 'Config: helix.monitor.level, helix.monitor.daily_budget_usd (Sam, in Helix Loop)');
     assert.deepEqual([(await monitor()).level, (await monitor()).budgetUsd, (await monitor()).budgetSet], ['standard', 8, true]);
     await post({ monitorBudget: null });
     assert.equal(loadConfig(root).helix?.monitor?.daily_budget_usd, undefined);
@@ -454,7 +454,7 @@ test('the endpoints: Home, the board, pause, stop a pass, notes for a running ta
 
     await post('/api/pilot', { mode: 'auto', auto_level: 'yolo' });
     assert.equal(loadConfig(root).pilot?.mode, 'auto');
-    assert.equal(gitLog(root), 'Config: pilot.mode, pilot.auto_level (Daniel, in Helix Loop)');
+    assert.equal(gitLog(root), 'Config: pilot.mode, pilot.auto_level (Sam, in Helix Loop)');
     const rule = await post('/api/rate', { name: 'lockfile-only merge conflicts', request: 'failures', decide: 'helix' });
     assert.equal(rule.id, 'R-1');
     const refused = await fetch(`${app.url}/api/rate`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-helix-token': token }, body: JSON.stringify({ name: 'releases', request: 'release', decide: 'helix' }) });

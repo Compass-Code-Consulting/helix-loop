@@ -10,7 +10,7 @@ import { claudeSignIn, codexSignIn } from '../src/agents/auth.ts';
 import { claudeAdapter, describeClaude } from '../src/agents/claude.ts';
 import { codexAdapter, unwrapShell } from '../src/agents/codex.ts';
 import { loadQuota, mapAgents } from '../src/agents/quota.ts';
-import { loadConfig, paths } from '../src/config.ts';
+import { configPath, loadConfig, paths } from '../src/config.ts';
 import { seedControlPlane } from '../src/dryrun.ts';
 import { hashToken, newToken, type LiveFile } from '../src/live.ts';
 import { loadPlan } from '../src/plan/store.ts';
@@ -22,29 +22,29 @@ import { startApp } from '../src/app/server.ts';
 import { loopStatus, mapModel, passesNow } from '../src/app/state.ts';
 import { ASSISTANT_TOOLS, RESOLVE_REQUEST, type HelixJob } from '../src/app/helix.ts';
 import { addComment, addMessage, addProposal, addReply, decide, resolveThread, thread, ThreadError, threadsOf, readEntries } from '../src/app/threads.ts';
+import { FIXTURE } from './fixture.ts';
 
 // The loop app (spec: Mushy.LoopEngineering.LoopApp.2026-10-25.md): threads, the MCP endpoints, plan edits and
 // the server's guards, each against a temporary control plane.
 
 function controlPlane(tasks: Partial<Task>[] = [], humans: (Partial<HumanTask> & { id: string })[] = []): string {
   const root = mkdtempSync(join(tmpdir(), 'mushy-app-'));
-  seedControlPlane(root);
+  seedControlPlane(root, FIXTURE);
   const p = paths(root);
   tasks.forEach((t, i) => {
     const id = t.id ?? `T-${String(i + 1).padStart(4, '0')}`;
-    const full: Task = { id, repo: 'mushy-social-media', stage: 'day1', area: `area-${id.toLowerCase()}`, title: `App test task ${id}`, reqs: ['PB-14'], spec: ['PB-14'], acceptance: [`unit: [PB-14] behaviour of ${id}`], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...t };
+    const full: Task = { id, repo: 'acme-app', stage: 'day1', area: `area-${id.toLowerCase()}`, title: `App test task ${id}`, reqs: ['PB-14'], spec: ['PB-14'], acceptance: [`unit: [PB-14] behaviour of ${id}`], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...t };
     writeFileSync(join(p.tasks, `${id}.yaml`), stringify(full));
   });
   for (const h of humans) writeFileSync(join(p.human, `${h.id}.yaml`), stringify({ title: `App test human step ${h.id}`, done_check: 'Daniel says it is done', lead_time_days: 1, agent_can_help: 'no', blocked_by: [], status: 'todo', ...h }));
-  mkdirSync(join(root, 'harness'), { recursive: true });
-  writeFileSync(join(root, 'harness', 'config.yaml'), stringify({ ...loadConfig(), root: undefined, push: false }));
+  writeFileSync(configPath(root), stringify({ ...loadConfig(FIXTURE), root: undefined, push: false }));
   mkdirSync(p.runs, { recursive: true });
   return root;
 }
 
 function livePass(root: string, task: string, agent: 'claude' | 'codex' = 'claude'): string {
   const token = newToken();
-  const live: LiveFile = { updatedAt: new Date().toISOString(), pid: process.pid, passes: [{ id: `${task}:${agent}:1`, task, repo: 'mushy-social-media', agent, attempt: 1, startedAt: new Date().toISOString(), phase: 'agent', phaseAt: new Date().toISOString(), toolCalls: 0, tokenHash: hashToken(token) }] };
+  const live: LiveFile = { updatedAt: new Date().toISOString(), pid: process.pid, passes: [{ id: `${task}:${agent}:1`, task, repo: 'acme-app', agent, attempt: 1, startedAt: new Date().toISOString(), phase: 'agent', phaseAt: new Date().toISOString(), toolCalls: 0, tokenHash: hashToken(token) }] };
   writeFileSync(paths(root).live, JSON.stringify(live));
   return token;
 }
@@ -56,7 +56,7 @@ test('a root comment starts its own thread, with a copy of the comment as its fi
   const t = addComment(dir, 'T-0034', 'Should this wait on T-0020?');
   assert.equal(t.key, 'T-0034#c1');
   assert.equal(t.root.text, 'Should this wait on T-0020?');
-  assert.deepEqual(t.messages.map((m) => [m.author, m.text]), [['daniel', 'Should this wait on T-0020?']]);
+  assert.deepEqual(t.messages.map((m) => [m.author, m.text]), [['owner', 'Should this wait on T-0020?']]);
   assert.equal(t.state, 'open');
   assert.equal(t.waitingOn, 'helix');
 });
@@ -98,7 +98,7 @@ test('a proposal is decided once', () => {
   const p = addProposal(dir, t.key, 'The second half', { title: 'Second half of T-0001' });
   decide(dir, t.key, p.id, 'declined', 'not yet');
   assert.throws(() => decide(dir, t.key, p.id, 'accepted', ''), /already decided/);
-  assert.equal(thread(dir, t.key)!.waitingOn, 'daniel', 'a decision does not count as Daniel speaking');
+  assert.equal(thread(dir, t.key)!.waitingOn, 'owner', 'a decision does not count as Daniel speaking');
 });
 
 // ---- MCP ----
@@ -134,7 +134,7 @@ test('a builder token works only while its pass is in flight', () => {
 });
 
 test('both adapters wire exactly the app\'s server into a pass, and none without one', () => {
-  const config = loadConfig();
+  const config = loadConfig(FIXTURE);
   const mcp = { url: 'http://127.0.0.1:47320/mcp/builder', token: 'tok' };
   const claude = claudeAdapter(config.agents.claude, config).invocation('build', '/w', 'p', mcp);
   const servers = JSON.parse(claude.args[claude.args.indexOf('--mcp-config') + 1]!).mcpServers;
@@ -151,20 +151,20 @@ test('both adapters wire exactly the app\'s server into a pass, and none without
   assert.ok(!codexAdapter(config.agents.codex, config, '/h').invocation('build', '/w', 'p').args.some((a) => a.startsWith('mcp_servers')));
 });
 
-test('Helix resolves a thread only after it has answered, or when Daniel pressed Resolve', async () => {
+test('Helix resolves a thread only after it has answered, or when the owner pressed Resolve', async () => {
   const root = controlPlane([{}]);
   const dir = paths(root).threads;
   const t = addComment(dir, 'T-0001', 'What does this build?');
   const job: HelixJob = { role: 'assistant', key: t.key, root, tokenHash: '', startedAt: '', resolved: false };
   const resolve = ASSISTANT_TOOLS.find((x) => x.name === 'resolve_thread')!;
-  await assert.rejects(async () => resolve.call({ summary: 'Done.' }, { root, job }), /Not yet: answer Daniel first/);
+  await assert.rejects(async () => resolve.call({ summary: 'Done.' }, { root, job }), /Not yet: answer the owner first/);
   addMessage(dir, t.key, 'helix', 'It builds the thing.');
   await resolve.call({ summary: 'Explained what it builds.' }, { root, job });
   assert.equal(thread(dir, t.key)!.state, 'resolved');
   assert.equal(job.resolved, true);
 
   const second = addComment(dir, 'T-0001', 'Close this straight away');
-  addMessage(dir, second.key, 'daniel', RESOLVE_REQUEST);
+  addMessage(dir, second.key, 'owner', RESOLVE_REQUEST);
   await resolve.call({ summary: 'Closed at Daniel\'s request.' }, { root, job: { ...job, key: second.key } });
   assert.equal(thread(dir, second.key)!.state, 'resolved');
 });
@@ -189,14 +189,14 @@ test('a plan edit is refused for a task in a pass, for fields the editor may not
 test('an accepted edit is written, rendered and committed with a message that says who changed what', async () => {
   const root = controlPlane([{}, { status: 'needs_human' }], [{ id: 'HT-1', handoff_prompt: 'Line one.\nLine two.\n' }]);
   const git = (...a: string[]) => execFileSync('git', a, { cwd: root }).toString().trim();
-  writeFileSync(join(root, '.gitignore'), 'runs/\n');
+  writeFileSync(join(root, '.gitignore'), '.helix/runs/\n');
   git('init', '-q', '-b', 'main');
   git('add', '-A');
   git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', 'control plane');
   const r = await updateTask(root, 'T-0002', { status: 'ready', notes: 'Use the shared helper.' }, { fields: ['status', 'notes'], message: 'Plan: T-0002 handed back to the loop (Daniel, in the loop app)' });
   assert.equal(r.committed, true);
   assert.equal(git('log', '-1', '--format=%s'), 'Plan: T-0002 handed back to the loop (Daniel, in the loop app)');
-  assert.ok(git('show', '--name-only', '--format=', 'HEAD').split('\n').includes('plan/tasks/T-0002.yaml'));
+  assert.ok(git('show', '--name-only', '--format=', 'HEAD').split('\n').includes('.helix/plan/tasks/T-0002.yaml'));
   assert.equal(loadPlan(paths(root).tasks, paths(root).human).tasks.get('T-0002')!.status, 'ready');
 
   await updateHuman(root, 'HT-1', { status: 'done', notes: 'Approved on 2026-10-25.' }, { fields: ['status', 'notes'], message: 'Plan: HT-1 done (Daniel, in the loop app)' });
@@ -204,7 +204,7 @@ test('an accepted edit is written, rendered and committed with a message that sa
   assert.match(human, /status: done/);
   assert.match(human, /handoff_prompt: \|\n {2}Line one\.\n {2}Line two\./, 'the block scalar is left as it was');
 
-  const created = await createTask(root, { repo: 'mushy-docs', stage: 'day1', area: 'docs/new', title: 'A task the steward proposed and Daniel accepted', reqs: ['PB-14'], spec: ['PB-14'], acceptance: ['unit: [PB-14] the new docs page renders'], blocked_by: ['T-0001'], estimate_passes: 1 }, 'Plan: {id}: proposed (steward)');
+  const created = await createTask(root, { repo: 'acme-docs', stage: 'day1', area: 'docs/new', title: 'A task the steward proposed and Daniel accepted', reqs: ['PB-14'], spec: ['PB-14'], acceptance: ['unit: [PB-14] the new docs page renders'], blocked_by: ['T-0001'], estimate_passes: 1 }, 'Plan: {id}: proposed (steward)');
   assert.equal(created.value.id, 'T-0003');
   assert.equal(git('log', '-1', '--format=%s'), 'Plan: T-0003: proposed (steward)');
 });
@@ -304,7 +304,7 @@ const claudeResult = (id: string, content: string, isError = false) => j({ type:
 
 test('a Claude Code pass log reads as what its builder did: setup, its words and calls settled by their results, its turn, then the gate', () => {
   const root = mkdtempSync(join(tmpdir(), 'mushy-feed-'));
-  const wt = `${root}/worktrees/mushy-social-media/T-0001-claude`;
+  const wt = `${root}/worktrees/acme-app/T-0001-claude`;
   const file = join(root, 'T-0001-claude-1.log');
   writeFileSync(file, [
     'Packages: +849', 'Done in 24.8s',
@@ -396,13 +396,13 @@ test('a loop that writes no runs/live.json still shows its passes, from the plan
   assert.equal(codex.state, 'busy');
 
   // A loop that writes runs/live.json is believed instead, once it is the one running.
-  const live: LiveFile = { updatedAt: new Date().toISOString(), pid: process.pid, passes: [{ id: 'T-0003:claude:1', task: 'T-0003', repo: 'mushy-social-media', agent: 'claude', attempt: 1, startedAt: new Date().toISOString(), phase: 'agent', phaseAt: new Date().toISOString(), toolCalls: 4 }] };
+  const live: LiveFile = { updatedAt: new Date().toISOString(), pid: process.pid, passes: [{ id: 'T-0003:claude:1', task: 'T-0003', repo: 'acme-app', agent: 'claude', attempt: 1, startedAt: new Date().toISOString(), phase: 'agent', phaseAt: new Date().toISOString(), toolCalls: 4 }] };
   writeFileSync(p.live, j(live));
   assert.deepEqual(passesNow(root, plan, status).map((x) => [x.task, x.inferred ?? false]), [['T-0003', false]]);
 });
 
 test('the map shows each agent\'s slots, and fewer while its weekly pace holds it back', () => {
-  const config = loadConfig();
+  const config = loadConfig(FIXTURE);
   config.agents.codex.slots = 2;
   config.agents.codex.weekly_target = 0.9;
   const now = Date.UTC(2026, 9, 26, 12);
@@ -425,8 +425,8 @@ test('the feed and agent endpoints serve only pass logs, and say what an agent d
   const day = new Date().toISOString().slice(0, 10);
   mkdirSync(join(p.logs, day), { recursive: true });
   const rel = join('runs', 'logs', day, 'T-0001-claude-1.log');
-  writeFileSync(join(root, rel), `${j({ type: 'assistant', message: { content: [{ type: 'text', text: 'Hello.' }] } })}\n`);
-  writeFileSync(p.ledger, `${j({ kind: 'pass', at: new Date().toISOString(), task: 'T-0001', repo: 'mushy-social-media', agent: 'claude', model: 'm', attempt: 1, outcome: 'gate_failed', durationMs: 60_000, costUsd: 1.5, tokens: { input: 0, cachedInput: 0, output: 0 }, log: `${rel}.gz`, failing: '|unit| a > b' })}\n`);
+  writeFileSync(join(p.home, rel), `${j({ type: 'assistant', message: { content: [{ type: 'text', text: 'Hello.' }] } })}\n`);
+  writeFileSync(p.ledger, `${j({ kind: 'pass', at: new Date().toISOString(), task: 'T-0001', repo: 'acme-app', agent: 'claude', model: 'm', attempt: 1, outcome: 'gate_failed', durationMs: 60_000, costUsd: 1.5, tokens: { input: 0, cachedInput: 0, output: 0 }, log: `${rel}.gz`, failing: '|unit| a > b' })}\n`);
   const app = await startApp({ root, port: 0 });
   try {
     const feed = await (await fetch(`${app.url}/api/feed?path=${encodeURIComponent(rel)}`)).json();

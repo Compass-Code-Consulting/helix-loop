@@ -575,15 +575,15 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
 
       // ---- releases ----
       case '/api/release':
-        return reply(res, 200, cliJob(which, `Release ${body.repo}`, ['release', repoArg(loadConfig(root), body.repo)]));
+        return reply(res, 200, cliJob(which, `Release ${body.repo}`, ['release', 'run', repoArg(loadConfig(root), body.repo)]));
       case '/api/approve':
         if (!pendingApprovals(paths(root).approvals, repoArg(loadConfig(root), body.repo)).some((a) => a.approval.tag === body.tag)) throw new HttpError(409, `${body.repo} ${body.tag} is not waiting for approval`);
         if (body.read !== true) throw new HttpError(400, 'confirm that you read the changes to the reviewed paths');
-        return reply(res, 200, cliJob(which, `Approve ${body.repo} ${body.tag}`, ['approve-release', repoArg(loadConfig(root), body.repo), String(body.tag)]));
+        return reply(res, 200, cliJob(which, `Approve ${body.repo} ${body.tag}`, ['release', 'approve', repoArg(loadConfig(root), body.repo), String(body.tag)]));
       case '/api/export': {
         const what = String(body.what);
         if (!['map', 'metrics', 'render', 'validate'].includes(what)) throw new HttpError(400, 'export map, metrics, render or validate');
-        return reply(res, 200, cliJob(which, { map: 'Export the dependency map', metrics: 'Save a metrics version', render: 'Render the plan documents', validate: 'Validate the plan' }[what]!, [what]));
+        return reply(res, 200, cliJob(which, { map: 'Export the dependency map', metrics: 'Save a metrics version', render: 'Render the plan documents', validate: 'Validate the plan' }[what]!, { map: ['plan', 'map'], metrics: ['metrics'], render: ['plan', 'render'], validate: ['validate'] }[what]!));
       }
 
       // ---- conversations ----

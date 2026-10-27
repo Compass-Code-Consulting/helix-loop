@@ -61,7 +61,7 @@ export interface Config {
   release: {
     every_merged_tasks: number;
     hold_until?: Partial<Record<RepoName, string>>; // repo → the human task (HT-##) its releases wait for
-    review_paths: string[]; // globs: a release that changes any of them waits for approve-release
+    review_paths: string[]; // globs: a release that changes any of them waits for `helix-loop release approve`
   };
   e2e_runner?: { port: number; script: string; timeout_minutes: number; concurrency?: number };
   agent_network?: { allowed_domains: string[]; allow_write: string[] };

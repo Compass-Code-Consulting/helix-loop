@@ -84,7 +84,7 @@ The builder must write a test whose title contains the text after the kind exact
 | `integration` | Runs the product's own modules against real infrastructure (the real database, with its security rules on), but not through HTTP. |
 | `unit` | Pure functions: formulas, parsers, pickers, with fixtures that pin their output. |
 
-- **Specific and observable.** "[PB-14] window pick replays exactly from its stored seed" is right; "posting windows work" is not (an example from the Mushy spec, where posts go out at a seeded random moment in a window).
+- **Specific and observable.** "[PB-14] window pick replays exactly from its stored seed" is right; "posting windows work" is not (an example from a social media product's spec, where posts go out at a seeded random moment in a window).
 - **Tags are a subset of the task's `reqs`.** A line may carry several: `[PB-2, PB-3]`.
 - **Cover the edge cases the spec states**: limits, errors, empty states, roles that may not.
 - **Two to five lines** is typical. One line is fine for a small fix; more than six suggests two tasks.
@@ -129,7 +129,7 @@ A bug found by the loop, a reviewer or a person becomes a task with `priority: f
 - **The acceptance test is the reproduction**, so the bug cannot come back.
 - Cite the requirement the bug breaks; if none covers it, that is a spec gap to raise too.
 
-An example from the Mushy loop, where the loop found the bug itself:
+An example from a real loop, where the loop found the bug itself:
 
 ```yaml
 priority: fix_first

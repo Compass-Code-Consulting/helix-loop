@@ -1,15 +1,20 @@
 {
-  "name": "mushy-harness",
-  "private": true,
+  "name": "helix-loop",
+  "version": "0.1.0",
+  "description": "Build a product from a spec with headless coding agents (Claude Code and Codex), in a loop you steer.",
   "type": "module",
-  "description": "The Mushy build loop: scheduler, agent adapters, gate and merge queue.",
+  "license": "UNLICENSED",
+  "private": true,
   "engines": { "node": ">=26" },
-  "bin": { "helix-loop": "./bin/helix-loop.ts", "mushy-loop": "./bin/mushy-loop.ts" },
+  "bin": { "helix-loop": "dist/bin/helix-loop.js" },
+  "files": ["dist/", "src/app/page/", "src/metrics/page.css", "src/metrics/page.js", "schema/", "presets/", "templates/", "skill/", "clients/", "docs/", "README.md"],
   "scripts": {
-    "loop": "node bin/helix-loop.ts",
+    "build": "node scripts/build.ts",
+    "prepare": "node scripts/build.ts",
     "typecheck": "tsc --noEmit -p .",
     "test": "node --test 'test/**/*.test.ts'",
-    "check": "npm run typecheck && npm test"
+    "docs": "node bin/helix-loop.ts docs",
+    "check": "npm run typecheck && npm test && node bin/helix-loop.ts docs --check"
   },
   "dependencies": {
     "ajv": "8.20.0",

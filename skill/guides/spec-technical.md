@@ -55,7 +55,7 @@ A requirement is one behaviour a test can prove.
 - **Prose requirements.** A screen, an entity or a formula described only in prose still has to be built. Planners give each a synthetic ID (`PBS-3 Posts screen queue grouped by day`) in a separate list, so coverage counts it too.
 - **Deferred requirements** that are written down but not in this build are listed by ID with the reason, so no task claims them and coverage does not expect them.
 
-An example from the Mushy spec, a social media product:
+An example from a real spec, for a social media product:
 
 ```markdown
 ### Requirements
@@ -102,7 +102,7 @@ Look hardest where specs are usually thin: layout and navigation, forms and vali
 
 Write each finding like this, numbered in one series for the whole spec:
 
-An example finding, from the Mushy spec's hardening:
+An example finding, from a real spec's hardening:
 
 ```markdown
 #### SH-14 Channel picker: spec behaviour, design visuals

@@ -201,7 +201,7 @@ function check(plan: Plan, schemaDir: string, kind: 'task' | 'human', value: Tas
 // that is not a git checkout (the dry run) is only rendered. Says whether a commit was made, and which.
 export async function afterEdit(root: string, files: string[], message: string): Promise<{ committed: boolean; commit?: string }> {
   const docs = [paths(root).implementationPlan, paths(root).humanPlan];
-  await exec(process.execPath, [BIN, 'render', '--root', root], { timeout: 120_000 }).catch(() => undefined);
+  await exec(process.execPath, [BIN, 'plan', 'render', '--root', root], { timeout: 120_000 }).catch(() => undefined);
   if (!existsSync(join(root, '.git'))) return { committed: false };
   const rel = [...files, ...docs.filter(existsSync)].map((f) => relative(root, f));
   if (!(await commit(root, rel, message))) return { committed: false };

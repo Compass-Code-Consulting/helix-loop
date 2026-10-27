@@ -8,7 +8,7 @@ import { claudeAdapter, claudeUsage } from '../src/agents/claude.ts';
 import { builderEnv, type Usage } from '../src/agents/adapter.ts';
 import { describePace, loopMode, PACE_MARGIN, paceSlots } from '../src/agents/quota.ts';
 import { VirtualClock, suspensionWatch } from '../src/clock.ts';
-import { CONTROL_PLANE, loadConfig, paths } from '../src/config.ts';
+import { asset, configPath, loadConfig, paths } from '../src/config.ts';
 import { firstFailure, globToRegExp, missingAcceptanceTests, offAreaPaths } from '../src/gate.ts';
 import { secretFindings } from '../src/merge.ts';
 import { sh } from '../src/proc.ts';
@@ -22,6 +22,7 @@ import type { HumanTask, Plan, Task } from '../src/types.ts';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { parse, stringify } from 'yaml';
+import { FIXTURE } from './fixture.ts';
 
 const CHICAGO_NOON = zonedToEpoch(2026, 9, 23, 12, 0, 'America/Chicago'); // Oct 23 2026, 12:00 CDT
 
@@ -61,7 +62,7 @@ test('reset times: Codex rollout rate_limits, the exhausted window wins', () => 
 });
 
 test('Claude adapter classifies the real result events', () => {
-  const config = loadConfig();
+  const config = loadConfig(FIXTURE);
   const a = claudeAdapter(config.agents.claude, config);
   const limit = JSON.stringify({ type: 'result', is_error: true, api_error_status: 429, result: "You've hit your session limit · resets 11:40pm (America/Chicago)" });
   const r = a.interpret(limit, '', 1, CHICAGO_NOON) as ReturnType<typeof a.interpret> & { kind: string; resetAt: number };
@@ -83,7 +84,7 @@ test('usage windows: Claude rate_limit_event lines and Codex rollout rate_limits
   assert.deepEqual(claudeUsage(ev, 5), { at: 5, session: { used: 0.04, resetsAt: 1792976400_000 }, weekly: { used: 0.72, resetsAt: 1793030400_000 } });
   assert.equal(claudeUsage({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed' } }, 5), undefined);
   // A pass reports the windows several times; the last report is the one kept.
-  const config = loadConfig();
+  const config = loadConfig(FIXTURE);
   const later = { ...ev, rate_limit_info: { ...ev.rate_limit_info, unifiedWindows: { seven_day: { utilization: 0.73, resetsAt: 1793030400 } } } };
   const stdout = [ev, later, { type: 'result', is_error: false, result: 'T-0001: done', total_cost_usd: 1 }].map((e) => JSON.stringify(e)).join('\n');
   assert.equal((claudeAdapter(config.agents.claude, config).interpret(stdout, '', 0, 7) as { usage?: Usage }).usage?.weekly?.used, 0.73);
@@ -117,7 +118,7 @@ test('pace: every slot behind an even pace, one within the margin, none ahead of
 });
 
 test("Codex adapter: a model at capacity is transient, not the task's failure", () => {
-  const config = loadConfig();
+  const config = loadConfig(FIXTURE);
   const a = codexAdapter(config.agents.codex, config, '/nonexistent-codex-home');
   const msg = 'Selected model is at capacity. Please try a different model.';
   const stdout = [{ type: 'thread.started', thread_id: 't' }, { type: 'error', message: msg }, { type: 'turn.failed', error: { message: msg } }].map((e) => JSON.stringify(e)).join('\n');
@@ -148,8 +149,8 @@ test('forbidden-path globs', () => {
 });
 
 test('the PreToolUse hook denies background commands and writes outside the worktree', () => {
-  const hook = join(CONTROL_PLANE, 'harness', 'hooks', 'claude-pretooluse.ts');
-  const call = (ev: object) => execFileSync('node', [hook], { input: JSON.stringify({ cwd: CONTROL_PLANE + '/worktrees/x/T-0001-claude', ...ev }) }).toString();
+  const hook = asset('hooks', 'claude-pretooluse.ts');
+  const call = (ev: object) => execFileSync('node', [hook], { input: JSON.stringify({ cwd: FIXTURE + '/worktrees/x/T-0001-claude', ...ev }) }).toString();
   const decision = (out: string) => (out ? JSON.parse(out).hookSpecificOutput.permissionDecision : 'allow');
   assert.equal(decision(call({ tool_name: 'Bash', tool_input: { command: 'npm test', run_in_background: true } })), 'deny');
   assert.equal(decision(call({ tool_name: 'Bash', tool_input: { command: 'npm test' } })), 'allow');
@@ -158,24 +159,24 @@ test('the PreToolUse hook denies background commands and writes outside the work
   assert.equal(decision(call({ tool_name: 'Write', tool_input: { file_path: '/etc/hosts' } })), 'deny');
 });
 
-test('spec index: every requirement of the real spec resolves to its definition', () => {
-  const p = paths(CONTROL_PLANE);
+test('spec index: every requirement of the spec resolves to its definition', () => {
+  const p = paths(FIXTURE);
   const text = readFileSync(p.spec, 'utf8');
   const { index } = buildIndex(text);
   const defined = new Set([...text.matchAll(/\*\*([A-Z]{1,5}-\d+[a-z]?)\b/g)].map((m) => m[1]));
   assert.deepEqual(Object.keys(index.reqs).sort(), [...defined].sort());
-  assert.ok(defined.size >= 224);
+  assert.equal(defined.size, 13);
   assert.match(index.version, /^\d+\.\d+(\.\d+)?$/);
   assert.equal(index.reqs['PB-14']!.section, '§11');
   assert.ok(index.sections['§11 Requirements']);
   assert.ok(index.sections['§10.5']);
-  assert.equal(index.glossary, '§24');
+  assert.equal(index.glossary, '§2');
 });
 
 // ---- plan helpers ----
 function task(id: string, over: Partial<Task> = {}): Task {
   return {
-    id, repo: 'mushy-social-media', stage: 'day1', area: `area-${id}`, title: `Task ${id} title`, reqs: ['PB-14'],
+    id, repo: 'acme-app', stage: 'day1', area: `area-${id}`, title: `Task ${id} title`, reqs: ['PB-14'],
     spec: ['§11 Requirements'], acceptance: [`unit: [PB-14] behaviour of ${id}`], blocked_by: [], estimate_passes: 1,
     status: 'ready', claimed_by: null, attempts: [], ...over,
   };
@@ -253,7 +254,7 @@ test('scheduler: only human work left', () => {
 });
 
 test('prompt: injects only the cited spec and fails loudly over budget', () => {
-  const p = paths(CONTROL_PLANE);
+  const p = paths(FIXTURE);
   const index = loadIndex(p.specIndex);
   const template = readFileSync(join(p.prompts, 'build.md'), 'utf8');
   const t = task('T-0001', { reqs: ['PB-14', 'OPS-1'] });
@@ -262,11 +263,11 @@ test('prompt: injects only the cited spec and fails loudly over budget', () => {
   assert.match(out, /\*\*OPS-1/);
   assert.doesNotMatch(out, /\*\*NAV-1\b/);
   assert.ok(Buffer.byteLength(out) < 40_000);
-  assert.throws(() => renderPrompt({ template, task: { ...t, spec: ['§10', '§15', '§19'] }, index, sectionsDir: p.specSections, budgetBytes: 40_000 }), PromptOverBudget);
+  assert.throws(() => renderPrompt({ template, task: { ...t, spec: ['§10', '§15', '§19'] }, index, sectionsDir: p.specSections, budgetBytes: Buffer.byteLength(out) }), PromptOverBudget);
 });
 
 test("prompt: a retry's note on the last attempt fits the room the spec leaves, keeping its first line and its end", () => {
-  const p = paths(CONTROL_PLANE);
+  const p = paths(FIXTURE);
   const index = loadIndex(p.specIndex);
   const template = readFileSync(join(p.prompts, 'build.md'), 'utf8');
   const t = task('T-0001', { reqs: ['PB-14', 'OPS-1'] });
@@ -282,7 +283,7 @@ test("prompt: a retry's note on the last attempt fits the room the spec leaves, 
 });
 
 test('prompt: carried work is always announced, then the conflicts git left and the last note, in the room left', () => {
-  const p = paths(CONTROL_PLANE);
+  const p = paths(FIXTURE);
   const index = loadIndex(p.specIndex);
   const template = readFileSync(join(p.prompts, 'build.md'), 'utf8');
   const t = task('T-0001', { reqs: ['PB-14', 'OPS-1'] });
@@ -303,7 +304,7 @@ test('prompt: carried work is always announced, then the conflicts git left and 
 });
 
 test("prompt: a note or spec text holding $&, $' or $$ goes in as written", () => {
-  const p = paths(CONTROL_PLANE);
+  const p = paths(FIXTURE);
   const index = loadIndex(p.specIndex);
   const template = readFileSync(join(p.prompts, 'build.md'), 'utf8');
   const note = "the gate failed: kill $$ said $& and $' and $`";
@@ -330,7 +331,7 @@ test('release tags follow v<YYYY>.<MM>.<DD>.<N>, counting that day per repo', as
 });
 
 test('the design role runs each agent on its design model and effort: Astra for Codex', () => {
-  const config = loadConfig();
+  const config = loadConfig(FIXTURE);
   const codex = codexAdapter(config.agents.codex, config).invocation('design', '/tmp/w', 'prompt').args;
   assert.equal(codex[codex.indexOf('-m') + 1], 'gpt-6-astra');
   assert.ok(codex.includes(`model_reasoning_effort="${config.agents.codex.models.design.effort}"`), codex.join(' '));
@@ -350,23 +351,23 @@ test('the design role runs each agent on its design model and effort: Astra for 
 
 test('validate: a release hold must name a human task in the plan', () => {
   const plan = planOf([], [human('HT-25')]);
-  assert.deepEqual(validateReleaseHolds(plan, { 'mushy-website': 'HT-25' }), []);
+  assert.deepEqual(validateReleaseHolds(plan, { 'acme-website': 'HT-25' }), []);
   assert.deepEqual(validateReleaseHolds(plan, {}), []);
-  const [problem] = validateReleaseHolds(plan, { 'mushy-website': 'HT-26' });
-  assert.equal(problem?.message, "release.hold_until holds mushy-website's releases until HT-26, which is not a human task in the plan");
+  const [problem] = validateReleaseHolds(plan, { 'acme-website': 'HT-26' });
+  assert.equal(problem?.message, "release.hold_until holds acme-website's releases until HT-26, which is not a human task in the plan");
 });
 
 test('config: a release hold must name a known repo and a human task', () => {
-  const raw = parse(readFileSync(join(CONTROL_PLANE, 'harness', 'config.yaml'), 'utf8')) as { release: object };
+  const raw = parse(readFileSync(configPath(FIXTURE), 'utf8')) as { release: object };
   const file = join(mkdtempSync(join(tmpdir(), 'mushy-config-')), 'config.yaml');
   const withHold = (hold: Record<string, string>) => {
     writeFileSync(file, stringify({ ...raw, release: { ...raw.release, hold_until: hold } }));
-    return () => loadConfig(CONTROL_PLANE, file);
+    return () => loadConfig(FIXTURE, file);
   };
-  assert.deepEqual(withHold({ 'mushy-website': 'HT-25' })().release.hold_until, { 'mushy-website': 'HT-25' });
+  assert.deepEqual(withHold({ 'acme-website': 'HT-25' })().release.hold_until, { 'acme-website': 'HT-25' });
   // A misspelt repo would hold nothing, so it is refused rather than ignored.
   assert.throws(withHold({ 'mushy-websit': 'HT-25' }), /release\.hold_until\.mushy-websit is not a repo/);
-  assert.throws(withHold({ 'mushy-website': 'approved' }), /must name a human task/);
+  assert.throws(withHold({ 'acme-website': 'approved' }), /must name a human task/);
 });
 
 test('scheduler: a stage opens past tasks that wait on a person, even through a diamond of tasks', () => {
@@ -394,7 +395,7 @@ test('builders get the loop\'s environment without what a parent Claude Code or 
     VSCODE_IPC_HOOK: '/tmp/vscode.sock', ELECTRON_RUN_AS_NODE: '1', ANTHROPIC_API_KEY: 'not-a-key', OPENAI_BASE_URL: 'https://example.com',
   });
   // CODEX_HOME goes too: the codex adapter sets the one the loop uses.
-  assert.deepEqual(Object.keys(env).sort(), ['GIT_EDITOR', 'HOME', 'LANG', 'HELIX_FAKE_STATE', 'PATH', 'TMPDIR']);
+  assert.deepEqual(Object.keys(env).sort(), ['GIT_EDITOR', 'HELIX_FAKE_STATE', 'HOME', 'LANG', 'PATH', 'TMPDIR']);
 });
 
 test('validate: only design-role work may wait on a design-role task', () => {
@@ -411,7 +412,7 @@ test('validate: only design-role work may wait on a design-role task', () => {
 });
 
 test('restricted paths: only the design-guide area changes branding/, and only ci the workflows', () => {
-  const { restricted_paths } = loadConfig();
+  const { restricted_paths } = loadConfig(FIXTURE);
   const changed = ['branding/README.md', 'branding/assets/mascot/mushy-waving.svg', '.github/workflows/ci.yml', 'src/assets/brand/branding/x.svg', 'src/index.ts'];
   assert.deepEqual(offAreaPaths(changed, restricted_paths, 'docs/branding'), ['.github/workflows/ci.yml']);
   assert.deepEqual(offAreaPaths(changed, restricted_paths, 'docs/branding/mascot'), ['.github/workflows/ci.yml'], 'areas below it may too');
@@ -420,12 +421,12 @@ test('restricted paths: only the design-guide area changes branding/, and only c
 });
 
 test('config: release review paths are .github/ and infra/ by default, and never an empty list', () => {
-  assert.deepEqual(loadConfig().release.review_paths, ['.github/**', 'infra/**']);
-  const raw = parse(readFileSync(join(CONTROL_PLANE, 'harness', 'config.yaml'), 'utf8')) as { release: Record<string, unknown> };
+  assert.deepEqual(loadConfig(FIXTURE).release.review_paths, ['.github/**', 'infra/**']);
+  const raw = parse(readFileSync(configPath(FIXTURE), 'utf8')) as { release: Record<string, unknown> };
   const file = join(mkdtempSync(join(tmpdir(), 'mushy-config-')), 'config.yaml');
   const withRelease = (release: object) => {
     writeFileSync(file, stringify({ ...raw, release }));
-    return () => loadConfig(CONTROL_PLANE, file);
+    return () => loadConfig(FIXTURE, file);
   };
   const { review_paths: listed, ...rest } = raw.release;
   assert.ok(listed, 'the real config lists them');
@@ -535,7 +536,7 @@ test("gitleaks' verbose report gives each finding's rule, file and line, and nev
 });
 
 test('prompt: carried work is introduced by why it did not merge', () => {
-  const p = paths(CONTROL_PLANE);
+  const p = paths(FIXTURE);
   const index = loadIndex(p.specIndex);
   const template = readFileSync(join(p.prompts, 'build.md'), 'utf8');
   const render = (why: 'moved' | 'failed' | 'cut' | 'blocked') =>

@@ -768,7 +768,7 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
       // The last failure that counted against the task. Interruptions (a session limit, a suspension, a
       // transient error, an origin that diverged) say nothing about the code, and their notes are for the owner.
       const last = task.attempts.filter((a) => a.outcome !== 'merged' && !UNCOUNTED_OUTCOMES.includes(a.outcome)).pop();
-      const input = { template: ctx.template, task, index: ctx.index, sectionsDir: p.specSections, budgetBytes: config.limits.prompt_budget_bytes };
+      const input = { template: ctx.template, task, index: ctx.index, sectionsDir: p.specSections, budgetBytes: config.limits.prompt_budget_bytes, product: projectInfo(config).name };
       prompt = renderPrompt({ ...input, retryLog: last?.note, carried });
       promptBytes = Buffer.byteLength(prompt);
       retryBytes = promptBytes - Buffer.byteLength(renderPrompt(input));

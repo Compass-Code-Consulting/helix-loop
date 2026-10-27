@@ -8,7 +8,7 @@ import type { LedgerEvent } from '../src/ledger.ts';
 const at = (min: number) => new Date(Date.UTC(2026, 9, 24, 1, 0) + min * 60_000).toISOString();
 // As the loop logs it: the duration runs from the claim to the end of the pass, the gate's time included.
 const pass =(min: number, agent: string, outcome: string, durationMin: number, gateMin: number): LedgerEvent => ({
-  kind: 'pass', at: at(min), task: 'T-0001', repo: 'mushy-social-media', agent, model: 'm', attempt: 1, outcome,
+  kind: 'pass', at: at(min), task: 'T-0001', repo: 'acme-app', agent, model: 'm', attempt: 1, outcome,
   durationMs: durationMin * 60_000, gateMs: gateMin * 60_000, costUsd: 1.5, tokens: { input: 1_000_000, cachedInput: 500_000, output: 100_000 }, log: 'x',
 });
 
@@ -19,7 +19,7 @@ test('stats: working, gating, limited and idle add up to the time the loop ran, 
     pass(40, 'codex', 'gate_failed', 30, 5),
     { kind: 'agent', at: at(45), agent: 'codex', state: 'limited', resetAt: at(75) },
     { kind: 'agent', at: at(75), agent: 'codex', state: 'available' },
-    { kind: 'merge', at: at(31), task: 'T-0001', repo: 'mushy-social-media', commit: 'abc', agent: 'claude', regated: false },
+    { kind: 'merge', at: at(31), task: 'T-0001', repo: 'acme-app', commit: 'abc', agent: 'claude', regated: false },
     { kind: 'loop', at: at(100), event: 'exit', code: 0 },
     // Down for 20 minutes, then running again until "now" (minute 140).
     { kind: 'loop', at: at(120), event: 'start' },

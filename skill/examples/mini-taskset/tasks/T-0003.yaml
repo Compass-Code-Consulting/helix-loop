@@ -1,5 +1,5 @@
 id: T-0003
-repo: mushy-social-media
+repo: acme-app
 stage: day1
 area: api/rate-limits
 epic: waitlist-core

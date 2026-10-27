@@ -15,7 +15,7 @@ const pass = (over: Partial<Pass>): Pass => ({
   kind: 'pass',
   at: new Date(T0 + HOUR).toISOString(),
   task: 'T-0001',
-  repo: 'mushy-social-media',
+  repo: 'acme-app',
   agent: 'claude',
   model: 'm',
   attempt: 1,
@@ -27,7 +27,7 @@ const pass = (over: Partial<Pass>): Pass => ({
   ...over,
 });
 const task = (id: string, over: Partial<Task> = {}): Task => ({
-  id, repo: 'mushy-social-media', stage: 'day1', area: 'a', title: id, reqs: [], spec: [], acceptance: [], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...over,
+  id, repo: 'acme-app', stage: 'day1', area: 'a', title: id, reqs: [], spec: [], acceptance: [], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...over,
 });
 const planOf = (tasks: Task[]): Plan => ({ tasks: new Map(tasks.map((t) => [t.id, t])), human: new Map() });
 

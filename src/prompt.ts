@@ -30,6 +30,7 @@ export interface RenderInput {
   retryLog?: string; // tail of the last failed attempt's gate or agent output
   carried?: CarriedWork; // an earlier attempt's work, already in the worktree
   budgetBytes: number;
+  product?: string; // the product's name, for {{PRODUCT}}
 }
 
 // Work an earlier attempt kept, merged into the pass's worktree before it started (merge.ts, carryInto).
@@ -71,6 +72,7 @@ export function renderPrompt(input: RenderInput): string {
   // Replaced through functions: a replacement string would expand any `$&`, `$'` or `$$` a note or the spec holds.
   const fill = (retry: string) =>
     template
+      .replaceAll('{{PRODUCT}}', () => input.product ?? 'the product')
       .replaceAll('{{TASK_ID}}', () => task.id)
       .replaceAll('{{REPO}}', () => task.repo)
       .replaceAll('{{TASK}}', () => taskYaml)

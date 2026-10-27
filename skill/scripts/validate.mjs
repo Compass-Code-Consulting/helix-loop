@@ -8,7 +8,7 @@
 // `ID: warning: message`, then a summary line, and exits 0 when there are no errors, 1 when there are.
 //
 // The schemas are read, in order, from --schema-dir, <plan-dir>/schema, the skill's own schema/
-// (next to scripts/), and the loop repo's plan/schema when run from its source tree.
+// (next to scripts/), and helix-loop's schema/ when run from its source tree.
 // Requirement coverage is checked when --reqs names a file, or <plan-dir>/reqs.txt exists: one
 // requirement ID per line, first word only, `#` starts a comment.
 //
@@ -538,7 +538,7 @@ function readDir(dir, idPattern, problems) {
 
 export function findSchemaDir(planDir, explicit) {
   const here = dirname(fileURLToPath(import.meta.url));
-  const candidates = explicit ? [explicit] : [join(planDir, 'schema'), join(here, '..', 'schema'), join(here, '..', '..', 'plan', 'schema')];
+  const candidates = explicit ? [explicit] : [join(planDir, 'schema'), join(here, '..', 'schema'), join(here, '..', '..', 'schema')];
   return candidates.find((d) => existsSync(join(d, 'task.schema.json'))) ?? null;
 }
 

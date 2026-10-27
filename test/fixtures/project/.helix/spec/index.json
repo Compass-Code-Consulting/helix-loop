@@ -1,0 +1,224 @@
+{
+  "version": "1.0",
+  "sections": {
+    "§0": {
+      "key": "§0",
+      "title": "0. Building from this spec",
+      "file": "00-building-from-this-spec.md",
+      "startLine": 1,
+      "endLine": 4
+    },
+    "§1": {
+      "key": "§1",
+      "title": "1. Overview",
+      "file": "01-overview.md",
+      "startLine": 1,
+      "endLine": 3
+    },
+    "§2": {
+      "key": "§2",
+      "title": "2. Glossary",
+      "file": "02-glossary.md",
+      "startLine": 1,
+      "endLine": 5
+    },
+    "§10": {
+      "key": "§10",
+      "title": "10. Platform",
+      "file": "10-platform.md",
+      "startLine": 1,
+      "endLine": 13
+    },
+    "§10 Configuration": {
+      "key": "§10 Configuration",
+      "title": "10.1 Configuration",
+      "file": "10-platform.md",
+      "startLine": 5,
+      "endLine": 9
+    },
+    "§10.1": {
+      "key": "§10.1",
+      "title": "10.1 Configuration",
+      "file": "10-platform.md",
+      "startLine": 5,
+      "endLine": 9
+    },
+    "§10 Background jobs": {
+      "key": "§10 Background jobs",
+      "title": "10.5 Background jobs",
+      "file": "10-platform.md",
+      "startLine": 10,
+      "endLine": 13
+    },
+    "§10.5": {
+      "key": "§10.5",
+      "title": "10.5 Background jobs",
+      "file": "10-platform.md",
+      "startLine": 10,
+      "endLine": 13
+    },
+    "§11": {
+      "key": "§11",
+      "title": "11. Publishing",
+      "file": "11-publishing.md",
+      "startLine": 1,
+      "endLine": 15
+    },
+    "§11 Requirements": {
+      "key": "§11 Requirements",
+      "title": "Requirements",
+      "file": "11-publishing.md",
+      "startLine": 5,
+      "endLine": 12
+    },
+    "§11 Sharing": {
+      "key": "§11 Sharing",
+      "title": "Sharing",
+      "file": "11-publishing.md",
+      "startLine": 13,
+      "endLine": 15
+    },
+    "§15": {
+      "key": "§15",
+      "title": "15. Stack",
+      "file": "15-stack.md",
+      "startLine": 1,
+      "endLine": 3
+    },
+    "§19": {
+      "key": "§19",
+      "title": "19. Navigation",
+      "file": "19-navigation.md",
+      "startLine": 1,
+      "endLine": 4
+    },
+    "§24": {
+      "key": "§24",
+      "title": "24. Operations",
+      "file": "24-operations.md",
+      "startLine": 1,
+      "endLine": 4
+    },
+    "App. A": {
+      "key": "App. A",
+      "title": "Appendix A. Definitions of done",
+      "file": "app-a-definitions-of-done.md",
+      "startLine": 1,
+      "endLine": 3
+    },
+    "App. B": {
+      "key": "App. B",
+      "title": "Appendix B. Changelog",
+      "file": "app-b-changelog.md",
+      "startLine": 1,
+      "endLine": 5
+    }
+  },
+  "reqs": {
+    "PLT-1": {
+      "id": "PLT-1",
+      "section": "§10",
+      "subsection": "§10 Configuration",
+      "file": "10-platform.md",
+      "startLine": 7,
+      "endLine": 7
+    },
+    "PLT-2": {
+      "id": "PLT-2",
+      "section": "§10",
+      "subsection": "§10 Configuration",
+      "file": "10-platform.md",
+      "startLine": 8,
+      "endLine": 8
+    },
+    "PLT-3": {
+      "id": "PLT-3",
+      "section": "§10",
+      "subsection": "§10 Background jobs",
+      "file": "10-platform.md",
+      "startLine": 12,
+      "endLine": 12
+    },
+    "PLT-4": {
+      "id": "PLT-4",
+      "section": "§10",
+      "subsection": "§10 Background jobs",
+      "file": "10-platform.md",
+      "startLine": 13,
+      "endLine": 13
+    },
+    "PB-1": {
+      "id": "PB-1",
+      "section": "§11",
+      "subsection": "§11 Requirements",
+      "file": "11-publishing.md",
+      "startLine": 7,
+      "endLine": 7
+    },
+    "PB-2": {
+      "id": "PB-2",
+      "section": "§11",
+      "subsection": "§11 Requirements",
+      "file": "11-publishing.md",
+      "startLine": 8,
+      "endLine": 8
+    },
+    "PB-14": {
+      "id": "PB-14",
+      "section": "§11",
+      "subsection": "§11 Requirements",
+      "file": "11-publishing.md",
+      "startLine": 9,
+      "endLine": 10
+    },
+    "PB-15": {
+      "id": "PB-15",
+      "section": "§11",
+      "subsection": "§11 Requirements",
+      "file": "11-publishing.md",
+      "startLine": 11,
+      "endLine": 11
+    },
+    "PB-20": {
+      "id": "PB-20",
+      "section": "§11",
+      "subsection": "§11 Sharing",
+      "file": "11-publishing.md",
+      "startLine": 15,
+      "endLine": 15
+    },
+    "NAV-1": {
+      "id": "NAV-1",
+      "section": "§19",
+      "subsection": null,
+      "file": "19-navigation.md",
+      "startLine": 3,
+      "endLine": 3
+    },
+    "NAV-2": {
+      "id": "NAV-2",
+      "section": "§19",
+      "subsection": null,
+      "file": "19-navigation.md",
+      "startLine": 4,
+      "endLine": 4
+    },
+    "OPS-1": {
+      "id": "OPS-1",
+      "section": "§24",
+      "subsection": null,
+      "file": "24-operations.md",
+      "startLine": 3,
+      "endLine": 3
+    },
+    "OPS-2": {
+      "id": "OPS-2",
+      "section": "§24",
+      "subsection": null,
+      "file": "24-operations.md",
+      "startLine": 4,
+      "endLine": 4
+    }
+  },
+  "glossary": "§2"
+}

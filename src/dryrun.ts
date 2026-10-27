@@ -10,7 +10,8 @@ import type { Task } from './types.ts';
 // `helix-loop run --dry-run` runs it at real speed on a copy of the plan, in .helix/runs/dry-run/, so the app
 // can be watched and tried without touching the real loop, its repos or its ledger.
 
-export const FAKES = asset('fakes');
+// The fake CLIs' launchers: beside the sources in a checkout, compiled under dist/ when installed.
+export const FAKES = import.meta.url.endsWith('.ts') ? asset('fakes') : asset('dist', 'fakes');
 
 // The parts of a project a loop reads but never writes: the spec index, the prompts and the TaskSet's file.
 export function seedControlPlane(root: string, from: string): void {

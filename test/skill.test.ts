@@ -13,10 +13,10 @@ import { installSkill, packSkill, skillInfo } from '../src/skill.ts';
 // The Helix skill (app spec §13.1): its validator agrees with the loop, its example is a valid TaskSet,
 // and the pack and install carry the skill with the loop's current schemas.
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const validator = join(root, 'skill', 'scripts', 'validate.mjs');
 const example = join(root, 'skill', 'examples', 'mini-taskset');
-const schemaDir = join(root, 'plan', 'schema');
+const schemaDir = join(root, 'schema');
 const hasUnzip = spawnSync('unzip', ['-v']).status === 0;
 
 function validate(planDir: string, ...args: string[]): { code: number; lines: string[] } {
@@ -33,11 +33,13 @@ interface Reader {
 }
 const reader = async () => (await import(pathToFileURL(validator).href)) as Reader;
 
-test('skill: the validator reads every task and human task in the live plan exactly as the yaml package does', async () => {
+// A project's own plan is the best corpus: HELIX_CORPUS names a plan folder to read every file of, as well.
+test('skill: the validator reads every task and human task exactly as the yaml package does', async () => {
   const { parseYaml } = await reader();
-  for (const dir of ['tasks', 'human']) {
-    for (const f of readdirSync(join(root, 'plan', dir))) {
-      const text = readFileSync(join(root, 'plan', dir, f), 'utf8');
+  const plans = [example, ...(process.env.HELIX_CORPUS ? [process.env.HELIX_CORPUS] : [])];
+  for (const [plan, dir] of plans.flatMap((p) => ['tasks', 'human'].map((d) => [p, d] as const))) {
+    for (const f of readdirSync(join(plan, dir))) {
+      const text = readFileSync(join(plan, dir, f), 'utf8');
       assert.deepEqual(parseYaml(text, f), parse(text), f);
     }
   }
@@ -125,7 +127,7 @@ test('skill: a broken TaskSet fails with one line per problem', () => {
     assert.equal(r.code, 1);
     const has = (line: string) => assert.ok(r.lines.includes(line), `missing "${line}" in:\n${r.lines.join('\n')}`);
     has('T-0001: dependency cycle: T-0001 → T-0004 → T-0002 → T-0001');
-    has('T-0003: epic billing is not declared in lane mushy-social-media in taskset.yaml');
+    has('T-0003: epic billing is not declared in lane acme-app in taskset.yaml');
     has('T-0007: warning: estimate_passes 2: more than one pass; split it unless splitting would leave something half-built');
     has('T-0008: blocked_by T-0999, which does not exist');
     has('T-0006: acceptance "e2e: [WL-7] an invalid address shows the field error next to the input and keeps what was typed" is tagged WL-7, which is not in the task\'s reqs');
@@ -141,7 +143,7 @@ test('skill: lanes, epics, schema and coverage problems are reported against the
   try {
     cpSync(example, dir, { recursive: true });
     const t5 = join(dir, 'tasks', 'T-0005.yaml');
-    writeFileSync(t5, readFileSync(t5, 'utf8').replace('repo: mushy-social-media', 'repo: mushy-docs').replace('estimate_passes: 0.5', 'estimate_passes: 4'));
+    writeFileSync(t5, readFileSync(t5, 'utf8').replace('repo: acme-app', 'repo: acme-docs').replace('estimate_passes: 0.5', 'estimate_passes: 4'));
     const t4 = join(dir, 'tasks', 'T-0004.yaml');
     writeFileSync(t4, readFileSync(t4, 'utf8').replace(/^epic: .*\n/m, ''));
     writeFileSync(join(dir, 'reqs.txt'), `${readFileSync(join(dir, 'reqs.txt'), 'utf8')}WL-9 Something no task delivers\n`);
@@ -151,9 +153,9 @@ test('skill: lanes, epics, schema and coverage problems are reported against the
     const r = validate(dir);
     assert.equal(r.code, 1);
     for (const line of [
-      'T-0005: repo mushy-docs is not a lane in taskset.yaml',
+      'T-0005: repo acme-docs is not a lane in taskset.yaml',
       'T-0005: schema: /estimate_passes must be <= 3',
-      "T-0004: has no epic; set epic to one of lane mushy-social-media's epics (waitlist-core)",
+      "T-0004: has no epic; set epic to one of lane acme-app's epics (waitlist-core)",
       'WL-9: no task delivers this requirement',
       'T-0003: is in T-0042.yaml; the file must be named T-0003.yaml',
       'T-0003: is defined twice',
