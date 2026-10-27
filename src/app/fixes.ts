@@ -1,5 +1,5 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { paths } from '../config.ts';
 import { loadPlan } from '../plan/store.ts';
 import type { Task } from '../types.ts';
@@ -12,6 +12,8 @@ import { ownerOf } from './prompts.ts';
 // group of tasks. Each becomes one validated commit and one entry in the undo list.
 
 export const BATCH_FIELDS = ['status', 'notes', 'blocked_by'] as const;
+// What the owner changes on a human task: where it stands, and its notes (the checklist's ticks, evidence).
+export const HUMAN_FIELDS = ['status', 'notes'] as const;
 const NEW_TASK_FIELDS = ['repo', 'stage', 'area', 'feature', 'epic', 'title', 'reqs', 'spec', 'acceptance', 'blocked_by', 'estimate_passes', 'priority', 'agent', 'notes'];
 
 // A note goes under what the task's notes already say, so the next builder reads both.
@@ -57,16 +59,22 @@ export function toBatch(root: string, changes: PlanChange[]): { batch: Batch; pa
 }
 
 // Applies plan changes as one commit, records them for undo, and says what changed.
-export async function applyChanges(root: string, changes: PlanChange[], opts: { what: string; by: string; source?: string }): Promise<{ change?: Change; created: string[]; tasks: string[] }> {
+export async function applyChanges(root: string, changes: PlanChange[], opts: { what: string; by: string; where?: string; source?: string }): Promise<{ change?: Change; created: string[]; tasks: string[] }> {
   const { batch, pause } = toBatch(root, changes);
   if (pause) {
     mkdirSync(dirname(paths(root).pause), { recursive: true });
     writeFileSync(paths(root).pause, `paused by ${opts.by}: ${opts.what}\n`);
   }
-  if (!batch.tasks?.length && !batch.create?.length) return { created: [], tasks: [] };
-  // The commit says what and who; where it came from (a group, a fix, a request) is kept in the undo record.
-  const r = await applyBatch(root, batch, { fields: BATCH_FIELDS, message: `Plan: ${opts.what} (${opts.by}, in Helix Loop)` });
-  const files = r.value.tasks.map((id) => relative(root, `${paths(root).tasks}/${id}.yaml`));
+  return applyRecorded(root, batch, opts);
+}
+
+// A batch as one commit and one entry in the undo list. The commit says what and who, and where they changed
+// it (in the app, or with the CLI); where it came from (a group, a fix, a request) is kept in the undo record.
+export async function applyRecorded(root: string, batch: Batch, opts: { what: string; by: string; where?: string; source?: string }): Promise<{ change?: Change; created: string[]; tasks: string[] }> {
+  if (!batch.tasks?.length && !batch.create?.length && !batch.human?.length) return { created: [], tasks: [] };
+  const r = await applyBatch(root, batch, { fields: BATCH_FIELDS, humanFields: HUMAN_FIELDS, message: `Plan: ${opts.what} (${opts.by}, ${opts.where ?? 'in Helix Loop'})` });
+  const human = new Set((batch.human ?? []).map((h) => h.id));
+  const files = r.value.tasks.map((id) => relative(root, join(human.has(id) ? paths(root).human : paths(root).tasks, `${id}.yaml`)));
   const change = r.commit ? recordChange(root, { by: opts.by, what: opts.what, commit: r.commit, files, tasks: r.value.tasks, source: opts.source }) : undefined;
   return { change, created: r.value.created, tasks: r.value.tasks };
 }

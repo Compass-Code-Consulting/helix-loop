@@ -111,7 +111,8 @@ const map = define({
   name: 'plan map',
   group: 'Spec and TaskSet',
   summary: 'Write the dependency map, a self-contained HTML Gantt chart',
-  description: 'Writes .helix/plan/DependencyMap.html: every task and human task against time, the critical path highlighted. It opens in any browser, with no app running; the app\'s Map is the live version.',
+  description: `Writes .helix/plan/DependencyMap.html: every task and human task against time, the critical path highlighted.
+It opens in any browser, with no app running; the app's Map is the live version.`,
   run({ root, out }) {
     const p = paths(root);
     atomicWrite(p.map, renderDependencyMap(currentMap(root)));

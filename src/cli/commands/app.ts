@@ -11,7 +11,8 @@ const app = define({
   group: 'The app',
   summary: 'Open Helix Loop, the control room: Home, the Map, Live, Helix, the metrics, Settings',
   description: `Serves the app on http://127.0.0.1 (never another interface) and the MCP endpoints builders report to and Helix works through.
-It runs until you stop it (Ctrl-C). The loop runs on its own: either can restart without the other.`,
+It runs until you stop it (Ctrl-C).
+The loop runs on its own: either can restart without the other.`,
   options: {
     port: { type: 'string', value: 'N', description: 'The port, instead of the config\'s app.port (47320 by default)' },
     open: { type: 'boolean', description: 'Open it in the browser once it is up' },

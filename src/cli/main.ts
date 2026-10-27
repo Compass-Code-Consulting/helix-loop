@@ -66,7 +66,14 @@ export async function main(argv: string[], io = { out: (s = '') => console.log(s
   if (parsed.values.help) return io.out(commandHelp(command)), 0;
   if (parsed.values.version) return io.out(VERSION), 0;
   const required = (command.args ?? []).filter((a) => !a.optional).length;
-  if (parsed.positionals.length < required || (!(command.args ?? []).some((a) => a.variadic) && parsed.positionals.length > (command.args ?? []).length)) {
+  const tooMany = !(command.args ?? []).some((a) => a.variadic) && parsed.positionals.length > (command.args ?? []).length;
+  // "task hand-bak T-1" matched "task": a mistyped subcommand, said as one.
+  if (tooMany && rest[0] && !rest[0].startsWith('-') && COMMANDS.some((c) => c.name.startsWith(`${command.name} `))) {
+    const near = closest(`${command.name} ${rest[0]}`);
+    io.err(`helix-loop: no command "${command.name} ${rest[0]}".${near ? ` Did you mean \`helix-loop ${near}\`?` : ''} Run \`helix-loop --help\` for the list.`);
+    return 1;
+  }
+  if (parsed.positionals.length < required || tooMany) {
     io.err(`helix-loop ${command.name}: expected ${(command.args ?? []).map((a) => (a.optional ? `[${a.name}]` : `<${a.name}>`)).join(' ') || 'no arguments'}. Run \`helix-loop ${command.name} --help\`.`);
     return 1;
   }

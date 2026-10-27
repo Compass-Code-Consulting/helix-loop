@@ -1,32 +1,27 @@
 import { execFile, spawn } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, watch, writeFileSync, type FSWatcher } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, watch, type FSWatcher } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { extname, join, normalize, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
-import { gunzipSync } from 'node:zlib';
 import { ownerOf } from './prompts.ts';
-import { asset, BIN, configPath, logFile, FEEDBACK_KINDS, HELIX_DIR, loadConfig, MONITOR_LEVELS, monitorOf, PACKAGE_ROOT, paths, projectInfo, type Config, type FeedbackKind } from '../config.ts';
+import { asset, BIN, configPath, logFile, FEEDBACK_KINDS, HELIX_DIR, loadConfig, MONITOR_LEVELS, monitorOf, PACKAGE_ROOT, paths, projectInfo, type FeedbackKind } from '../config.ts';
 import { git } from '../git.ts';
 import { renderDependencyMap } from '../map/render.ts';
 import { renderMetrics } from '../metrics/render.ts';
 import { run } from '../proc.ts';
 import { pendingApprovals } from '../release.ts';
 import { installSkill, packSkill, skillInfo } from '../skill.ts';
-import { AGENTS, type AgentName, type HumanTask } from '../types.ts';
+import { AGENTS, type AgentName } from '../types.ts';
 import { localDay } from '../agents/quota.ts';
 import type { LedgerEvent } from '../ledger.ts';
-import { commit, createTask, PlanEditError, runningTasks, updateHuman, updateTask } from './actions.ts';
+import { commit, createTask, PlanEditError } from './actions.ts';
 import { finishMoved } from './board.ts';
-import { undoChange } from './changes.ts';
-import { applyChangeSet, applyToText, checkConfig, CONTROLS, ConfigEditError, configFile, effects, GROUPS, getValue, type ChangeSet } from './config.ts';
+import { CONTROLS, ConfigEditError, effects, GROUPS, getValue } from './config.ts';
 import { readFeed } from './feed.ts';
-import { addClarification, applyChanges, withNote } from './fixes.ts';
 import { deleteKey, forget, health, INSTALL, saveKey, SIGN_IN } from './health.ts';
 import { ASSISTANT_TOOLS, Helix, HELIX_SERVER, monitorSpentToday, monitorTools, readReads, RESOLVE_REQUEST, type HelixRole } from './helix.ts';
-import { appendHitl, DEFAULT_FEEDBACK, FEEDBACK_LABELS, feedbackRule, pilotOf, readHitl, readRules, REQUESTS, tableOf, writeRules, type Rule } from './hitl.ts';
-import { appendStored, type PlanChange } from './incidents.ts';
+import { DEFAULT_FEEDBACK, FEEDBACK_LABELS, feedbackRule, pilotOf, readHitl, tableOf } from './hitl.ts';
 import { Jobs, type Job } from './jobs.ts';
 import { BUILDER_SERVER, BUILDER_TOOLS, handleRpc, passFor } from './mcp.ts';
 import { estimateLevels, monitorChanges, monitorShouldRun, monitorTurnCosts } from './monitor.ts';
@@ -34,9 +29,10 @@ import { listPrompts, monitorPromptName, resetPrompt, savePrompt } from './promp
 import { loadSettings, saveSettings } from './settings.ts';
 import { appState, loopStatus, mapModel, metricsModel, readReports, snapshot, type Snapshot } from './state.ts';
 import { readTaskSetFile } from './taskset.ts';
-import { loadPlan } from '../plan/store.ts';
-import { addComment, addMessage, addReply, allThreads, decide, isTarget, newConversationTarget, readEntries, thread, threadsOf, ThreadError } from './threads.ts';
-import { builderHistory, buildView, helixSummary, mergeBuckets, pilotView, resolvedRecord, taskCommits, welcome, type View } from './views.ts';
+import { addComment, addMessage, addReply, allThreads, decide, isTarget, newConversationTarget, thread, ThreadError } from './threads.ts';
+import { buildView, helixSummary, mergeBuckets, pilotView, resolvedRecord, welcome, type View } from './views.ts';
+import * as ops from '../ops/index.ts';
+import { inApp, OpError } from '../ops/actor.ts';
 
 // `helix-loop app` (spec §4): one local process serving one live page, its JSON API and change stream, and the
 // MCP endpoints for builders and Helix. It shares only files with the loop, so either can restart without the
@@ -62,11 +58,14 @@ class HttpError extends Error {
   }
 }
 
-export async function startApp(opts: { root: string; port: number; open?: boolean }): Promise<App> {
+// monitor: false keeps Helix's monitor from taking turns, for an app the CLI starts for one question (`helix-loop
+// ask`): only the app the owner runs watches the loop.
+export async function startApp(opts: { root: string; port: number; open?: boolean; monitor?: boolean }): Promise<App> {
   const roots: Record<Which, string> = { real: opts.root, dry: paths(opts.root).dryRun };
   const settingsFile = paths(opts.root).appSettings;
   // Who the app acts for, in commit messages and records: the project's owner.
   const OWNER = () => ownerOf(roots.real);
+  const ACTOR = () => inApp(roots.real);
   const launchToken = randomBytes(24).toString('base64url');
   let port = opts.port;
 
@@ -126,10 +125,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   }, 25_000);
 
   const jobs = new Jobs((job) => send('job', job));
-  const helixAgent = (role: HelixRole): AgentName => {
-    const s = loadSettings(settingsFile).helix;
-    return (role === 'monitor' ? (s?.monitor ?? loadConfig(roots.real).helix?.monitor?.agent) : s?.assistant) ?? 'claude';
-  };
+  const helixAgent = (role: HelixRole): AgentName => ops.helixAgentOf(roots.real, role);
   const helix = new Helix({
     port: () => port,
     agent: helixAgent,
@@ -150,6 +146,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     }
   };
   const monitorOn = () => {
+    if (opts.monitor === false) return false;
     const m = monitorNow();
     if (!m?.enabled) return false;
     return monitorSpentToday(paths(roots.real).helixTurns, localDay(Date.now()), localDay) < m.budgetUsd;
@@ -158,7 +155,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   // off nothing is read, and it starts from what is there when it comes on.
   let seen: { events: number; reports: number } | undefined;
   const monitorConsider = () => {
-    const m = monitorNow();
+    const m = opts.monitor === false ? undefined : monitorNow();
     if (!m?.enabled) return void (seen = undefined);
     const events = snap('real').events;
     const reports = readReports(roots.real);
@@ -261,7 +258,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
 
   const server = createServer((req, res) => {
     handle(req, res).catch((e: Error) => {
-      const status = e instanceof HttpError ? e.status : e instanceof PlanEditError || e instanceof ThreadError || e instanceof ConfigEditError ? 409 : 500;
+      const status = e instanceof HttpError || e instanceof OpError ? e.status : e instanceof PlanEditError || e instanceof ThreadError || e instanceof ConfigEditError ? 409 : 500;
       if (status === 500) console.error(e.stack ?? e);
       if (!res.headersSent) reply(res, status, { error: e.message });
       else res.end();
@@ -297,6 +294,8 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
 
     if (req.method === 'GET') {
       if (path === '/health') return void res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
+      // Which project this app serves, so the CLI can find it and act through it (src/cli/client.ts).
+      if (path === '/api/project') return reply(res, 200, { root: roots.real, name: projectInfo(loadConfig(roots.real)).name });
       if (path === '/') {
         const page = readFileSync(join(PAGE, 'index.html'), 'utf8').replace('{{TOKEN}}', launchToken);
         return void res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }).end(page);
@@ -314,7 +313,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         // One pass's feed, as its builder writes it, or the page's change stream.
         const log = q.get('pass');
         if (log) {
-          const sub = { which, log: logPath(log) };
+          const sub = { which, log: ops.logPath(log) };
           passClients.set(res, sub);
           req.on('close', () => {
             passClients.delete(res);
@@ -357,9 +356,9 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         if (!t) throw new HttpError(404, 'no such thread');
         return reply(res, 200, t);
       }
-      if (path === '/api/log') return text(res, readLog(root, q.get('path') ?? ''));
+      if (path === '/api/log') return text(res, ops.readLog(root, q.get('path') ?? ''));
       if (path === '/api/feed') {
-        const rel = logPath(q.get('path') ?? '');
+        const rel = ops.logPath(q.get('path') ?? '');
         const agent = /-(claude|codex)-\d+\.log(\.gz)?$/.exec(rel)?.[1] as AgentName | undefined;
         if (!agent) throw new HttpError(400, 'not a pass log');
         // A pass that just ended has had its log compressed.
@@ -400,84 +399,51 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     if (!tokenOk(req.headers['x-helix-token'] as string | undefined, launchToken)) throw new HttpError(403, 'reload the page: its launch token is out of date');
     const body = (await readJson(req)) as Record<string, any>;
     const dir = paths(root).threads;
-    // A change that builds on what a task says now reads it from disk: the cache follows file events, which can
-    // arrive after a second request that came straight after the first.
-    const fresh = () => loadPlan(paths(root).tasks, paths(root).human);
     switch (path) {
       // ---- the loop ----
       case '/api/loop/start':
         return reply(res, 200, await startLoop(which, body));
       case '/api/loop/stop': {
-        if (!loopStatus(root, snap(which).events).running) throw new HttpError(409, 'the loop is not running');
-        mkdirSync(paths(root).runs, { recursive: true });
-        writeFileSync(paths(root).stopFile, '');
+        ops.stopLoop(root);
         changed(which, 'loop');
         return reply(res, 200, { stopping: true });
       }
       case '/api/loop/pause': {
-        mkdirSync(paths(root).runs, { recursive: true });
-        if (body.paused) writeFileSync(paths(root).pause, `paused by ${OWNER()}, in Helix Loop\n`);
-        else rmSync(paths(root).pause, { force: true });
+        ops.setPaused(root, !!body.paused, ACTOR());
         changed(which, 'loop');
         return reply(res, 200, { paused: !!body.paused });
       }
       case '/api/pass/stop': {
         const task = String(body.task ?? '');
-        if (!runningTasks(root, snap(which).plan).has(task)) throw new HttpError(409, `${task} has no pass in flight`);
-        const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 2000) : undefined;
-        writeStopRequest(root, task, { to: body.to === 'needs_human' ? 'needs_human' : 'ready', ...(note ? { note } : {}), why: `stopped by ${OWNER()} in Live` });
+        ops.stopPass(root, task, { to: body.to === 'needs_human' ? 'needs_human' : 'ready', note: typeof body.note === 'string' ? body.note : undefined, why: `stopped by ${OWNER()} in Live` });
         return reply(res, 200, { stopping: task });
       }
 
       // ---- the plan: one task, or a batch ----
       case '/api/task/action': {
         const id = String(body.id ?? '');
-        const t = fresh().tasks.get(id);
-        const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim() : undefined;
-        if (body.action === 'hand_back' || body.action === 'park') {
-          const patch = { status: body.action === 'hand_back' ? ('ready' as const) : ('parked' as const), ...(note ? { notes: withNote(t, note) } : {}) };
-          return reply(res, 200, await updateTask(root, id, patch, { fields: ['status', 'notes'], message: `Plan: ${id} ${body.action === 'hand_back' ? 'handed back to the loop' : 'parked'} (${OWNER()}, in Helix Loop)` }));
-        }
-        if (body.action === 'add_dep' || body.action === 'remove_dep') {
-          const on = String(body.on ?? '');
-          return reply(res, 200, await applyChanges(root, [{ op: body.action, task: id, on }], { what: `${id} ${body.action === 'add_dep' ? 'waits on' : 'no longer waits on'} ${on}`, by: OWNER() }));
-        }
+        const note = typeof body.note === 'string' ? body.note : undefined;
+        if (body.action === 'hand_back' || body.action === 'park') return reply(res, 200, await ops.setStatus(root, [id], body.action, { note, actor: ACTOR() }));
+        if (body.action === 'add_dep' || body.action === 'remove_dep') return reply(res, 200, await ops.setDep(root, id, String(body.on ?? ''), body.action === 'add_dep', ACTOR()));
         throw new HttpError(400, 'action is hand_back, park, add_dep or remove_dep');
       }
       case '/api/batch': {
         const ids: string[] = Array.isArray(body.ids) ? body.ids.map(String).slice(0, 2000) : [];
         if (!ids.length) throw new HttpError(400, 'select at least one task');
-        const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim() : undefined;
         const op = body.action === 'park' ? 'park' : body.action === 'hand_back' ? 'hand_back' : undefined;
         if (!op) throw new HttpError(400, 'action is hand_back or park');
-        const changes: PlanChange[] = ids.filter((id) => snap(which).plan.tasks.has(id)).map((task) => ({ op, task, note }));
-        return reply(res, 200, await applyChanges(root, changes, { what: `${op === 'park' ? 'park' : 'hand back'} ${changes.length} task${changes.length === 1 ? '' : 's'}`, by: OWNER(), source: typeof body.group === 'string' ? `group ${body.group.slice(0, 80)}` : undefined }));
+        return reply(res, 200, await ops.setStatus(root, ids, op, { note: typeof body.note === 'string' ? body.note : undefined, actor: ACTOR(), skipUnknown: true, source: typeof body.group === 'string' ? `group ${body.group.slice(0, 80)}` : undefined }));
       }
       case '/api/undo':
-        return reply(res, 200, await undoChange(root, String(body.id ?? '')));
+        return reply(res, 200, await ops.undo(root, String(body.id ?? ''), ACTOR()));
       case '/api/note-next': {
         // Note for next attempt (spec §6.5): into the task's notes now, or, while its pass runs and the loop holds
         // the task, as soon as the pass ends.
-        const task = String(body.task ?? '');
-        const note = typeof body.note === 'string' ? body.note.trim().slice(0, 2000) : '';
-        if (!note) throw new HttpError(400, 'write the note first');
-        const plan = fresh();
-        if (!plan.tasks.has(task)) throw new HttpError(404, `no task ${task}`);
-        if (runningTasks(root, plan).has(task)) {
-          mkdirSync(paths(root).runs, { recursive: true });
-          appendFileSync(pendingNotes(root), `${JSON.stringify({ at: new Date().toISOString(), task, note })}\n`);
-          return reply(res, 200, { pending: true });
-        }
-        return reply(res, 200, await updateTask(root, task, { notes: withNote(plan.tasks.get(task), note) }, { fields: ['notes'], message: `Plan: ${task} note for its next attempt (${OWNER()}, in Helix Loop)` }));
+        return reply(res, 200, await ops.addNote(root, String(body.task ?? ''), typeof body.note === 'string' ? body.note : '', ACTOR()));
       }
       case '/api/notes': {
         // A task's notes (its next builder reads them in its prompt) or a human task's, edited in place.
-        const id = String(body.id ?? '');
-        const notes = typeof body.notes === 'string' ? body.notes.trim() : '';
-        if (notes.length > 6000) throw new HttpError(400, 'notes are at most 6,000 characters');
-        const message = `Plan: ${id} notes ${notes ? 'updated' : 'cleared'} (${OWNER()}, in Helix Loop)`;
-        const r = id.startsWith('HT-') ? await updateHuman(root, id, { notes }, { fields: ['notes'], message }) : await updateTask(root, id, { notes }, { fields: ['notes'], message });
-        return reply(res, 200, r);
+        return reply(res, 200, await ops.setNotes(root, String(body.id ?? ''), typeof body.notes === 'string' ? body.notes : '', ACTOR()));
       }
       case '/api/human/action':
         return reply(res, 200, await humanAction(which, body));
@@ -485,13 +451,9 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
       // ---- Home's screens ----
       case '/api/fix': {
         const key = String(body.key ?? '');
-        const inc = view(which).incidents.find((i) => i.key === key);
+        const incidents = view(which).incidents;
+        const inc = incidents.find((i) => i.key === key);
         if (!inc?.fix) throw new HttpError(404, 'no fix waiting for that incident');
-        if (body.decision === 'declined') {
-          appendStored(paths(root).incidents, { type: 'decided', key, at: new Date().toISOString(), fix: inc.fix.id, decision: 'declined' });
-          changed(which, 'incidents');
-          return reply(res, 200, { declined: inc.fix.id });
-        }
         // Try in dry run: a fresh dry run of the plan as it stands, with this fix applied to it.
         if (body.decision === 'dry') return reply(res, 200, await startLoop('dry', { agents: AGENTS, planChanges: inc.fix.changes }));
         if (body.decision === 'revise') {
@@ -499,58 +461,46 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
           helix.watch(root, key);
           return reply(res, 200, { revising: key });
         }
-        const r = await applyChanges(root, inc.fix.changes, { what: inc.fix.summary, by: OWNER(), source: `fix ${inc.fix.id}` });
-        appendStored(paths(root).incidents, { type: 'decided', key, at: new Date().toISOString(), fix: inc.fix.id, decision: 'accepted', change: r.change?.id });
+        const r = await ops.decideFix(root, key, body.decision === 'declined' ? 'declined' : 'accepted', ACTOR(), incidents);
         changed(which, 'incidents');
         return reply(res, 200, r);
       }
-      case '/api/answer':
-        return reply(res, 200, await answerOnce(which, body));
+      case '/api/answer': {
+        // Answer once (spec §6.3): into the notes of every task asked, and optionally the spec and a rule.
+        const tasks: string[] | undefined = Array.isArray(body.tasks) && body.tasks.length ? body.tasks.map(String) : undefined;
+        const r = await ops.answerOnce(root, String(body.key ?? ''), String(body.text ?? ''), { tasks, notes: body.notes !== false, spec: !!body.spec, rule: !!body.rule, home: roots.real }, ACTOR(), view(which).incidents);
+        if (r.rule) changed('real', 'config');
+        changed(which, 'incidents');
+        return reply(res, 200, r);
+      }
       case '/api/ask/decide': {
-        const id = String(body.id ?? '');
-        const r = readHitl(paths(root).hitl).raised.find((x) => x.id === id);
-        if (!r) throw new HttpError(404, `no request ${id}`);
-        if (r.answered) throw new HttpError(409, `${id} was decided already`);
-        const option = r.options[Number(body.option)];
-        if (!option) throw new HttpError(400, 'pick one of its options');
-        const applied = await applyChanges(root, option.changes, { what: `${option.label}: ${r.question.slice(0, 80)}`, by: OWNER(), source: id });
-        appendHitl(paths(root).hitl, { type: 'answered', id, at: new Date().toISOString(), option: Number(body.option) });
+        const applied = await ops.decideAsk(root, String(body.id ?? ''), Number(body.option), ACTOR());
         changed(which, 'hitl');
         return reply(res, 200, applied);
       }
       case '/api/rate': {
-        // ▲ Keep asking / ▼ Decide these yourself (spec §7.3), on a kind of request Helix named.
-        const name = String(body.name ?? '').trim();
-        if (name.length < 3) throw new HttpError(400, 'name the kind of request');
-        const request = REQUESTS.find((r) => r.kind === body.request)?.kind;
-        if (request === 'release' || request === 'human_done') throw new HttpError(409, 'releases and human tasks always wait for you; no rating changes that');
-        return reply(res, 200, addRule(roots.real, { name: name.slice(0, 80), request, decide: body.decide === 'helix' ? 'helix' : 'ask', from: typeof body.from === 'string' ? body.from : undefined }));
+        const rule = await ops.rate(roots.real, { name: String(body.name ?? ''), request: typeof body.request === 'string' ? body.request : undefined, decide: body.decide === 'helix' ? 'helix' : 'ask', from: typeof body.from === 'string' ? body.from : undefined }, ACTOR());
+        changed('real', 'config');
+        return reply(res, 200, rule);
       }
       case '/api/rule/undo': {
-        const rules = readRules(roots.real);
-        const next = rules.filter((r) => r.id !== body.id);
-        if (next.length === rules.length) throw new HttpError(404, 'no such rule');
-        await commitFile(roots.real, writeRules(roots.real, next), `Helix: rule ${body.id} removed (${OWNER()}, in Helix Loop)`);
+        const r = await ops.undoRule(roots.real, String(body.id ?? ''), ACTOR());
         changed('real', 'config');
-        return reply(res, 200, { rules: next });
+        return reply(res, 200, r);
       }
       case '/api/resolved': {
         // Agree, Undo or Always ask, on what Helix resolved (spec §7.4); `ids` agrees with several at once.
         const ids: string[] = Array.isArray(body.ids) ? body.ids.map(String) : [String(body.id ?? '')];
-        const { records } = readHitl(paths(root).hitl);
         const rating = body.rating === 'undo' ? 'undo' : body.rating === 'always_ask' ? 'always_ask' : 'agree';
-        for (const id of ids) {
-          const rec = records.find((r) => r.id === id);
-          if (!rec) throw new HttpError(404, `no record ${id}`);
-          if (rating === 'undo' && rec.change) await undoChange(root, rec.change);
-          if (rating === 'always_ask') addRule(roots.real, { name: rec.name ?? rec.request, request: rec.request, decide: 'ask', from: id });
-          appendHitl(paths(root).hitl, { type: 'rated', id, at: new Date().toISOString(), rating });
-        }
+        const r = await ops.rateResolved(root, roots.real, ids, rating, ACTOR());
+        if (rating === 'always_ask') changed('real', 'config');
         changed(which, 'hitl');
-        return reply(res, 200, { rated: ids.length });
+        return reply(res, 200, r);
       }
-      case '/api/secret':
-        return reply(res, 200, await addSecret(which, body));
+      case '/api/secret': {
+        const tasks: string[] = Array.isArray(body.tasks) ? body.tasks.map(String) : [];
+        return reply(res, 200, await ops.addSecret(root, { name: String(body.name ?? ''), value: String(body.value ?? ''), where: body.where === 'github' ? 'github' : 'keychain', repo: body.repo, env: typeof body.env === 'string' ? body.env : undefined, tasks }, ACTOR()));
+      }
       case '/api/home/seen': {
         const s = loadSettings(settingsFile);
         saveSettings(settingsFile, { ...s, lastHome: { at: new Date().toISOString(), finish: view('real').board.finish, mode: pilotOf(loadConfig(roots.real)).mode } });
@@ -575,11 +525,11 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
 
       // ---- releases ----
       case '/api/release':
-        return reply(res, 200, cliJob(which, `Release ${body.repo}`, ['release', 'run', repoArg(loadConfig(root), body.repo)]));
+        return reply(res, 200, cliJob(which, `Release ${body.repo}`, ['release', 'run', ops.repoArg(loadConfig(root), body.repo)]));
       case '/api/approve':
-        if (!pendingApprovals(paths(root).approvals, repoArg(loadConfig(root), body.repo)).some((a) => a.approval.tag === body.tag)) throw new HttpError(409, `${body.repo} ${body.tag} is not waiting for approval`);
+        if (!pendingApprovals(paths(root).approvals, ops.repoArg(loadConfig(root), body.repo)).some((a) => a.approval.tag === body.tag)) throw new HttpError(409, `${body.repo} ${body.tag} is not waiting for approval`);
         if (body.read !== true) throw new HttpError(400, 'confirm that you read the changes to the reviewed paths');
-        return reply(res, 200, cliJob(which, `Approve ${body.repo} ${body.tag}`, ['release', 'approve', repoArg(loadConfig(root), body.repo), String(body.tag)]));
+        return reply(res, 200, cliJob(which, `Approve ${body.repo} ${body.tag}`, ['release', 'approve', ops.repoArg(loadConfig(root), body.repo), String(body.tag)]));
       case '/api/export': {
         const what = String(body.what);
         if (!['map', 'metrics', 'render', 'validate'].includes(what)) throw new HttpError(400, 'export map, metrics, render or validate');
@@ -628,60 +578,37 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
 
       // ---- settings ----
       case '/api/config/apply': {
-        const changes = changeSet(body.changes);
+        const changes = ops.parseChangeSet(body.changes);
         // Try in dry run: a fresh dry run of the plan as it stands, with these values.
         if (body.dry) return reply(res, 200, await startLoop('dry', { agents: AGENTS, configChanges: changes }));
-        const r = await applyChangeSet(roots.real, changes);
+        const r = await ops.applyConfig(roots.real, changes, ACTOR());
         changed('real', 'config');
         return reply(res, 200, r);
       }
       case '/api/config/check': {
-        checkConfig(roots.real, applyToText(readFileSync(configFile(roots.real), 'utf8'), changeSet(body.changes)));
+        ops.checkConfigChanges(roots.real, ops.parseChangeSet(body.changes));
         return reply(res, 200, { ok: true });
       }
       case '/api/pilot': {
-        // Pilot mode applies at once: one commit of config.yaml's pilot section.
-        const changes: ChangeSet[] = [];
-        if (body.mode === 'active' || body.mode === 'auto') changes.push({ key: 'pilot.mode', value: body.mode });
-        if (['cautious', 'prudent', 'intrepid'].includes(body.active_level)) changes.push({ key: 'pilot.active_level', value: body.active_level });
-        if (['intrepid', 'yolo'].includes(body.auto_level)) changes.push({ key: 'pilot.auto_level', value: body.auto_level });
-        if (typeof body.record === 'boolean') changes.push({ key: 'pilot.record', value: body.record });
-        const r = await applyChangeSet(roots.real, changes);
+        // Pilot mode applies at once: one commit of config.yaml's pilot section. What isn't a mode or level is left out.
+        const pick = <T extends string>(v: unknown, of: readonly T[]) => ((of as readonly unknown[]).includes(v) ? (v as T) : undefined);
+        const r = await ops.setPilot(roots.real, { mode: pick(body.mode, ['active', 'auto'] as const), active_level: pick(body.active_level, ops.ACTIVE_LEVELS), auto_level: pick(body.auto_level, ops.AUTO_LEVELS), record: typeof body.record === 'boolean' ? body.record : undefined }, ACTOR());
         changed('real', 'config');
         return reply(res, 200, r);
       }
       case '/api/feedback': {
-        // One kind's rule, for every lane or for one lane.
-        const kind = String(body.kind) as FeedbackKind;
-        if (!(FEEDBACK_KINDS as readonly string[]).includes(kind)) throw new HttpError(400, 'not a feedback kind');
-        const lane = body.lane ? repoArg(loadConfig(root), body.lane) : undefined;
-        const base = lane ? `feedback.lanes.${lane}.${kind}` : `feedback.${kind}`;
-        const changes: ChangeSet[] = [];
-        if (['inbox', 'helix', 'off'].includes(body.send_to)) changes.push({ key: `${base}.send_to`, value: body.send_to });
-        if (typeof body.after === 'string' && /^(first|task:\d{1,2}|tasks:\d{1,3})$/.test(body.after)) changes.push({ key: `${base}.after`, value: body.after });
-        if (typeof body.pause === 'boolean') changes.push({ key: `${base}.pause`, value: body.pause });
-        if (typeof body.notify === 'boolean') changes.push({ key: `${base}.notify`, value: body.notify });
-        const r = await applyChangeSet(roots.real, changes);
+        const r = await ops.setFeedback(root, String(body.kind), { send_to: body.send_to, after: body.after, pause: typeof body.pause === 'boolean' ? body.pause : undefined, notify: typeof body.notify === 'boolean' ? body.notify : undefined }, body.lane ? String(body.lane) : undefined, ACTOR());
         changed('real', 'config');
         return reply(res, 200, r);
       }
       case '/api/helix/settings': {
-        const s = loadSettings(settingsFile);
-        const next = { ...(s.helix ?? {}) };
-        for (const role of ['assistant', 'monitor'] as const) {
-          if (body[role] === undefined) continue;
-          const agent = agentArg(body[role]);
-          const h = (await health(loadConfig(roots.real))).find((x) => x.agent === agent)!;
-          if (!h.helix) throw new HttpError(409, `${agent} can't run Helix yet: it needs to be installed, signed in or given a key, and working`);
-          next[role] = agent;
-        }
-        saveSettings(settingsFile, { ...s, helix: next });
-        const changes: ChangeSet[] = [];
-        if (typeof body.monitorEnabled === 'boolean') changes.push({ key: 'helix.monitor.enabled', value: body.monitorEnabled });
-        if ((MONITOR_LEVELS as readonly string[]).includes(body.monitorLevel)) changes.push({ key: 'helix.monitor.level', value: body.monitorLevel });
-        // null: back to the level's own cap.
-        if (body.monitorBudget === null || (typeof body.monitorBudget === 'number' && body.monitorBudget >= 0 && body.monitorBudget <= 500)) changes.push({ key: 'helix.monitor.daily_budget_usd', value: body.monitorBudget });
-        if (changes.length) await applyChangeSet(roots.real, changes);
+        const next = await ops.setHelixAgents(roots.real, { assistant: body.assistant === undefined ? undefined : ops.agentArg(body.assistant), monitor: body.monitor === undefined ? undefined : ops.agentArg(body.monitor) });
+        // What isn't a level or a cap is left out; null puts the cap back to the level's own.
+        await ops.setMonitor(roots.real, {
+          enabled: typeof body.monitorEnabled === 'boolean' ? body.monitorEnabled : undefined,
+          level: (MONITOR_LEVELS as readonly string[]).includes(body.monitorLevel) ? body.monitorLevel : undefined,
+          budget: body.monitorBudget === null || (typeof body.monitorBudget === 'number' && body.monitorBudget >= 0 && body.monitorBudget <= 500) ? body.monitorBudget : undefined,
+        }, ACTOR());
         changed('real', 'config');
         changed('real', 'settings');
         return reply(res, 200, { helix: next });
@@ -689,14 +616,15 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
       case '/api/helix/watch': {
         if (!monitorOn()) throw new HttpError(409, "Helix's monitor is off: turn it on in Settings › Helix");
         monitorAt = Date.now();
-        helix.watch(roots.real);
+        // A focus: what to look at, as a human task just done (`human:HT-3`) from the CLI.
+        helix.watch(roots.real, typeof body.focus === 'string' && /^human:HT-\d+$/.test(body.focus) ? body.focus : undefined);
         return reply(res, 200, { queued: true });
       }
       case '/api/prompt':
         if (body.reset) return reply(res, 200, await resetPrompt(roots.real, String(body.name)));
         return reply(res, 200, await savePrompt(roots.real, String(body.name), String(body.text ?? '')));
       case '/api/setup': {
-        const agent = agentArg(body.agent);
+        const agent = ops.agentArg(body.agent);
         const config = loadConfig(roots.real);
         const done = () => forget(agent);
         if (body.action === 'install') {
@@ -707,7 +635,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
         throw new HttpError(400, 'action is install or signin');
       }
       case '/api/key': {
-        const agent = agentArg(body.agent);
+        const agent = ops.agentArg(body.agent);
         if (body.key === null) await deleteKey(agent);
         else await saveKey(agent, String(body.key ?? ''));
         forget(agent);
@@ -736,28 +664,9 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   // ---- what the handlers use ----
 
   // Notes left for a running task land once its pass has ended and the loop has let go of it.
-  let flushing = false;
   async function flushNotes(w: Which) {
-    const file = pendingNotes(roots[w]);
-    if (flushing || !existsSync(file)) return;
-    flushing = true;
-    try {
-      const all = readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as { task: string; note: string });
-      const plan = snapshot(roots[w]).plan;
-      const busy = runningTasks(roots[w], plan);
-      const ready = all.filter((n) => !busy.has(n.task));
-      if (!ready.length) return;
-      const left = all.filter((n) => busy.has(n.task));
-      writeFileSync(file, left.map((n) => `${JSON.stringify(n)}\n`).join(''));
-      for (const n of ready) {
-        const t = loadPlanFresh(roots[w]).tasks.get(n.task);
-        if (t) await updateTask(roots[w], n.task, { notes: withNote(t, n.note) }, { fields: ['notes'], message: `Plan: ${n.task} note for its next attempt (${OWNER()}, in Helix Loop)` }).catch((e) => console.error(`note for ${n.task}: ${(e as Error).message}`));
-      }
-    } catch (e) {
-      console.error(`pending notes: ${(e as Error).message}`);
-    } finally {
-      flushing = false;
-    }
+    const r = await ops.landNotes(roots[w], ACTOR());
+    for (const f of r.failed) console.error(`note for ${f.task}: ${f.error}`);
   }
 
   function stateOf(which: Which) {
@@ -798,33 +707,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   }
 
   async function taskDetail(which: Which, id: string) {
-    const root = roots[which];
-    const plan = snap(which).plan;
-    const task = plan.tasks.get(id);
-    const human = plan.human.get(id);
-    if (!task && !human) throw new HttpError(404, `no task ${id}`);
-    const dir = paths(root).threads;
-    const targets = [id, ...(task?.blocked_by ?? human?.blocked_by ?? []).map((d) => `${id}~${d}`)];
-    const v = view(which);
-    const live = stateOf(which).live.find((p) => p.task === id);
-    const events = snap(which).events;
-    const passes = events.filter((e): e is Extract<LedgerEvent, { kind: 'pass' }> => e.kind === 'pass' && e.task === id);
-    return {
-      task,
-      human: human && { ...human, steps: stepsOf(human), done: doneSteps(human) },
-      board: v.board.tasks.find((t) => t.id === id) ?? v.board.human.find((h) => h.id === id),
-      epic: task ? v.board.epics.find((e) => e.tasks.includes(id)) : undefined,
-      running: runningTasks(root, plan).has(id),
-      live,
-      reports: readReports(root).filter((r) => r.task === id).slice(-30),
-      history: task ? builderHistory(plan, events, id, live) : [],
-      commits: task?.status === 'done' ? await taskCommits(root, events, id) : undefined,
-      merged: events.findLast((e): e is Extract<LedgerEvent, { kind: 'merge' }> => e.kind === 'merge' && e.task === id),
-      cost: { usd: passes.reduce((n, e) => n + e.costUsd, 0), ms: passes.reduce((n, e) => n + e.durationMs, 0), passes: passes.length },
-      remote: task ? await remoteUrl(root, task.repo) : undefined,
-      unblocks: [...plan.tasks.values()].filter((t) => t.blocked_by.includes(id)).map((t) => ({ id: t.id, title: t.title, status: t.status })),
-      threads: Object.fromEntries(targets.map((t) => [t, threadsOf(t, readEntries(dir, t))])),
-    };
+    return ops.taskStory(roots[which], id, { snap: snap(which), view: view(which), live: stateOf(which).live });
   }
 
   // Everything a group's screen shows (spec §6.3).
@@ -837,12 +720,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     const inc = g.incident ? v.incidents.find((i) => i.key === g.incident) : undefined;
     const out: Record<string, unknown> = { group: g };
     if (g.kind === 'your_tasks') {
-      const human = g.members.map((m) => {
-        const h = plan.human.get(m.id)!;
-        const b = v.board.human.find((x) => x.id === m.id)!;
-        const waiting = [...[...plan.tasks.values()].filter((t) => t.blocked_by.includes(h.id) && t.status !== 'done'), ...[...plan.human.values()].filter((x) => x.blocked_by.includes(h.id) && x.status !== 'done')];
-        return { ...h, held: b.held, late: b.late, latestStart: b.latestStart, critical: b.critical, steps: stepsOf(h), done: doneSteps(h), unblocks: waiting.map((t) => ({ id: t.id, title: t.title, status: t.status })) };
-      });
+      const human = g.members.map((m) => ops.humanCard(plan, v.board, m.id));
       out.human = human;
       // Worked out, not written: what doing the two that hold the most today does to the finish.
       const top = human.slice(0, 2).map((h) => h.id);
@@ -856,7 +734,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
       out.quotes = reports.slice(-40).reverse().map((r) => ({ task: r.task, title: plan.tasks.get(r.task)?.title, agent: r.agent, at: r.at, message: r.message }));
       // The failures over time, and the latest gate output, for Accept fix's evidence.
       const latest = [...inc.members].filter((m) => m.log).sort((a, b) => b.last.localeCompare(a.last))[0];
-      if (latest?.log) out.lastOutput = { task: latest.task, attempt: latest.attempt, text: gateTail(root, latest.log) };
+      if (latest?.log) out.lastOutput = { task: latest.task, attempt: latest.attempt, text: ops.gateTail(root, latest.log) };
       out.timeline = hourly(inc.times, Date.now());
     }
     if (g.kind === 'release') {
@@ -966,96 +844,15 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   async function humanAction(which: Which, body: Record<string, any>) {
     const root = roots[which];
     const id = String(body.id ?? '');
-    const h = loadPlan(paths(root).tasks, paths(root).human).human.get(id);
-    if (!h) throw new HttpError(404, `no human task ${id}`);
-    const patch: Partial<HumanTask> = {};
-    if (body.status !== undefined) {
-      if (!['todo', 'in_progress', 'done'].includes(body.status)) throw new HttpError(400, 'status is todo, in_progress or done');
-      patch.status = body.status;
-    }
-    let notes = h.notes ?? '';
-    // The checklist's ticks, kept as one line of the notes.
-    if (Array.isArray(body.steps)) {
-      const done = body.steps.map(Number).filter((n: number) => n > 0).sort((a: number, b: number) => a - b);
-      notes = [done.length ? `Steps done: ${done.join(', ')}` : '', notes.replace(/^Steps done:.*$\n?/m, '').trim()].filter(Boolean).join('\n');
-    }
-    if (typeof body.snooze === 'string') {
-      notes = [body.snooze ? `Snoozed until ${body.snooze.slice(0, 10)}` : '', notes.replace(/^Snoozed until .*$\n?/m, '').trim()].filter(Boolean).join('\n');
-    }
-    if (typeof body.evidence === 'string' && body.evidence.trim()) notes = [notes, `Evidence (${new Date().toISOString().slice(0, 10)}): ${body.evidence.trim().slice(0, 1000)}`].filter(Boolean).join('\n');
-    if (notes !== (h.notes ?? '')) patch.notes = notes;
-    if (!Object.keys(patch).length) return { value: h, committed: false };
-    const what = patch.status ? patch.status.replace('_', ' ') : body.snooze !== undefined ? (body.snooze ? `snoozed until ${body.snooze.slice(0, 10)}` : 'unsnoozed') : 'checklist updated';
-    const r = await updateHuman(root, id, patch, { fields: ['status', 'notes'], message: `Plan: ${id} ${what} (${OWNER()}, in Helix Loop)` });
+    const r = await ops.humanAction(root, id, {
+      status: body.status === undefined ? undefined : String(body.status),
+      steps: Array.isArray(body.steps) ? body.steps.map(Number) : undefined,
+      snooze: typeof body.snooze === 'string' ? body.snooze : undefined,
+      evidence: typeof body.evidence === 'string' ? body.evidence : undefined,
+    }, ACTOR());
     // Done: Helix's monitor adds what builders need from it (an ID, never a secret) to the tasks waiting on it.
-    if (patch.status === 'done' && monitorOn()) helix.watch(root, `human:${id}`);
+    if (r.change && body.status === 'done' && monitorOn()) helix.watch(root, `human:${id}`);
     return r;
-  }
-
-  // Answer once (spec §6.3): into the notes of every task asked, and optionally the spec and a rule.
-  async function answerOnce(which: Which, body: Record<string, any>) {
-    const root = roots[which];
-    const key = String(body.key ?? '');
-    const text = String(body.text ?? '').trim();
-    if (text.length < 8) throw new HttpError(400, 'write the answer first');
-    const inc = view(which).incidents.find((i) => i.key === key);
-    if (!inc) throw new HttpError(404, 'no such question');
-    const tasks: string[] = Array.isArray(body.tasks) && body.tasks.length ? body.tasks.map(String) : inc.members.map((m) => m.task);
-    const about = key.startsWith('spec:') ? key.slice(5) : inc.cause.slice(0, 40);
-    const out: Record<string, unknown> = {};
-    if (body.notes !== false) {
-      const plan = loadPlan(paths(root).tasks, paths(root).human);
-      const open = tasks.filter((id) => ['ready', 'needs_human', 'parked'].includes(plan.tasks.get(id)?.status ?? ''));
-      const changes: PlanChange[] = open.map((task) => ({ op: plan.tasks.get(task)!.status === 'ready' ? 'note' : 'hand_back', task, note: `Answer about ${about}: ${text}` }) as PlanChange);
-      out.applied = await applyChanges(root, changes, { what: `answer ${changes.length} question${changes.length === 1 ? '' : 's'} about ${about}`, by: OWNER(), source: `incident ${key}` });
-    }
-    if (body.spec) out.clarification = await addClarification(roots.real, about, text, tasks);
-    if (body.rule) out.rule = addRule(roots.real, { name: `spec questions about ${about}`, request: 'spec_plain', decide: 'helix' });
-    if (inc.fix) appendStored(paths(root).incidents, { type: 'decided', key, at: new Date().toISOString(), fix: inc.fix.id, decision: 'accepted' });
-    changed(which, 'incidents');
-    return out;
-  }
-
-  // Add the secret (spec §6.3): the value goes from this request straight to the keychain or GitHub, on standard
-  // input, and is never logged, stored or shown again. The tasks it stopped then go back to the loop.
-  async function addSecret(which: Which, body: Record<string, any>) {
-    const root = roots[which];
-    const name = String(body.name ?? '');
-    if (!/^[A-Z][A-Z0-9_]{2,}$/.test(name)) throw new HttpError(400, 'a secret name is upper case, like STRIPE_TEST_KEY');
-    const value = String(body.value ?? '');
-    if (!value || /\n/.test(value) || value.length > 10_000) throw new HttpError(400, 'paste the value on one line');
-    if (body.where === 'github') {
-      const repo = repoArg(loadConfig(root), body.repo);
-      const remote = await git(join(paths(root).repos, repo), 'remote', 'get-url', 'origin').catch(() => '');
-      const slug = /github\.com[:/](.+?)(\.git)?$/.exec(remote)?.[1];
-      if (!slug) throw new HttpError(409, `${repo} has no GitHub remote`);
-      const env = String(body.env ?? '').trim();
-      if (env && !/^[\w-]+$/.test(env)) throw new HttpError(400, 'an environment name, like production');
-      const r = await run('gh', ['secret', 'set', name, '--repo', slug, ...(env ? ['--env', env] : [])], { cwd: tmpdir(), stdin: value, timeoutMs: 60_000 });
-      if (r.code !== 0) throw new HttpError(409, `gh refused it: ${r.stderr.split(value).join('***').trim().slice(0, 300)}`);
-    } else {
-      const quote = (s: string) => `"${s.replace(/(["\\])/g, '\\$1')}"`;
-      const r = await run('security', ['-i'], { cwd: tmpdir(), stdin: `add-generic-password -U -s ${quote(`Helix Loop: ${name}`)} -a ${quote(name)} -w ${quote(value)}\n`, timeoutMs: 20_000 });
-      if (r.code !== 0 || /error/i.test(r.stderr)) throw new HttpError(409, `the keychain refused it: ${r.stderr.split(value).join('***').trim().slice(0, 200)}`);
-    }
-    const tasks: string[] = Array.isArray(body.tasks) ? body.tasks.map(String) : [];
-    const waiting = tasks.filter((id) => ['needs_human', 'parked'].includes(snap(which).plan.tasks.get(id)?.status ?? ''));
-    const handed = waiting.length ? await applyChanges(root, waiting.map((task) => ({ op: 'hand_back', task, note: `${name} is set now.` }) as PlanChange), { what: `hand back ${waiting.length} task${waiting.length === 1 ? '' : 's'}: ${name} is set`, by: OWNER() }) : undefined;
-    return { saved: name, where: body.where === 'github' ? 'github' : 'keychain', handed };
-  }
-
-  function addRule(root: string, r: Omit<Rule, 'id' | 'at'>): Rule {
-    const rules = readRules(root);
-    const rule: Rule = { id: `R-${Math.max(0, ...rules.map((x) => Number(x.id.slice(2)) || 0)) + 1}`, at: new Date().toISOString(), ...r };
-    const file = writeRules(root, [...rules.filter((x) => x.name.toLowerCase() !== r.name.toLowerCase()), rule]);
-    void commitFile(root, file, `Helix: rule ${rule.id}, ${rule.decide === 'helix' ? 'decide' : 'always ask about'} "${rule.name}" (${OWNER()}, in Helix Loop)`);
-    changed('real', 'config');
-    return rule;
-  }
-
-  async function commitFile(root: string, file: string, message: string) {
-    if (!existsSync(join(root, '.git'))) return false;
-    return commit(root, [relative(root, file)], message).catch(() => false);
   }
 
   // A builder's report_issue under a Pause or Notify rule (spec §10): its pass stops at once and the task waits
@@ -1066,7 +863,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     const kind = (({ plan_problem: 'scope_grew', flake: 'flaky_test' }) as Record<string, string>)[r.issue ?? ''] ?? r.issue;
     if (!(FEEDBACK_KINDS as readonly string[]).includes(kind ?? '')) return;
     const rule = feedbackRule(loadConfig(roots.real), kind as FeedbackKind, snap('real').plan.tasks.get(task)?.repo);
-    if (rule.pause) writeStopRequest(roots.real, task, { to: 'needs_human', why: `${kind!.replace('_', ' ')}: ${r.message.slice(0, 200)}` });
+    if (rule.pause) ops.writeStopRequest(roots.real, task, { to: 'needs_human', why: `${kind!.replace('_', ' ')}: ${r.message.slice(0, 200)}` });
     if (rule.notify && process.platform === 'darwin') {
       const msg = `${task}: ${r.message.slice(0, 140)}`.replace(/["\\]/g, '');
       spawn('osascript', ['-e', `display notification "${msg}" with title "Helix Loop: ${FEEDBACK_LABELS[kind as FeedbackKind].label}"`], { stdio: 'ignore', detached: true }).unref();
@@ -1092,75 +889,23 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   }
 
   async function startLoop(which: Which, body: Record<string, any>) {
-    const root = roots[which];
-    if (which === 'real' && loopStatus(root, snap('real').events).running) throw new HttpError(409, 'the loop is already running');
-    if (which === 'dry' && loopStatus(roots.dry, existsSync(paths(roots.dry).ledger) ? snapshot(roots.dry).events : []).running) throw new HttpError(409, 'a dry run is already running');
-    const agents: AgentName[] = Array.isArray(body.agents) ? body.agents.filter((a: string) => (AGENTS as readonly string[]).includes(a)) : [];
-    if (!agents.length) throw new HttpError(400, 'pick at least one agent');
-    if (which === 'real') {
-      // Builders only on a subscription, installed and working: the same check the loop makes before each pass.
-      const h = await health(loadConfig(root));
-      const bad = agents.filter((a) => !h.find((x) => x.agent === a)?.builder);
-      if (bad.length) throw new HttpError(409, `${bad.join(' and ')} can't build: see Settings › Agents`);
-    }
-    const max = Number(body.maxPasses);
-    let changesFile: string | undefined;
-    if (which === 'dry' && Array.isArray(body.configChanges) && body.configChanges.length) {
-      // Checked now against the real config, so a bad value fails here rather than in the dry run's log.
-      checkConfig(roots.real, applyToText(readFileSync(configFile(roots.real), 'utf8'), body.configChanges));
-      changesFile = join(paths(opts.root).runs, 'dry-run-config.json');
-      writeFileSync(changesFile, JSON.stringify(body.configChanges));
-    }
-    let planFile: string | undefined;
-    if (which === 'dry' && Array.isArray(body.planChanges) && body.planChanges.length) {
-      planFile = join(paths(opts.root).runs, 'dry-run-plan.json');
-      writeFileSync(planFile, JSON.stringify(body.planChanges));
-    }
-    const args = [BIN, 'run', '--root', opts.root, '--agents', agents.join(','), ...(max > 0 ? ['--max-passes', String(Math.floor(max))] : []), ...(which === 'dry' ? ['--dry-run'] : []), ...(changesFile ? ['--config-changes', changesFile] : []), ...(planFile ? ['--plan-changes', planFile] : [])];
-    // The log sits outside the dry run's root, which each dry run replaces.
-    const logFile = join(paths(opts.root).runs, which === 'dry' ? 'dry-run.log' : 'loop.log');
-    const fd = openSync(logFile, 'a');
-    const child = spawn(process.execPath, args, { cwd: opts.root, detached: true, stdio: ['ignore', fd, fd] });
-    child.unref();
-    closeSync(fd);
+    const r = await ops.startLoop(opts.root, which, {
+      agents: Array.isArray(body.agents) ? body.agents.filter((a: string) => (AGENTS as readonly string[]).includes(a)) : [],
+      maxPasses: Number(body.maxPasses),
+      configChanges: Array.isArray(body.configChanges) ? body.configChanges : undefined,
+      planChanges: Array.isArray(body.planChanges) ? body.planChanges : undefined,
+    });
     changed(which, 'loop');
-    return { pid: child.pid, log: relative(opts.root, logFile) };
-  }
-
-  function logPath(rel: string): string {
-    const clean = normalize(rel);
-    if (!/^runs\/logs\/[\w./-]+\.log(\.gz)?$/.test(clean) || clean.includes('..')) throw new HttpError(400, 'not a pass log');
-    return clean;
-  }
-
-  function readLog(root: string, rel: string): string {
-    const clean = logPath(rel);
-    const file = [logFile(root, clean), logFile(root, `${clean}.gz`)].find((f) => existsSync(f));
-    if (!file) throw new HttpError(404, 'that log is gone');
-    const buf = readFileSync(file);
-    const s = (file.endsWith('.gz') ? gunzipSync(buf) : buf).toString('utf8');
-    return s.length > 2_000_000 ? `… (the first ${s.length - 2_000_000} characters are left out)\n${s.slice(-2_000_000)}` : s;
-  }
-
-  // The end of a pass log's gate output: from its last gate run, without the builder's event lines.
-  function gateTail(root: string, rel: string): string {
-    let s: string;
-    try {
-      s = readLog(root, rel);
-    } catch {
-      return '';
-    }
-    const at = s.lastIndexOf('> gate ');
-    return (at >= 0 ? s.slice(at) : s).split('\n').filter((l) => !l.startsWith('{')).slice(-40).join('\n').slice(-4000);
+    return r;
   }
 
   async function commitDiff(root: string, repo: string, sha: string): Promise<string> {
     if (!/^[0-9a-f]{7,40}$/.test(sha)) throw new HttpError(400, 'not a commit');
-    return (await exec('git', ['show', '--stat', '--patch', '--format=fuller', sha], { cwd: join(paths(root).repos, repoArg(loadConfig(root), repo)), maxBuffer: 20_000_000 })).stdout.slice(0, 1_500_000);
+    return (await exec('git', ['show', '--stat', '--patch', '--format=fuller', sha], { cwd: join(paths(root).repos, ops.repoArg(loadConfig(root), repo)), maxBuffer: 20_000_000 })).stdout.slice(0, 1_500_000);
   }
 
   async function releaseFiles(root: string, repo: string, tag: string) {
-    const a = pendingApprovals(paths(root).approvals, repoArg(loadConfig(root), repo)).find((x) => x.approval.tag === tag)?.approval;
+    const a = pendingApprovals(paths(root).approvals, ops.repoArg(loadConfig(root), repo)).find((x) => x.approval.tag === tag)?.approval;
     if (!a) throw new HttpError(404, `${repo} ${tag} is not waiting for approval`);
     const dir = join(paths(root).repos, repo);
     const stat = (await exec('git', ['diff', '--numstat', a.since, a.commit], { cwd: dir, maxBuffer: 20_000_000 })).stdout.trim();
@@ -1175,16 +920,10 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   const which = (root: string): Which => (root === roots.dry ? 'dry' : 'real');
 
   async function releaseFileDiff(root: string, repo: string, tag: string, file: string): Promise<string> {
-    const a = pendingApprovals(paths(root).approvals, repoArg(loadConfig(root), repo)).find((x) => x.approval.tag === tag)?.approval;
+    const a = pendingApprovals(paths(root).approvals, ops.repoArg(loadConfig(root), repo)).find((x) => x.approval.tag === tag)?.approval;
     if (!a) throw new HttpError(404, `${repo} ${tag} is not waiting for approval`);
     if (!file || file.includes('..')) throw new HttpError(400, 'not a file');
     return (await exec('git', ['diff', a.since, a.commit, '--', file], { cwd: join(paths(root).repos, repo), maxBuffer: 20_000_000 })).stdout.slice(0, 1_000_000);
-  }
-
-  async function remoteUrl(root: string, repo: string): Promise<string | undefined> {
-    const u = await git(join(paths(root).repos, repo), 'remote', 'get-url', 'origin').catch(() => '');
-    const slug = /github\.com[:/](.+?)(\.git)?$/.exec(u)?.[1];
-    return slug ? `https://github.com/${slug}` : undefined;
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -1208,33 +947,8 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   };
 }
 
-const pendingNotes = (root: string) => join(paths(root).runs, 'pending-notes.jsonl');
-const loadPlanFresh = (root: string) => snapshot(root).plan;
-
-// A stop request the loop picks up (runs/stop-pass/<task>.json), written whole: a temp name, then a rename.
-function writeStopRequest(root: string, task: string, r: { to: 'ready' | 'needs_human'; note?: string; why?: string }): void {
-  const dir = paths(root).stopPass;
-  mkdirSync(dir, { recursive: true });
-  const tmp = join(dir, `.${task}.tmp`);
-  writeFileSync(tmp, JSON.stringify({ at: new Date().toISOString(), ...r }));
-  renameSync(tmp, join(dir, `${task}.json`));
-}
-
-// A human task's steps: the numbered lines under "Steps:" in its handoff prompt.
-export function stepsOf(h: HumanTask): string[] {
-  const p = h.handoff_prompt ?? '';
-  const at = p.search(/^Steps:\s*$/m);
-  if (at < 0) return [];
-  const out: string[] = [];
-  for (const line of p.slice(at).split('\n').slice(1)) {
-    const m = /^\s*(\d+)\.\s+(.*)$/.exec(line);
-    if (m) out.push(m[2]!.trim());
-    else if (out.length && line.trim() === '') break;
-    else if (out.length && /^\s{2,}\S/.test(line)) out[out.length - 1] += ` ${line.trim()}`;
-  }
-  return out;
-}
-const doneSteps = (h: HumanTask) => (/^Steps done: (.*)$/m.exec(h.notes ?? '')?.[1] ?? '').split(',').map((x) => Number(x.trim())).filter((n) => n > 0);
+// Kept here too for the callers that read a human task's steps from the server's module.
+export { stepsOf } from '../ops/plan.ts';
 
 // Failures per hour over the incident's span, at most three days back, for its chart.
 function hourly(times: number[], now: number): { start: number; counts: number[] } {
@@ -1245,19 +959,6 @@ function hourly(times: number[], now: number): { start: number; counts: number[]
   for (const t of times) if (t >= start) counts[Math.min(n - 1, Math.floor((t - start) / 3_600_000))]!++;
   return { start, counts };
 }
-
-const changeSet = (raw: unknown): ChangeSet[] => {
-  if (!Array.isArray(raw) || !raw.length) throw new HttpError(400, 'nothing to apply');
-  return raw.map((c: { key?: unknown; value?: unknown }) => ({ key: String(c.key), value: c.value }));
-};
-const repoArg = (config: Config, r: unknown) => {
-  if (!config.repos[String(r)]) throw new HttpError(400, `not a repo: ${String(r)}`);
-  return String(r);
-};
-const agentArg = (a: unknown): AgentName => {
-  if (!(AGENTS as readonly string[]).includes(String(a))) throw new HttpError(400, `not an agent: ${String(a)}`);
-  return a as AgentName;
-};
 
 function reply(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(JSON.stringify(body));

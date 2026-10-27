@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { claudeAdapter } from '../../agents/claude.ts';
 import { codexAdapter } from '../../agents/codex.ts';
@@ -22,6 +22,8 @@ import { loadPlan } from '../../plan/store.ts';
 import { describeBase, pendingApprovals } from '../../release.ts';
 import { buildStats, formatStats } from '../../stats.ts';
 import { AGENTS } from '../../types.ts';
+import * as ops from '../../ops/index.ts';
+import { withCli } from '../../ops/actor.ts';
 import { define, str, UsageError } from '../command.ts';
 import { currentMap, paceLine, when } from '../shared.ts';
 
@@ -96,10 +98,7 @@ const stop = define({
   group: 'The loop',
   summary: 'Stop the loop gracefully: no new passes, and it exits once the running ones end',
   run({ root, out }) {
-    const p = paths(root);
-    if (!loopStatus(root, readLedger(p.ledger)).running) throw new UsageError('The loop is not running.');
-    mkdirSync(p.runs, { recursive: true });
-    writeFileSync(p.stopFile, '');
+    ops.stopLoop(root);
     out('Stopping: the loop starts no new passes and exits when the running ones end.');
   },
 });
@@ -109,9 +108,7 @@ const pause = define({
   group: 'The loop',
   summary: 'Pause new passes; running passes finish, and the loop waits instead of exiting',
   run({ root, out }) {
-    const p = paths(root);
-    mkdirSync(p.runs, { recursive: true });
-    writeFileSync(p.pause, `paused by ${ownerOf(root)}, with helix-loop pause\n`);
+    ops.setPaused(root, true, withCli(root));
     out('New passes are paused. Running passes finish. `helix-loop resume` starts them again.');
   },
 });
@@ -121,7 +118,7 @@ const resume = define({
   group: 'The loop',
   summary: 'Let the loop start new passes again',
   run({ root, out }) {
-    rmSync(paths(root).pause, { force: true });
+    ops.setPaused(root, false, withCli(root));
     out('New passes can start again.');
   },
 });
