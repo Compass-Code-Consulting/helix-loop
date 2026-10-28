@@ -1,15 +1,11 @@
-// Shared data shapes for the loop. Plan files (plan/tasks/*.yaml, plan/human/*.yaml) are validated
-// against plan/schema/*.json, which must stay in step with these types.
+// Shared data shapes for the loop. Plan files (plan/taskset.yaml, plan/milestones.yaml, plan/tasks/*.yaml,
+// plan/human/*.yaml) are validated against schema/*.json, which must stay in step with these types.
 
 export const AGENTS = ['claude', 'codex'] as const;
 export type AgentName = (typeof AGENTS)[number];
 
 // A product repo the loop builds: a key of the project config's `repos`, which says how to gate it.
 export type RepoName = string;
-
-// A milestone of the plan, in the order the TaskSet declares (plan/stages.ts). Optional: a plan without
-// stages has no stage gating.
-export type Stage = string;
 
 export type TaskStatus = 'ready' | 'claimed' | 'done' | 'needs_human' | 'parked';
 
@@ -48,15 +44,17 @@ export interface Attempt {
 export interface Task {
   id: string; // T-0001
   repo: RepoName;
-  stage?: Stage; // the milestone it belongs to, when the plan has stages
+  story: string; // the user story it serves (plan/taskset.yaml); its feature, epic and lane follow
   area: string; // module the task owns; two agents never hold the same area at once
-  feature?: string; // product area the plan documents group it under (a planner's name in plan/planners.yaml)
-  epic?: string; // the epic's key in its lane in plan/taskset.yaml; the lane is the task's repo
   title: string;
   reqs: string[];
   spec: string[]; // section headings or requirement IDs, resolved through spec/index.json
   acceptance: string[];
   blocked_by: string[]; // T-#### or HT-##
+  // Written by the Milestones step. placeholder_for: built before these tasks, against a placeholder (they are
+  // not in blocked_by). wires: the follow-up that replaces those tasks' placeholders with the real thing.
+  placeholder_for?: string[];
+  wires?: string[];
   estimate_passes: number;
   priority?: 'fix_first' | 'normal';
   // Pins the task to one agent and picks which of that agent's models runs it (config `models`).
@@ -77,6 +75,7 @@ export type HumanStatus = 'todo' | 'in_progress' | 'done';
 export interface HumanTask {
   id: string; // HT-01
   title: string;
+  story?: string; // the user story it clearly serves; human tasks stay outside the hierarchy and the milestones
   done_check: string;
   lead_time_days: number;
   agent_can_help: 'yes' | 'partly' | 'no';
@@ -88,12 +87,71 @@ export interface HumanTask {
   notes?: string; // what the owner recorded: the evidence a step is done, or why it waits
 }
 
+// ---- The TaskSet's hierarchy (plan/taskset.yaml, plan/taskset.ts): Lane › Epic › Feature › Story › Task ----
+
+export type Timeline = 'code' | 'project';
+export type Level = 'lane' | 'epic' | 'feature' | 'story';
+
+export interface StoryDef {
+  key: string; // unique across the TaskSet, like every key below the lane
+  title: string;
+  need: string; // "As a …, I want …, so that …"
+  feature: string;
+  epic: string;
+  lane: string;
+}
+
+export interface FeatureDef {
+  key: string;
+  title: string;
+  capability?: string;
+  epic: string;
+  lane: string;
+  stories: string[]; // in reading order
+}
+
+export interface EpicDef {
+  key: string;
+  title: string;
+  outcome: string;
+  lane: string;
+  features: string[];
+}
+
+export interface LaneDef {
+  key: string;
+  repo: RepoName;
+  epics: string[];
+}
+
+export interface TaskSetDef {
+  revision: number;
+  milestonesFile?: string; // as taskset.yaml names it; absent in revision 1, before Milestones are planned
+  timelines: Timeline[];
+  lanes: LaneDef[]; // in reading order; YAML order says nothing about delivery
+  epics: Map<string, EpicDef>;
+  features: Map<string, FeatureDef>;
+  stories: Map<string, StoryDef>;
+}
+
+// ---- Helix Milestones (plan/milestones.yaml, plan/milestones.ts): the delivery order ----
+
+export interface MilestoneDef {
+  key: string;
+  title: string;
+  demo: string; // what the owner can see or do once it is reached
+  features: string[]; // every story of these features…
+  stories: string[]; // …plus these stories, taken from a feature placed later…
+  tasks: string[]; // …plus these tasks, taken from a story placed elsewhere
+}
+
 export interface Plan {
   tasks: Map<string, Task>;
   human: Map<string, HumanTask>;
-  // The plan's stages in order, from the TaskSet; when absent, those its tasks name (plan/stages.ts stagesOf).
-  stages?: Stage[];
-  stageTitles?: Record<Stage, string>;
+  // Read beside the tasks (plan/store.ts loadPlan): the hierarchy, when taskset.yaml reads as version 2, and the
+  // milestones in delivery order, when milestones.yaml exists. Validation reports a plan without either.
+  taskset?: TaskSetDef;
+  milestones?: MilestoneDef[];
 }
 
 // ---- Dependency map: computed by map/graph.ts, rendered by map/render.ts ----
@@ -108,7 +166,7 @@ export interface MapNode {
   kind: 'task' | 'human';
   lane: RepoName | 'human';
   title: string;
-  stage?: Stage;
+  milestone?: string; // tasks only: its milestone's title
   area?: string;
   status: TaskStatus | HumanStatus;
   summary?: string; // tasks only: Task.summary

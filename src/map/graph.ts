@@ -1,3 +1,4 @@
+import { membership, milestoneRank } from '../plan/milestones.ts';
 import type { LoopMode, MapAgent, MapModel, MapNode, Plan } from '../types.ts';
 
 // The dependency map (design doc §7.1): a DAG of every task and human task, with a forward pass
@@ -15,14 +16,17 @@ const EPS = 1e-6;
 
 export function computeMap(plan: Plan, opts: MapOptions): MapModel {
   const nodes = new Map<string, MapNode>();
+  const member = membership(plan);
+  const milestoneTitle = new Map((plan.milestones ?? []).map((m) => [m.key, m.title]));
   for (const t of plan.tasks.values()) {
+    const milestone = milestoneTitle.get(member.of.get(t.id) ?? '');
     const mergedBy = [...t.attempts].reverse().find((a) => a.outcome === 'merged')?.agent ?? null;
     nodes.set(t.id, {
       id: t.id,
       kind: 'task',
       lane: t.repo,
       title: t.title,
-      stage: t.stage,
+      ...(milestone ? { milestone } : {}),
       area: t.area,
       status: t.status,
       ...(t.summary ? { summary: t.summary } : {}),
@@ -176,8 +180,9 @@ function topoOrder(nodes: Map<string, MapNode>): string[] {
   return out;
 }
 
-// Scheduling rank (design doc §7.1), best first: fix-first, critical path, least slack, then the
-// task that unblocks the most downstream work. Ties break on id so runs are reproducible.
+// Scheduling rank (design doc §7.1), best first: fix-first, then the earliest milestone not yet reached (a task's
+// milestone: one already reached has no open work), then the critical path, least slack, and the task that
+// unblocks the most downstream work. Ties break on id so runs are reproducible.
 export function rankTasks(model: MapModel, plan: Plan): string[] {
   const byId = new Map(model.nodes.map((n) => [n.id, n]));
   const downstream = new Map<string, number>();
@@ -195,11 +200,12 @@ export function rankTasks(model: MapModel, plan: Plan): string[] {
     downstream.set(id, seen.size);
     return seen.size;
   };
+  const milestone = milestoneRank(plan);
   return [...plan.tasks.values()]
     .map((t) => {
       const n = byId.get(t.id)!;
-      return { id: t.id, fix: t.priority === 'fix_first' ? 0 : 1, crit: n.critical ? 0 : 1, slack: n.slack, down: countDown(t.id) };
+      return { id: t.id, fix: t.priority === 'fix_first' ? 0 : 1, ms: milestone.get(t.id)!, crit: n.critical ? 0 : 1, slack: n.slack, down: countDown(t.id) };
     })
-    .sort((a, b) => a.fix - b.fix || a.crit - b.crit || a.slack - b.slack || b.down - a.down || a.id.localeCompare(b.id))
+    .sort((a, b) => a.fix - b.fix || a.ms - b.ms || a.crit - b.crit || a.slack - b.slack || b.down - a.down || a.id.localeCompare(b.id))
     .map((r) => r.id);
 }

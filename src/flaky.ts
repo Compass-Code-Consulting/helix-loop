@@ -90,9 +90,9 @@ export function fixTaskFor(input: { id: string; signature: string; failures: Fai
   return {
     id: input.id,
     repo: input.first.repo,
-    stage: input.first.stage,
+    // The first failing task's story: the same lane, and its milestone, though fix-first work runs before any.
+    story: input.first.story,
     area: 'build/flaky',
-    feature: input.first.feature,
     title: `The ${kind} "${clip(test.title, 80)}" passes every time, instead of failing unrelated tasks`,
     priority: 'fix_first',
     reqs,

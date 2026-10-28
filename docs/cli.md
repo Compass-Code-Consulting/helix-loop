@@ -20,7 +20,7 @@ Commands act on the project around the current folder: the nearest folder up wit
 ## Commands
 
 - **Start a project:** [`init`](#helix-loop-init), [`doctor`](#helix-loop-doctor), [`skill install`](#helix-loop-skill-install), [`skill`](#helix-loop-skill), [`skill pack`](#helix-loop-skill-pack), [`migrate`](#helix-loop-migrate)
-- **Spec and TaskSet:** [`spec index`](#helix-loop-spec-index), [`spec sections`](#helix-loop-spec-sections), [`validate`](#helix-loop-validate), [`plan render`](#helix-loop-plan-render), [`plan map`](#helix-loop-plan-map), [`taskset`](#helix-loop-taskset), [`taskset init`](#helix-loop-taskset-init), [`taskset import`](#helix-loop-taskset-import)
+- **Spec and TaskSet:** [`spec index`](#helix-loop-spec-index), [`spec sections`](#helix-loop-spec-sections), [`validate`](#helix-loop-validate), [`plan render`](#helix-loop-plan-render), [`plan map`](#helix-loop-plan-map), [`taskset`](#helix-loop-taskset), [`taskset history`](#helix-loop-taskset-history), [`taskset import`](#helix-loop-taskset-import), [`milestones`](#helix-loop-milestones), [`milestones check`](#helix-loop-milestones-check), [`milestones apply`](#helix-loop-milestones-apply)
 - **The loop:** [`run`](#helix-loop-run), [`stop`](#helix-loop-stop), [`pause`](#helix-loop-pause), [`resume`](#helix-loop-resume), [`status`](#helix-loop-status), [`stats`](#helix-loop-stats), [`metrics`](#helix-loop-metrics), [`pass stop`](#helix-loop-pass-stop), [`watch`](#helix-loop-watch), [`log`](#helix-loop-log)
 - **Tasks:** [`tasks`](#helix-loop-tasks), [`task`](#helix-loop-task), [`task hand-back`](#helix-loop-task-hand-back), [`task park`](#helix-loop-task-park), [`task note`](#helix-loop-task-note), [`task notes`](#helix-loop-task-notes), [`task dep add`](#helix-loop-task-dep-add), [`task dep remove`](#helix-loop-task-dep-remove)
 - **Human tasks:** [`human`](#helix-loop-human), [`human start`](#helix-loop-human-start), [`human done`](#helix-loop-human-done), [`human step`](#helix-loop-human-step), [`human snooze`](#helix-loop-human-snooze), [`human prompt`](#helix-loop-human-prompt)
@@ -179,14 +179,15 @@ helix-loop spec sections [filter] [options]
 
 ### helix-loop validate
 
-Check the plan: schemas, dependencies, repos, coverage, prompt sizes, state
+Check the plan: schemas, the TaskSet, the milestones, dependencies, coverage, prompt sizes, state
 
 ```
 helix-loop validate [options]
 ```
 
-Runs every check the loop runs before it starts: each task and human task against the schemas, every dependency resolving with no cycles and no task waiting on a later stage, each task's repo in the config, every requirement claimed by a task (or deferred), each task's prompt within its budget, and claim state that makes sense.
-Exits 0 when the plan is clean, 1 when it has problems.
+Runs every check the loop runs before it starts: the TaskSet, its milestones, and each task and human task against their schemas; the hierarchy, Lane › Epic › Feature › Story › Task, with every task in a declared story of the lane that builds its repo; the milestones, which place every task exactly once, never make a task wait on a later milestone, and wire each placeholder in once; every dependency resolving with no cycles; each task's repo in the config; every requirement claimed by a task (or deferred); each task's prompt within its budget; and claim state that makes sense.
+Warnings (a level outside its usual size, a milestone left empty) are printed but don't fail.
+Exits 0 when the plan has no errors, 1 when it has.
 
 | Option | What it does |
 | --- | --- |
@@ -200,7 +201,7 @@ Write the Implementation Plan, the Human Implementation Plan and the dependency 
 helix-loop plan render
 ```
 
-Writes .helix/plan/ImplementationPlan.md (Lane › Epic › Task), HumanImplementationPlan.md (the steps only the owner can do, with start-by dates) and DependencyMap.html, from the plan as it stands.
+Writes .helix/plan/ImplementationPlan.md (the milestones in delivery order, then Lane › Epic › Feature › Story › Task), HumanImplementationPlan.md (the steps only the owner can do, with start-by dates) and DependencyMap.html, from the plan as it stands.
 The app and Helix run this after every plan change; never edit those files by hand.
 
 ### helix-loop plan map
@@ -216,26 +217,34 @@ It opens in any browser, with no app running; the app's Map is the live version.
 
 ### helix-loop taskset
 
-Show the TaskSet: lanes, their epics in order, and how far each has got
+Show the TaskSet: Lane › Epic › Feature › Story, and how far each has got
 
 ```
 helix-loop taskset [options]
 ```
 
+Lists the lanes, their epics and features, with the tasks done in each; --stories adds the stories.
+--json gives the whole hierarchy, each story with its tasks and the stories it waits on (through its tasks' dependencies), which the Helix skill reads to plan milestones.
+
+| Option | What it does |
+| --- | --- |
+| `--stories` | List the stories too |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop taskset history
+
+The TaskSet's revisions: when each became current, who made it and why
+
+```
+helix-loop taskset history [options]
+```
+
+Reads .helix/plan/history/index.yaml.
+Each superseded revision is kept whole in .helix/plan/history/r<N>/: its taskset.yaml, milestones.yaml, tasks/ and human/ as they were when it was replaced.
+
 | Option | What it does |
 | --- | --- |
 | `--json` | Machine-readable output, for commands that list or show something. |
-
-### helix-loop taskset init
-
-Write taskset.yaml for a plan that has none, one epic per lane and feature
-
-```
-helix-loop taskset init
-```
-
-For a plan written before TaskSets: writes .helix/plan/taskset.yaml with its stages, both timelines, and one epic per lane and feature, and sets each task's epic.
-Rename, split and merge the epics afterwards (keep each task's epic in step), or regroup the plan properly with the Helix skill and `helix-loop taskset import`.
 
 ### helix-loop taskset import
 
@@ -245,8 +254,10 @@ Check a TaskSet from the Helix skill and bring it into the plan
 helix-loop taskset import <path> [options]
 ```
 
-Takes a TaskSet folder (taskset.yaml, tasks/, human/, or a plan/ folder holding them) or a zip of one.
-It is checked against the schemas and its dependency graph, then compared with the running plan: what it adds, what it removes (only tasks nobody has started), and the tasks it keeps as they are because they are merged, running or attempted.
+Takes a TaskSet folder (taskset.yaml, tasks/, human/, and milestones.yaml when it has them; or a plan/ folder holding them) or a zip of one.
+It is checked against the schemas, the hierarchy and its dependency graph, then compared with the running plan: what it adds, what it removes (only tasks nobody has started), and the tasks it keeps as they are because they are merged, running or attempted.
+Applied, it becomes the TaskSet's next revision, and the one it replaces is kept in .helix/plan/history/.
+A TaskSet without milestones.yaml leaves the plan without a delivery order until `helix-loop milestones apply`: the loop doesn't run until then.
 Nothing is written without --apply (one commit) or --dry-run (into the dry run, to watch it with the fake agents first).
 
 | Argument | What it is |
@@ -265,6 +276,80 @@ Examples:
 helix-loop taskset import ~/Downloads/helix-taskset.zip
 # Bring it into the plan
 helix-loop taskset import ./taskset --apply
+```
+
+### helix-loop milestones
+
+The milestones in delivery order, with their progress and projected dates
+
+```
+helix-loop milestones [options]
+```
+
+Lists Helix Milestones (.helix/plan/milestones.yaml): each named, demoable outcome, the tasks done of those in it, and when it was reached or is projected to be, at the slots the loop has now.
+Milestones are a priority, not a gate: the loop prefers ready work in the earliest milestone not yet reached, and takes later work when nothing earlier is ready.
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop milestones check
+
+Check a Milestones proposal, or the plan's own, listing every dependency that points forward
+
+```
+helix-loop milestones check [folder] [options]
+```
+
+Checks a proposal folder (milestones.yaml, with the tasks/ it adds or changes and a taskset.yaml when it moves stories) against the project's plan, or the plan's own milestones when no folder is given.
+Every task must be in exactly one milestone, by its id, its story or its feature, most specific first.
+No task may wait on a task in a later milestone: each such dependency is listed with the two ways to resolve it.
+Pull it forward: name the dependency (and what it waits on in later milestones) in the same milestone or an earlier one.
+Or build against a placeholder: the waiting task names the dependency in placeholder_for instead of blocked_by, its description and acceptance say what the placeholder does, and a wiring task (wires: [it], blocked_by: it and the dependency) goes in the dependency's milestone or later.
+Exits 0 when the milestones would apply, 1 when they wouldn't.
+
+| Argument | What it is |
+| --- | --- |
+| `folder` | A Milestones proposal folder; the plan's own milestones when left out (optional) |
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+Examples:
+
+```sh
+# Check a proposal before applying it
+helix-loop milestones check ./milestones
+# The plan's own milestones, as JSON
+helix-loop milestones check --json
+```
+
+### helix-loop milestones apply
+
+Apply a Milestones proposal: the TaskSet's next revision, the old one kept in history
+
+```
+helix-loop milestones apply <folder> [options]
+```
+
+Checks the proposal as `helix-loop milestones check` does; nothing is written while anything is wrong.
+Then the TaskSet as it stands (taskset.yaml, tasks/, human/) is kept in .helix/plan/history/r<N>/, never edited again, and revision N+1 is written in place: the milestones, the tasks the proposal changes (placeholders) and adds (wiring tasks), and an entry in .helix/plan/history/index.yaml, as one commit.
+A running loop takes the new revision on its next round.
+
+| Argument | What it is |
+| --- | --- |
+| `folder` | The proposal: milestones.yaml, and the tasks/ (and taskset.yaml) it brings |
+
+| Option | What it does |
+| --- | --- |
+| `--why <text>` | Why, for the history (default: the milestones and placeholders it adds) |
+
+Examples:
+
+```sh
+# Apply the proposal the Helix skill wrote
+helix-loop milestones apply ./milestones
 ```
 
 ## The loop
@@ -444,7 +529,7 @@ helix-loop log T-0042 --attempt 1 --raw | less
 
 ### helix-loop tasks
 
-The tasks: the open ones by default, filtered by status, lane, epic or stage
+The tasks: the open ones by default, filtered by status, where they sit, or milestone
 
 ```
 helix-loop tasks [options]
@@ -457,9 +542,9 @@ By default only open tasks show; --all adds the done ones.
 | Option | What it does |
 | --- | --- |
 | `--status <list>` | Only these states, comma-separated: ready, waiting, claimed, needs_human, parked, done |
-| `--lane <repo>` | Only this lane (repo) |
-| `--epic <key>` | Only this epic |
-| `--stage <stage>` | Only this stage |
+| `--lane <key>` | Only this lane (its key, or the repo it builds) |
+| `--under <key>` | Only the tasks under this epic, feature or story |
+| `--milestone <key>` | Only this milestone |
 | `--ready` | Only tasks that can start now |
 | `--failing` | Only open tasks whose last attempt failed |
 | `--grep <text>` | Only tasks whose id, title or area holds this text |
@@ -485,7 +570,7 @@ Everything about one task: why it stopped, its attempts, notes and dependencies
 helix-loop task <id> [options]
 ```
 
-Shows one task: its state, lane, epic and stage, why it stopped, each attempt and how it ended, its notes, what it waits on and what waits on it, its commits once merged, and what it cost.
+Shows one task: its state, where it sits (Lane › Epic › Feature › Story) and its milestone, any placeholder it builds against or wires in, why it stopped, each attempt and how it ended, its notes, what it waits on and what waits on it, its commits once merged, and what it cost.
 A human task's id (HT-##) shows that task, as `helix-loop human show` does.
 
 | Argument | What it is |

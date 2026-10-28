@@ -27,7 +27,8 @@ import { Semaphore } from './semaphore.ts';
 import type { Notifier } from './notify.ts';
 import { atomicWrite, loadPlan, writeTask } from './plan/store.ts';
 import { clipNote, clipSummary, firstLine } from './summary.ts';
-import { validateGraph, validateReleaseHolds, validateRepos, validateSchemas, validateState } from './plan/validate.ts';
+import { membership, reachedBy } from './plan/milestones.ts';
+import { errorsOnly, validateGraph, validateHierarchy, validateMilestones, validateReleaseHolds, validateRepos, validateSchemas, validateState, validateStructure } from './plan/validate.ts';
 import { BUILDER_NICE, run } from './proc.ts';
 import { loadTemplate, PromptOverBudget, renderPrompt, type CarriedWork } from './prompt.ts';
 import { conflictCount, countedAttempts, onlyHumanWorkLeft, pick } from './sched/scheduler.ts';
@@ -92,6 +93,8 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
     const problems = [...validateSchemas(p.schema, p.tasks, p.human)];
     const plan = loadPlan(p.tasks, p.human);
     problems.push(...validateGraph(plan), ...validateRepos(plan, config.repos), ...validateState(plan), ...validateReleaseHolds(plan, config.release.hold_until));
+    // The TaskSet's hierarchy and the milestones: a plan without milestones has no delivery order, and is refused.
+    problems.push(...errorsOnly([...validateHierarchy(plan, config.repos), ...validateMilestones(plan)]));
     if (problems.length) {
       for (const x of problems.slice(0, 30)) log(`plan: ${x.id}: ${x.message}`);
       notify('The loop', `Plan is invalid (${problems.length} problems). Run: helix-loop validate`);
@@ -328,7 +331,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
         const diverged = [...ctx.diverged.keys()];
         const why = diverged.length
           ? `main has diverged from origin/main in ${diverged.join(', ')}; reconcile it, then run the loop again`
-          : onlyHumanWorkLeft(plan) ? 'only work that needs a person is left' : 'no task is ready (blocked, or its stage is not open)';
+          : onlyHumanWorkLeft(plan) ? 'only work that needs a person is left' : 'no task is ready: each waits on other work';
         notify('The loop needs you', why);
         return finish(EXIT.onlyHumanWork, why);
       }
@@ -1034,9 +1037,9 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
   const fixed = outcome === 'merged' ? filedFor(task) : undefined;
   if (fixed) ctx.failures.delete(fixed);
   if (outcome === 'merged') {
-    const closed = task.stage ? await stageRelease(ctx, task.stage) : false;
-    if (closed) ctx.refreshMap(task.id); // the stage's snapshot, committed with it
-    await commitPlan(ctx, `plan: ${task.id} done (${agent})${closed ? `; stage ${task.stage} closed` : ''}`, closed);
+    const reached = await milestoneReached(ctx, task);
+    if (reached) ctx.refreshMap(task.id); // the milestone's snapshot, committed with it
+    await commitPlan(ctx, `plan: ${task.id} done (${agent})${reached ? `; milestone ${reached.key} reached` : ''}`, !!reached);
   }
 }
 
@@ -1142,21 +1145,28 @@ async function checkpointRelease(ctx: PassContext, repo: string): Promise<void> 
   if (merges >= every) await tagRelease(ctx, repo, unreleased(ctx.deps.paths.ledger, repo), `Checkpoint every ${every} tasks`);
 }
 
-// Stage release: when the last task of a §21 stage is done, every repo with unreleased work is tagged.
-// Called after the task's status is final; the status updates are synchronous, so exactly the last
-// task of the stage to finish sees it closed. Says whether it did.
-async function stageRelease(ctx: PassContext, stage: string): Promise<boolean> {
-  const inStage = [...ctx.plan.tasks.values()].filter((t) => t.stage === stage);
-  if (!inStage.length || inStage.some((t) => t.status !== 'done')) return false;
+// Milestone release: when the last task of a milestone is done, each lane it touched with unreleased work is tagged,
+// and Home says so, with the milestone's demo to review. The loop doesn't pause: the next milestone's work goes on.
+// Called after the task's status is final; the status updates are synchronous, so exactly the last task of the
+// milestone to finish sees it reached. Returns the milestone it reached.
+async function milestoneReached(ctx: PassContext, task: Task) {
+  const m = reachedBy(ctx.plan, task.id);
+  if (!m) return undefined;
+  const { paths: p, clock, log, notify } = ctx.deps;
+  const members = membership(ctx.plan).tasks.get(m.key) ?? [];
+  const repos = [...new Set(members.map((id) => ctx.plan.tasks.get(id)!.repo))].filter((r) => ctx.deps.config.repos[r]);
+  record(p.ledger, { kind: 'milestone', at: iso(clock.now()), key: m.key, title: m.title, demo: m.demo, repos });
+  log(`🏁 milestone reached: ${m.title}`);
+  notify('Milestone reached', `${m.title}. Review it: ${m.demo}`);
   await Promise.all(
-    Object.keys(ctx.deps.config.repos).map((repo) =>
+    repos.map((repo) =>
       ctx.queue.enqueue(repo, async () => {
-        const ids = unreleased(ctx.deps.paths.ledger, repo);
-        if (ids.length) await tagRelease(ctx, repo, ids, `Stage ${stage} closed`);
+        const ids = unreleased(p.ledger, repo);
+        if (ids.length) await tagRelease(ctx, repo, ids, `Milestone reached: ${m.title}`);
       }),
     ),
   );
-  return true;
+  return m;
 }
 
 // Planning continues while the loop runs, and every change must validate before it is taken: new task
@@ -1169,6 +1179,7 @@ const idle = (t: Task) => IDLE.includes(t.status) && !t.claimed_by;
 const canonical = (v: unknown): unknown =>
   Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canonical((v as Record<string, unknown>)[k])])) : v;
 const sameTask = (a: Task, b: Task) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+const structureOf = (plan: Plan) => JSON.stringify([plan.taskset && { ...plan.taskset, epics: [...plan.taskset.epics], features: [...plan.taskset.features], stories: [...plan.taskset.stories] }, plan.milestones]);
 
 function reloadPlan(ctx: PassContext): void {
   const { paths: p, log } = ctx.deps;
@@ -1201,15 +1212,20 @@ function reloadPlan(ctx: PassContext): void {
     }
   }
   const humanChanged = JSON.stringify([...fresh.human]) !== JSON.stringify([...ctx.plan.human]);
-  if (!added.length && !changed.length && !humanChanged) return;
+  // A new TaskSet revision or new milestones (helix-loop milestones apply) come in whole, with the tasks they change.
+  const structureChanged = structureOf(fresh) !== structureOf(ctx.plan);
+  if (!added.length && !changed.length && !humanChanged && !structureChanged) return;
   const bad = new Set(validateSchemas(p.schema, p.tasks, p.human).map((x) => x.id));
-  const candidate: Plan = { tasks: new Map(ctx.plan.tasks), human: fresh.human };
+  const candidate: Plan = { ...ctx.plan, tasks: new Map(ctx.plan.tasks), human: fresh.human, taskset: fresh.taskset, milestones: fresh.milestones };
   for (const t of [...added, ...changed]) if (!bad.has(t.id)) candidate.tasks.set(t.id, t);
-  const graph = validateGraph(candidate);
-  if (graph.length || [...fresh.human.keys()].some((id) => bad.has(id))) {
+  // What the change breaks: graph problems, and hierarchy or milestone problems the loop's own plan doesn't have.
+  const before = new Set(validateStructure(ctx.plan).map((x) => `${x.id}: ${x.message}`));
+  const graph = [...validateGraph(candidate), ...validateStructure(candidate).filter((x) => !before.has(`${x.id}: ${x.message}`))];
+  if (graph.length || [...fresh.human.keys()].some((id) => bad.has(id)) || (structureChanged && [...bad].some((id) => id.endsWith('.yaml')))) {
     for (const x of graph.slice(0, 10)) log(`plan reload skipped: ${x.id}: ${x.message}`);
     return;
   }
+  if (structureChanged) log(`plan reload: TaskSet revision ${fresh.taskset?.revision ?? '?'}${fresh.milestones ? `, ${fresh.milestones.length} milestones` : ''}`);
   for (const t of added) if (bad.has(t.id)) log(`plan reload: ${t.id} fails the schema; not added`);
   for (const t of changed) {
     const was = ctx.plan.tasks.get(t.id)!.status;
@@ -1219,6 +1235,8 @@ function reloadPlan(ctx: PassContext): void {
   }
   ctx.plan.tasks = candidate.tasks;
   ctx.plan.human = candidate.human;
+  ctx.plan.taskset = candidate.taskset;
+  ctx.plan.milestones = candidate.milestones;
   const n = added.filter((t) => !bad.has(t.id)).length;
   if (n) log(`plan reload: ${n} new task${n === 1 ? '' : 's'}`);
 }
@@ -1258,7 +1276,7 @@ async function checkTampering(ctx: PassContext, task: Task, repoDir: string, con
 
 // Plan state is progress, and progress lives in git: the control plane commits plan/tasks and plan/human
 // after each merge, and nothing else under plan/. The dependency map (about 390 KB) is rewritten after
-// every pass but committed only as a stage's snapshot when the stage closes; `helix-loop map`
+// every pass but committed only as a milestone's snapshot when the milestone is reached; `helix-loop plan map`
 // regenerates it from the plan data at any time.
 async function commitPlan(ctx: PassContext, message: string, withMap: boolean): Promise<void> {
   const { config, paths: p } = ctx.deps;

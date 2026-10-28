@@ -214,7 +214,9 @@ export async function taskStory(root: string, id: string, c: { snap?: Snapshot; 
     task,
     human: human && { ...human, steps: stepsOf(human), done: doneSteps(human) },
     board: v.board.tasks.find((t) => t.id === id) ?? v.board.human.find((h) => h.id === id),
-    epic: task ? v.board.epics.find((e) => e.tasks.includes(id)) : undefined,
+    trail: task || human?.story ? trailItems(v.board, task ? v.board.tasks.find((t) => t.id === id)!.story : `story:${human!.story}`) : [],
+    milestone: task ? v.board.milestones.find((m) => m.tasks.includes(id)) : undefined,
+    wiredBy: task ? [...plan.tasks.values()].filter((t) => t.wires?.includes(id)).map((t) => ({ id: t.id, title: t.title, status: t.status })) : [],
     running: runningTasks(root, plan).has(id),
     live,
     reports: readReports(root).filter((r) => r.task === id).slice(-30),
@@ -226,6 +228,14 @@ export async function taskStory(root: string, id: string, c: { snap?: Snapshot; 
     unblocks: [...plan.tasks.values()].filter((t) => t.blocked_by.includes(id)).map((t) => ({ id: t.id, title: t.title, status: t.status })),
     threads: Object.fromEntries(targets.map((t) => [t, threadsOf(t, readEntries(dir, t))])),
   };
+}
+
+// Where an item sits: its lane, epic, feature and story, outermost first, as the board names them.
+export function trailItems(board: Board, itemId: string): { id: string; level: string; key: string; title: string }[] {
+  const byId = new Map(board.items.map((i) => [i.id, i]));
+  const out = [];
+  for (let i = byId.get(itemId); i; i = i.parent ? byId.get(i.parent) : undefined) out.unshift({ id: i.id, level: i.level, key: i.key, title: i.title });
+  return out;
 }
 
 export async function remoteUrl(root: string, repo: string): Promise<string | undefined> {

@@ -13,7 +13,6 @@ import { readChanges, UNDO_MS } from './changes.ts';
 import { decide, pilotOf, readHitl, readRules, REQUESTS, type HitlRecord } from './hitl.ts';
 import { incidents as findIncidents, readStored, type Incident } from './incidents.ts';
 import { loopStatus, passesNow, readReports, type PassNow, type Snapshot } from './state.ts';
-import { loadTaskSet } from './taskset.ts';
 import { sortGroups, triage, type Group } from './triage.ts';
 import { PROJECTION_METHOD } from './projection.ts';
 
@@ -37,11 +36,12 @@ export interface View {
   groups: Group[];
 }
 
-// What the board is built from: the plan and the ledger, the TaskSet, and the passes and slots the loop has now.
+// What the board is built from: the plan (with its TaskSet and milestones) and the ledger, and the passes and slots
+// the loop has now.
 export function boardInput(root: string, plan: Plan, events: LedgerEvent[], config: Config, now: number): BoardInput & { running: PassNow[] } {
   const passes = passesNow(root, plan, loopStatus(root, events));
   const agents = mapAgents(config, loadQuota(paths(root).agentsState, now), passes, now);
-  return { plan, events, taskset: loadTaskSet(root, plan), agents, running: passes, config, now };
+  return { plan, events, agents, running: passes, config, now };
 }
 
 export function buildView(root: string, snap: Snapshot, config: Config, opts: { dismissed: Set<string>; now?: number }): View {

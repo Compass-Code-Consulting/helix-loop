@@ -1,10 +1,10 @@
-import { stageIndex, stagesOf } from '../plan/stages.ts';
+import { membership } from '../plan/milestones.ts';
 import type { Plan, Task } from '../types.ts';
 
-// When each open task will run, as the loop would pick them (sched/scheduler.ts): best-ranked first, a stage
-// only once the earlier stages are settled, never two passes in one area, never before its blockers. It is a
-// simulation of the loop's choices with the slots it has now, not a promise: a failed attempt, a limit or a
-// person's step moves it.
+// When each open task will run, as the loop would pick them (sched/scheduler.ts): best-ranked first (so the earliest
+// milestone first), never two passes in one area, never before its blockers. It is a simulation of the loop's
+// choices with the slots it has now, not a promise: a failed attempt, a limit or a person's step moves it. Each
+// milestone is projected reached when its last task is.
 //
 // Whatever waits on the owner gets a date too, or most of the plan would have none (on 2026-10-27, four tasks that
 // needed a person held 208 of 416): a human task is done after its lead time from now (half of it once started), a
@@ -37,6 +37,7 @@ export interface Projection {
   tasks: Map<string, Projected>;
   human: Map<string, number>; // when each open human task is expected done
   finish: number; // when the last task ends: the last human task too, unless withHuman is off
+  milestones: Map<string, number>; // when each milestone not yet reached is projected to be: its last task's end
 }
 
 // When each open human task is expected done: its lead time (half of it once started), counted from when the
@@ -92,36 +93,15 @@ export function project(input: ProjectionInput): Projection {
     if (h) return h.status === 'done' || (human.get(d) ?? Infinity) <= at;
     return (end.get(d) ?? Infinity) <= at;
   };
-  // Settled for stage gating, as openStage: waiting on a person, itself or through what blocks it.
-  const waitsOnPerson = (t: Task, at: number, seen = new Set<string>()): boolean => {
-    if (seen.has(t.id)) return false;
-    seen.add(t.id);
-    if (availableAt(t) > at) return true;
-    const open = t.blocked_by.filter((d) => !blockerDone(d, at));
-    return open.length > 0 && open.every((d) => plan.human.has(d) || (pending.has(d) && waitsOnPerson(plan.tasks.get(d)!, at, seen)));
-  };
-  const stages = stagesOf(plan);
-  const openStageAt = (at: number): number => {
-    for (let s = 0; s < stages.length; s++) {
-      for (const t of order) {
-        if (t.stage !== stages[s] || t.role === 'design' || t.priority === 'fix_first') continue;
-        if ((end.get(t.id) ?? Infinity) <= at) continue;
-        if (!pending.has(t.id) || !waitsOnPerson(t, at)) return s;
-      }
-    }
-    return Math.max(0, stages.length - 1);
-  };
 
   const ranked = rank.filter((id) => pending.has(id));
   const wakes = [...human.values(), ...order.filter((t) => pending.has(t.id)).map(availableAt)];
   let t = now;
-  let stage = openStageAt(t);
   for (let guard = 0; guard < 4 * order.length + wakes.length + 100 && ranked.length; guard++) {
     // Fill the free slots, best-ranked first.
     const held = new Set(active.map((a) => a.area));
     for (let i = 0; i < ranked.length && active.length < slots; i++) {
       const task = plan.tasks.get(ranked[i]!)!;
-      if (stageIndex(stages, task.stage) > stage && task.priority !== 'fix_first') continue;
       if (held.has(task.area) || availableAt(task) > t) continue;
       if (!task.blocked_by.every((d) => blockerDone(d, t))) continue;
       const e = t + dur(task);
@@ -137,7 +117,6 @@ export function project(input: ProjectionInput): Projection {
     if (!isFinite(next)) break;
     t = next;
     for (let i = active.length - 1; i >= 0; i--) if (active[i]!.end <= t) active.splice(i, 1);
-    stage = openStageAt(t);
   }
   // A human task no builder waits on (a launch step, a review) still ends the project: it starts once the
   // builder work it waits on is projected done, and takes its lead time from there.
@@ -151,5 +130,12 @@ export function project(input: ProjectionInput): Projection {
   };
   const builders = Math.max(now, ...[...out.values()].map((p) => p.end));
   const finish = input.withHuman === false ? builders : Math.max(builders, ...[...plan.human.keys()].map((id) => humanEnd(id)));
-  return { tasks: out, human, finish };
+  // A milestone is reached when its last open task ends; one with a task the simulation never ran (behind a
+  // cycle, or a person who never comes) has no date.
+  const milestones = new Map<string, number>();
+  for (const [key, ids] of membership(plan).tasks) {
+    const open = ids.filter((id) => plan.tasks.get(id)?.status !== 'done');
+    if (open.length && open.every((id) => out.has(id))) milestones.set(key, Math.max(...open.map((id) => out.get(id)!.end)));
+  }
+  return { tasks: out, human, finish, milestones };
 }

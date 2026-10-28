@@ -2,15 +2,16 @@ import type { Config } from '../config.ts';
 import type { LedgerEvent } from '../ledger.ts';
 import { computeMap, rankTasks } from '../map/graph.ts';
 import { meanPassHours } from '../ledger.ts';
+import { membership } from '../plan/milestones.ts';
 import { countedAttempts } from '../sched/scheduler.ts';
-import type { AgentName, MapAgent, Plan, RepoName, Stage, Task } from '../types.ts';
+import type { AgentName, Level, MapAgent, Plan, RepoName, Task, Timeline } from '../types.ts';
 import { expectedHumanDone, project, type Projection } from './projection.ts';
-import type { TaskSet, Timeline } from './taskset.ts';
 
-// The board: the plan as the Map and Home read it. Every task with its lane, epic, bar (what happened for
-// finished work, the projection for the rest), what it holds up and whether it is on the frontier; every
-// human task with what it holds up and how late it is; every epic rolled up. Derived from the files on each
-// change of the plan or the ledger, never stored.
+// The board: the plan as the Map and Home read it. Every task with its story, milestone, bar (what happened for
+// finished work, the projection for the rest), what it holds up and whether it is on the frontier; every human task
+// with what it holds up and how late it is; the TaskSet's lanes, epics, features and stories, each with the tasks
+// under it, for the Map to roll up; and the milestones with their dates. Derived from the files on each change of
+// the plan or the ledger, never stored.
 
 const HOUR = 3_600_000;
 const FAILED = new Set(['gate_failed', 'no_commit', 'forbidden_paths', 'timeout', 'agent_error']);
@@ -20,8 +21,10 @@ export interface BoardTask {
   title: string;
   status: Task['status'];
   lane: RepoName;
-  epic: string; // Epic.id
-  stage?: Stage;
+  story: string; // its story item's id, `story:<key>`
+  milestone?: string; // its milestone's key
+  placeholderFor?: string[];
+  wires?: string[];
   agent: AgentName | null; // holder while claimed, or the agent that merged it
   estimate: number;
   critical: boolean;
@@ -51,22 +54,28 @@ export interface BoardHuman {
   frontier: boolean;
 }
 
-export interface BoardEpic {
-  id: string;
+// A lane, epic, feature or story, with the tasks under it; the page rolls each up from its tasks (map rows.js), so a
+// milestone filter can roll up only that milestone's share.
+export interface BoardItem {
+  id: string; // `${level}:${key}`: keys are unique per level across the TaskSet
+  level: Level;
   key: string;
-  lane: RepoName;
   title: string;
-  stage?: Stage;
+  repo: RepoName; // its lane's, for the lane's colour
+  about?: string; // the epic's outcome, the feature's capability, the story's need
+  parent?: string;
+  children: string[];
+  tasks: string[]; // every task under it, in the TaskSet's order
+}
+
+export interface BoardMilestone {
+  key: string;
+  title: string;
+  demo: string;
   tasks: string[];
   done: number;
-  running: number;
-  failing: number;
-  waiting: number; // needs you, parked, or behind a human task
-  start?: number;
-  end?: number;
-  frontier: boolean;
-  critical: boolean;
-  waitsOn?: string; // the human task most of its open work waits on
+  reached: boolean;
+  at?: number; // when it was reached (its last merge), or is projected to be
 }
 
 export interface Board {
@@ -76,19 +85,18 @@ export interface Board {
   finish: number; // projected: project complete
   codeFinish?: number; // code complete, when the TaskSet shows it
   timelines: Timeline[];
-  lanes: { name: RepoName; epics: string[]; done: number; total: number }[];
-  epics: BoardEpic[];
+  revision?: number; // the TaskSet's
+  items: BoardItem[]; // lanes in order, each followed by its epics, each by its features, each by its stories
+  milestones: BoardMilestone[]; // in delivery order
+  unplaced: string[]; // tasks whose story the TaskSet doesn't declare: shown in their lane under "Not in the TaskSet"
   tasks: BoardTask[];
   human: BoardHuman[];
   criticalPath: string[];
-  derivedEpics: boolean;
-  missingEpics: string[];
 }
 
 export interface BoardInput {
   plan: Plan;
   events: LedgerEvent[];
-  taskset: TaskSet;
   agents: MapAgent[];
   running: { task: string; agent: AgentName; startedAt: string }[];
   config: Config;
@@ -130,7 +138,8 @@ export function slotsNow(config: Config, agents: MapAgent[]): number {
 }
 
 export function buildBoard(input: BoardInput): Board & { projection: Projection; rank: string[] } {
-  const { plan, events, taskset, agents, running, config, now } = input;
+  const { plan, events, agents, running, config, now } = input;
+  const timelines = plan.taskset?.timelines ?? ['code', 'project'];
   const passHours = meanPassHours(events);
   const map = computeMap(plan, { now, passHours, agents, mode: 'idle' });
   const node = new Map(map.nodes.map((n) => [n.id, n]));
@@ -140,10 +149,12 @@ export function buildBoard(input: BoardInput): Board & { projection: Projection;
   const projection = project({ plan, rank, now, passHours, slots, running: runs });
   // Code complete: the same run with every open human task done now, before anything needs it, so no lead time
   // counts. Never later than project complete: with fewer waits, the greedy schedule can come out a little longer.
-  const codeFinish = taskset.timelines.includes('code')
+  const codeFinish = timelines.includes('code')
     ? Math.min(projection.finish, project({ plan, rank, now, passHours, slots, running: runs, humanDone: new Map([...projection.human.keys()].map((id) => [id, now])), withHuman: false }).finish)
     : undefined;
   const dependents = dependentsOf(plan);
+  const member = membership(plan);
+  const { items, unplaced } = boardItems(plan);
 
   // What happened to finished work: its first pass's start, its merge, and its failed attempts.
   const firstStart = new Map<string, number>();
@@ -192,8 +203,10 @@ export function buildBoard(input: BoardInput): Board & { projection: Projection;
       title: t.title,
       status: t.status,
       lane: t.repo,
-      epic: taskset.epicOf.get(t.id)!.id,
-      stage: t.stage,
+      story: `story:${plan.taskset?.stories.has(t.story) ? t.story : unplacedKey(t.repo)}`,
+      ...(member.of.has(t.id) ? { milestone: member.of.get(t.id) } : {}),
+      ...(t.placeholder_for?.length ? { placeholderFor: t.placeholder_for } : {}),
+      ...(t.wires?.length ? { wires: t.wires } : {}),
       agent: t.claimed_by ?? t.attempts.findLast((a) => a.outcome === 'merged')?.agent ?? null,
       estimate: t.estimate_passes,
       critical: n.critical,
@@ -231,36 +244,12 @@ export function buildBoard(input: BoardInput): Board & { projection: Projection;
   });
 
   const byId = new Map(tasks.map((t) => [t.id, t]));
-  const epics: BoardEpic[] = [];
-  for (const l of taskset.lanes) {
-    for (const e of l.epics) {
-      const ts = e.tasks.map((id) => byId.get(id)!).filter(Boolean);
-      const starts = ts.map((t) => t.start).filter((x): x is number => x !== undefined);
-      const ends = ts.map((t) => t.end).filter((x): x is number => x !== undefined);
-      const waitsOn = new Map<string, number>();
-      for (const t of ts) for (const w of t.waits ?? []) if (w.startsWith('HT-')) waitsOn.set(w, (waitsOn.get(w) ?? 0) + 1);
-      epics.push({
-        id: e.id,
-        key: e.key,
-        lane: e.lane,
-        title: e.title,
-        stage: e.stage,
-        tasks: e.tasks,
-        done: ts.filter((t) => t.status === 'done').length,
-        running: ts.filter((t) => t.status === 'claimed').length,
-        failing: ts.filter((t) => t.status !== 'done' && t.fails.length && t.attempts > 0 && FAILED.has(plan.tasks.get(t.id)!.attempts.at(-1)?.outcome ?? '')).length,
-        waiting: ts.filter((t) => t.status === 'needs_human' || t.status === 'parked' || t.waits?.length).length,
-        start: starts.length ? Math.min(...starts) : undefined,
-        end: ends.length ? Math.max(...ends) : undefined,
-        frontier: ts.some((t) => t.frontier),
-        critical: ts.some((t) => t.critical),
-        waitsOn: [...waitsOn.entries()].sort((a, b) => b[1] - a[1])[0]?.[0],
-      });
-    }
-  }
-  const lanes = taskset.lanes.map((l) => {
-    const ts = l.epics.flatMap((e) => e.tasks);
-    return { name: l.name, epics: l.epics.map((e) => e.id), done: ts.filter((id) => byId.get(id)?.status === 'done').length, total: ts.length };
+  const milestones: BoardMilestone[] = (plan.milestones ?? []).map((m) => {
+    const ids = member.tasks.get(m.key) ?? [];
+    const done = ids.filter((id) => byId.get(id)?.status === 'done').length;
+    const reached = ids.length > 0 && done === ids.length;
+    const at = reached ? Math.max(...ids.map((id) => byId.get(id)!.end ?? 0)) : projection.milestones.get(m.key);
+    return { key: m.key, title: m.title, demo: m.demo, tasks: ids, done, reached, ...(at ? { at } : {}) };
   });
 
   return {
@@ -269,17 +258,69 @@ export function buildBoard(input: BoardInput): Board & { projection: Projection;
     slots,
     finish: projection.finish,
     ...(codeFinish !== undefined ? { codeFinish } : {}),
-    timelines: taskset.timelines,
-    lanes,
-    epics,
+    timelines,
+    ...(plan.taskset ? { revision: plan.taskset.revision } : {}),
+    items,
+    milestones,
+    unplaced,
     tasks,
     human,
     criticalPath: map.criticalPath,
-    derivedEpics: taskset.derived,
-    missingEpics: taskset.missing,
     projection,
     rank,
   };
+}
+
+// The story that holds a lane's tasks whose story the TaskSet doesn't declare (or every task, without a version 2
+// TaskSet), so the Map still shows them; validation reports each.
+const unplacedKey = (repo: string) => `not-in-the-taskset-${repo}`;
+
+// The TaskSet as items, in reading order: each lane, then its epics, each followed by its features, each by its
+// stories. A repo with tasks no lane holds gets a lane of its own.
+export function boardItems(plan: Plan): { items: BoardItem[]; unplaced: string[] } {
+  const ts = plan.taskset;
+  const items: BoardItem[] = [];
+  const byStory = new Map<string, string[]>();
+  const unplaced: string[] = [];
+  for (const t of plan.tasks.values()) {
+    const key = ts?.stories.has(t.story) ? t.story : unplacedKey(t.repo);
+    if (key !== t.story) unplaced.push(t.id);
+    byStory.set(key, [...(byStory.get(key) ?? []), t.id]);
+  }
+  const lanes = [...(ts?.lanes ?? [])].map((l) => ({ ...l }));
+  for (const id of unplaced) {
+    const repo = plan.tasks.get(id)!.repo;
+    if (!lanes.some((l) => l.repo === repo)) lanes.push({ key: repo, repo, epics: [] });
+  }
+  const add = (level: Level, key: string, title: string, repo: string, parent: string | undefined, about?: string): BoardItem => {
+    const item: BoardItem = { id: `${level}:${key}`, level, key, title, repo, ...(about ? { about } : {}), ...(parent ? { parent } : {}), children: [], tasks: [] };
+    items.push(item);
+    return item;
+  };
+  for (const l of lanes) {
+    const lane = add('lane', l.key, l.key, l.repo, undefined);
+    const stray = unplaced.some((id) => plan.tasks.get(id)!.repo === l.repo && lanes.find((x) => x.repo === l.repo) === l);
+    const epics = [...l.epics.map((k) => ts!.epics.get(k)!), ...(stray ? [{ key: unplacedKey(l.repo), title: 'Not in the TaskSet', outcome: '', features: [unplacedKey(l.repo)] }] : [])];
+    for (const e of epics) {
+      const epic = add('epic', e.key, e.title, l.repo, lane.id, e.outcome);
+      lane.children.push(epic.id);
+      const features = e.key === unplacedKey(l.repo) ? [{ key: e.key, title: 'Not in the TaskSet', capability: undefined, stories: [e.key] }] : e.features.map((k) => ts!.features.get(k)!);
+      for (const f of features) {
+        const feature = add('feature', f.key, f.title, l.repo, epic.id, f.capability);
+        epic.children.push(feature.id);
+        for (const sk of f.stories) {
+          const s = ts?.stories.get(sk);
+          const story = add('story', sk, s?.title ?? 'Tasks whose story the TaskSet does not declare', l.repo, feature.id, s?.need);
+          feature.children.push(story.id);
+          story.tasks = byStory.get(sk) ?? [];
+          feature.tasks.push(...story.tasks);
+        }
+        epic.tasks.push(...feature.tasks);
+      }
+      lane.tasks.push(...epic.tasks);
+    }
+  }
+  return { items, unplaced };
 }
 
 // What leaving items as they are costs, in time on the projected finish, by running the projection again with

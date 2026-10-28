@@ -14,7 +14,7 @@ import { ownerOf } from './prompts.ts';
 export const BATCH_FIELDS = ['status', 'notes', 'blocked_by'] as const;
 // What the owner changes on a human task: where it stands, and its notes (the checklist's ticks, evidence).
 export const HUMAN_FIELDS = ['status', 'notes'] as const;
-const NEW_TASK_FIELDS = ['repo', 'stage', 'area', 'feature', 'epic', 'title', 'reqs', 'spec', 'acceptance', 'blocked_by', 'estimate_passes', 'priority', 'agent', 'notes'];
+const NEW_TASK_FIELDS = ['repo', 'story', 'area', 'title', 'reqs', 'spec', 'acceptance', 'blocked_by', 'estimate_passes', 'priority', 'agent', 'notes'];
 
 // A note goes under what the task's notes already say, so the next builder reads both.
 export const withNote = (t: Task | undefined, note?: string) => (note?.trim() ? [t?.notes?.trim(), note.trim()].filter(Boolean).join('\n\n') : t?.notes);

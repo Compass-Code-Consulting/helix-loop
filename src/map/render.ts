@@ -908,7 +908,7 @@ function panel(){
   var kv = el("dl", "kv");
   function row(k, v){ kv.appendChild(el("dt", null, k)); kv.appendChild(el("dd", null, v)); }
   row("Lane", LANE_NAME[n.lane] || n.lane);
-  if (n.stage) row("Stage", n.stage);
+  if (n.milestone) row("Milestone", n.milestone);
   if (n.area) row("Area", n.area);
   row("Earliest", range(n.es, n.ef));
   row("Latest", range(n.ls, n.lf));

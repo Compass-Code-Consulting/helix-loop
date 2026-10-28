@@ -2,30 +2,14 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "helix-loop/taskset.schema.json",
   "title": "Helix TaskSet",
-  "description": "plan/taskset.yaml: the lanes (repositories) the loop builds and, in each, its epics in order. Each task names its epic's key in `epic`; its lane is its `repo`.",
+  "description": "plan/taskset.yaml: the scope, as Lane › Epic › Feature › Story. Each task names its story in `story`; its feature, epic and lane follow. YAML order is reading order only: the order work is delivered in is Helix Milestones (plan/milestones.yaml).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "lanes"],
+  "required": ["version", "revision", "lanes"],
   "properties": {
-    "version": { "const": 1 },
-    "stages": {
-      "type": "array",
-      "description": "Optional milestones, in order. A task names its stage in `stage`; work in a later stage waits until every earlier stage is settled. Leave this out for no stage gating.",
-      "items": {
-        "oneOf": [
-          { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["key"],
-            "properties": {
-              "key": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
-              "title": { "type": "string", "minLength": 1, "maxLength": 80, "description": "How the stage reads, e.g. \"Day 1: Foundation\"." }
-            }
-          }
-        ]
-      }
-    },
+    "version": { "const": 2 },
+    "revision": { "type": "integer", "minimum": 1, "description": "1 for the TaskSet as first planned; applying Helix Milestones adds one, and keeps the revision it replaces in plan/history/." },
+    "milestones": { "type": "string", "pattern": "^[\\w.-]+\\.ya?ml$", "description": "The Helix Milestones file beside it, milestones.yaml. Absent only in revision 1, before the milestones are planned." },
     "timelines": {
       "description": "The finish dates the loop's app shows: [code, project] (both, the default) or [project]. Project complete is when everything is done, human tasks and their lead times included; code complete is when the last builder task would merge if every human task were done when it is needed, so a wait for an account or a D-U-N-S number doesn't count against the build.",
       "enum": [["code", "project"], ["project"]]
@@ -33,24 +17,53 @@
     "lanes": {
       "type": "object",
       "minProperties": 1,
-      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "description": "The repositories the loop builds, keyed by lane key. Every epic lives in exactly one lane.",
+      "propertyNames": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
         "required": ["repo", "epics"],
         "properties": {
-          "repo": { "type": "string", "minLength": 1, "description": "The repository the lane builds, as tasks name it in `repo`." },
+          "repo": { "type": "string", "minLength": 1, "description": "The repository the lane builds, as tasks name it in `repo` and the config declares it under `repos`." },
           "epics": {
             "type": "object",
-            "description": "The lane's epics, keyed by epic key, in the order they are built.",
-            "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "description": "Large strategic outcomes, keyed by a key unique across the TaskSet.",
+            "propertyNames": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
             "additionalProperties": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["title"],
+              "required": ["title", "outcome", "features"],
               "properties": {
-                "title": { "type": "string", "minLength": 3, "maxLength": 80, "description": "The capability the epic delivers, in plain words." },
-                "stage": { "type": "string", "minLength": 1, "description": "Optional: the stage, one of `stages`, when every task in the epic is in it. Epics group by capability; a stage is a milestone, not a level of the hierarchy." }
+                "title": { "type": "string", "minLength": 3, "maxLength": 80, "description": "Named for the outcome, not the code: \"Social publishing\", not \"Publishing service\"." },
+                "outcome": { "type": "string", "minLength": 8, "description": "What is true for people once the epic is done, in a sentence." },
+                "features": {
+                  "type": "object",
+                  "description": "Deliverable capabilities a user would recognise, each a vertical slice, keyed by a key unique across the TaskSet.",
+                  "propertyNames": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+                  "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["title", "stories"],
+                    "properties": {
+                      "title": { "type": "string", "minLength": 3, "maxLength": 80 },
+                      "capability": { "type": "string", "minLength": 8, "description": "Optional: what the feature lets people do, in a sentence." },
+                      "stories": {
+                        "type": "object",
+                        "description": "User stories, each one need small enough to demo on its own, keyed by a key unique across the TaskSet.",
+                        "propertyNames": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+                        "additionalProperties": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["title", "need"],
+                          "properties": {
+                            "title": { "type": "string", "minLength": 3, "maxLength": 80 },
+                            "need": { "type": "string", "pattern": "^As an? .+, I want .+, so that .+", "description": "\"As a …, I want …, so that …\": the person it serves, what they need, and why." }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }

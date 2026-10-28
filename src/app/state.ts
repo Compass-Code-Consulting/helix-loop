@@ -9,7 +9,7 @@ import { buildMetrics, type MetricsModel } from '../metrics/model.ts';
 import { readVersions } from '../metrics/archive.ts';
 import { taskHistory } from '../metrics/render.ts';
 import { loadPlan } from '../plan/store.ts';
-import { validateGraph, validateSchemas, validateState, type Problem } from '../plan/validate.ts';
+import { errorsOnly, validateGraph, validateHierarchy, validateMilestones, validateSchemas, validateState, type Problem } from '../plan/validate.ts';
 import { describeBase, pendingApprovals, unreleased } from '../release.ts';
 import { buildStats, type BuildStats } from '../stats.ts';
 import { AGENTS, type AgentName, type LoopMode, type MapModel, type Plan } from '../types.ts';
@@ -204,7 +204,7 @@ export function snapshot(root: string): Snapshot {
   const p = paths(root);
   const plan = loadPlan(p.tasks, p.human);
   const schema = existsSync(p.schema) ? validateSchemas(p.schema, p.tasks, p.human) : [];
-  return { plan, events: existsSync(p.ledger) ? readLedger(p.ledger) : [], problems: [...schema, ...validateGraph(plan), ...validateState(plan)] };
+  return { plan, events: existsSync(p.ledger) ? readLedger(p.ledger) : [], problems: [...schema, ...errorsOnly([...validateHierarchy(plan), ...validateMilestones(plan)]), ...validateGraph(plan), ...validateState(plan)] };
 }
 
 export function appState(root: string, snap: Snapshot, config: Config, opts: { dryRun: boolean; dismissed: Set<string>; now?: number }): AppState {

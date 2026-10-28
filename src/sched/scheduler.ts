@@ -1,8 +1,9 @@
-import { stageIndex, stagesOf } from '../plan/stages.ts';
-import { UNCOUNTED_OUTCOMES, type AgentName, type Plan, type Stage, type Task } from '../types.ts';
+import { UNCOUNTED_OUTCOMES, type AgentName, type Plan, type Task } from '../types.ts';
 
 // Picks the next task for a free agent slot (design doc §4 step 1 and §7.2). Pure: the loop
-// passes in the plan, the rank from the dependency map, and what is currently held.
+// passes in the plan, the rank from the dependency map, and what is currently held. The rank carries the order:
+// fix-first work, then the earliest milestone not yet reached, then the critical path (map/graph.ts rankTasks).
+// Milestones are a priority, not a gate: when nothing in an earlier milestone is ready, later work runs.
 
 export interface PickInput {
   plan: Plan;
@@ -10,22 +11,6 @@ export interface PickInput {
   agent: AgentName;
   heldAreas: Set<string>; // areas held by any running pass, either agent
   maxAttempts: number;
-}
-
-// A stage opens when every task of every earlier stage is settled: done, waiting on a person
-// (§21: each day closes green), or mascot design work. A review that takes weeks must not freeze the
-// rest of the build, and neither must an agent's quota while it draws the art: no other work may depend on a
-// design-role task (plan validation), so those finish alongside later stages. Fix-first work doesn't hold a
-// stage either: it is ranked ahead of everything in every stage reached, and on 2026-10-25 one fix whose last
-// attempt was the paused agent's held 472 tasks back for hours.
-export function openStage(plan: Plan): Stage | undefined {
-  const waiting = humanWaits(plan);
-  const stages = stagesOf(plan);
-  for (const s of stages) {
-    const inStage = [...plan.tasks.values()].filter((t) => t.stage === s);
-    if (inStage.some((t) => t.status !== 'done' && !waiting.has(t.id) && t.role !== 'design' && t.priority !== 'fix_first')) return s;
-  }
-  return stages.at(-1);
 }
 
 export function isUnblocked(plan: Plan, t: Task): boolean {
@@ -42,14 +27,10 @@ export const conflictCount = (t: Task): number => t.attempts.filter((a) => a.out
 
 export function pick(input: PickInput): Task | undefined {
   const { plan, rank, agent, heldAreas, maxAttempts } = input;
-  const stages = stagesOf(plan);
-  const stageIdx = stageIndex(stages, openStage(plan));
   const other: AgentName = agent === 'claude' ? 'codex' : 'claude';
   for (const id of rank) {
     const t = plan.tasks.get(id);
     if (!t || t.status !== 'ready') continue;
-    // Fix-first work may come from any stage already reached; feature work only from the open stage or earlier.
-    if (stageIndex(stages, t.stage) > stageIdx) continue;
     if (!isUnblocked(plan, t)) continue;
     if (heldAreas.has(t.area)) continue;
     if (t.agent && t.agent !== agent) continue;
