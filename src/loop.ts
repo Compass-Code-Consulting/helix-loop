@@ -8,7 +8,7 @@ import { hashToken, LiveBoard, newToken } from './live.ts';
 import { describePace, loadQuota, loopMode, mapAgents, markAvailable, markLimited, overBudget, paceSlots, rollDay, saveQuota, helixSpentUsd, type Pace, type QuotaState } from './agents/quota.ts';
 import type { Clock } from './clock.ts';
 import { suspensionWatch } from './clock.ts';
-import { asset, gitAuthor, productEnv, projectInfo, repoConfig, weeklyTargets, type Config, type Paths } from './config.ts';
+import { asset, gitAuthor, HELIX_DIR, productEnv, projectInfo, repoConfig, weeklyTargets, type Config, type Paths } from './config.ts';
 import { commitLeftovers, runGate, type GateStep } from './gate.ts';
 import { addWorktree, branchFor, commitsAhead, ensureUnionMerge, git, gitOk, head, removeWorktree } from './git.ts';
 import { compress, meanPassHours, readLedger, record, type LedgerEvent, type PassPhases } from './ledger.ts';
@@ -1245,9 +1245,11 @@ function reloadPlan(ctx: PassContext): void {
 
 // Defence in depth behind the sandboxes: after every pass, the product repo's primary checkout must be
 // clean and on main, and the control plane's protected files must not have changed during the pass.
-const PROTECTED = ['harness', 'prompts', 'spec', 'plan/schema', 'plan/capabilities.yaml', 'plan/planners.yaml', 'CLAUDE.md'];
+// The project's own files a builder has no business touching: the config, the build prompt, the spec, Helix's
+// prompts and rules, and the agent instructions at the top. The plan isn't here: the loop itself writes it.
+const PROTECTED = ['config.yaml', 'prompts', 'spec', 'helix'].map((f) => `${HELIX_DIR}/${f}`).concat('CLAUDE.md', 'AGENTS.md');
 
-async function controlPlaneChanges(root: string): Promise<string> {
+export async function controlPlaneChanges(root: string): Promise<string> {
   if (!existsSync(join(root, '.git'))) return '';
   return git(root, 'status', '--porcelain', '--', ...PROTECTED).catch(() => '');
 }

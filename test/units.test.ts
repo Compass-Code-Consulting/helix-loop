@@ -10,6 +10,7 @@ import { describePace, loopMode, PACE_MARGIN, paceSlots } from '../src/agents/qu
 import { VirtualClock, suspensionWatch } from '../src/clock.ts';
 import { asset, configPath, loadConfig, paths } from '../src/config.ts';
 import { firstFailure, globToRegExp, missingAcceptanceTests, offAreaPaths } from '../src/gate.ts';
+import { controlPlaneChanges } from '../src/loop.ts';
 import { secretFindings } from '../src/merge.ts';
 import { sh } from '../src/proc.ts';
 import { clipNote, clipSummary, NOTE_LIMIT } from '../src/summary.ts';
@@ -19,7 +20,7 @@ import { PromptOverBudget, renderPrompt, RETRY_RESERVE_BYTES } from '../src/prom
 import { conflictCount, countedAttempts, onlyHumanWorkLeft, pick } from '../src/sched/scheduler.ts';
 import { buildIndex, loadIndex } from '../src/spec/index.ts';
 import type { HumanTask, Plan, Task } from '../src/types.ts';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { parse, stringify } from 'yaml';
 import { FIXTURE } from './fixture.ts';
@@ -636,4 +637,20 @@ test('gate: a runner that reports each step when it ends gives exact step times,
 test('the test project names no real agent CLI', () => {
   const config = loadConfig(FIXTURE);
   for (const a of ['claude', 'codex'] as const) assert.match(config.agents[a].command, /^helix-test-no-real-/);
+});
+
+test('a pass that changes the config, the prompt, the spec or CLAUDE.md is caught; the plan the loop writes is not', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'helix-protected-'));
+  cpSync(paths(FIXTURE).home, paths(root).home, { recursive: true });
+  writeFileSync(join(root, 'CLAUDE.md'), 'Instructions\n');
+  const g = (...a: string[]) => execFileSync('git', a, { cwd: root, stdio: 'pipe' });
+  g('init', '-q', '-b', 'main');
+  g('-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A');
+  g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'seed');
+  assert.equal(await controlPlaneChanges(root), '');
+  writeFileSync(join(paths(root).tasks, 'T-0001.yaml'), readFileSync(join(paths(root).tasks, 'T-0001.yaml'), 'utf8') + '# the loop\n');
+  assert.equal(await controlPlaneChanges(root), '', 'the plan is the loop\'s to write');
+  writeFileSync(configPath(root), readFileSync(configPath(root), 'utf8') + '# a builder\n');
+  writeFileSync(join(root, 'CLAUDE.md'), 'Instructions, changed\n');
+  assert.deepEqual((await controlPlaneChanges(root)).split('\n').map((l) => l.trim()), ['M .helix/config.yaml', 'M CLAUDE.md']);
 });
