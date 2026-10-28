@@ -3,8 +3,8 @@
 //
 //   node scripts/validate.mjs <plan-dir> [--schema-dir <dir>] [--reqs <file>]
 //
-// <plan-dir> holds taskset.yaml, tasks/T-####.yaml and human/HT-##.yaml (JSON files with the same
-// names and a .json extension work too). It prints one problem per line as `ID: message`, warnings as
+// <plan-dir> holds taskset.yaml, milestones.yaml once the delivery order is planned, tasks/T-####.yaml and
+// human/HT-##.yaml (JSON files with the same names and a .json extension work too). It prints one problem per line as `ID: message`, warnings as
 // `ID: warning: message`, then a summary line, and exits 0 when there are no errors, 1 when there are.
 //
 // The schemas are read, in order, from --schema-dir, <plan-dir>/schema, the skill's own schema/
@@ -549,6 +549,17 @@ function readReqs(file) {
     .filter(Boolean);
 }
 
+// The message for a version 1 TaskSet, as the loop gives it.
+export const MIGRATE_V1 =
+  'is a version 1 TaskSet (Lane › Epic, with tasks naming `epic` and `stage`). Helix Loop now reads version 2: Lane › Epic › Feature › Story › Task, with each task naming its `story`, and the delivery order in Helix Milestones (milestones.yaml) instead of stages. Convert it as docs/migrating.md describes under "From a version 1 TaskSet"';
+const V1_FIELDS = ['epic', 'stage', 'feature'];
+// No title or key may say "Day N": the order is the milestones'.
+const DAY_N = /\bday[\s-]?\d/i;
+// The usual sizes, in children: outside them is a warning.
+const SIZES = { epic: [2, 8, 'features', 'feature'], feature: [2, 6, 'stories', 'story'], story: [2, 8, 'tasks', 'task'] };
+const isObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const entries = (v) => (isObject(v) ? Object.entries(v).filter(([, x]) => isObject(x)) : []);
+
 // Returns every problem as { id, level: 'error' | 'warning', message }.
 export function validateTaskSet(planDir, opts = {}) {
   const problems = [];
@@ -567,51 +578,95 @@ export function validateTaskSet(planDir, opts = {}) {
   const taskSchema = loadSchema('task.schema.json');
   const humanSchema = loadSchema('human.schema.json');
   const tasksetSchema = loadSchema('taskset.schema.json');
-  // The stages are the TaskSet's own (taskset.yaml `stages`); without that list, any stage name is fine.
-  let stages = [];
+  const milestonesSchema = loadSchema('milestones.schema.json');
 
-  // taskset.yaml: lanes and epics.
+  // taskset.yaml: Lane › Epic › Feature › Story. Keys are unique at their level across the whole TaskSet.
   let taskset = null;
+  let v1 = false;
+  const lanes = new Map();
+  const epics = new Map();
+  const features = new Map();
+  const stories = new Map();
   const tsFile = ['taskset.yaml', 'taskset.yml', 'taskset.json'].map((f) => join(planDir, f)).find(existsSync);
-  if (!tsFile) error('taskset.yaml', 'missing: a TaskSet declares its lanes and epics in taskset.yaml');
+  if (!tsFile) error('taskset.yaml', 'missing: a TaskSet declares its lanes, epics, features and stories in taskset.yaml');
   else {
     try {
       taskset = readDoc(tsFile).value;
-      if (tasksetSchema) for (const e of checkSchema(tasksetSchema, taskset)) error('taskset.yaml', `schema: ${e}`);
-      stages = (taskset?.stages ?? []).map((s) => (typeof s === 'string' ? s : s?.key)).filter(Boolean);
-      for (const [lane, l] of Object.entries(taskset?.lanes ?? {})) {
-        for (const [key, epic] of Object.entries(l?.epics ?? {})) {
-          if (epic?.stage !== undefined && stages.length && !stages.includes(epic.stage)) {
-            error(`${lane}/${key}`, `stage ${epic.stage} is not one of the TaskSet's stages (${stages.join(', ')})`);
-          }
-        }
-      }
     } catch (e) {
       error('taskset.yaml', `cannot be read: ${e.message}`);
     }
   }
+  if (isObject(taskset)) {
+    v1 = taskset.version === 1 || 'stages' in taskset || entries(taskset.lanes).some(([, l]) => entries(l.epics).some(([, e]) => 'stage' in e || !('features' in e)));
+    if (v1) error('taskset.yaml', MIGRATE_V1);
+    else {
+      if (tasksetSchema) for (const e of checkSchema(tasksetSchema, taskset)) error('taskset.yaml', `schema: ${e}`);
+      const once = (map, level, key, where, value) => {
+        if (map.has(key)) return void error('taskset.yaml', `${level} ${key} is declared twice (again in ${where}); keys are unique across the TaskSet`);
+        map.set(key, value);
+        return true;
+      };
+      for (const [laneKey, l] of entries(taskset.lanes)) {
+        const lane = { key: laneKey, repo: String(l.repo ?? laneKey), epics: [] };
+        lanes.set(laneKey, lane);
+        for (const [epicKey, e] of entries(l.epics)) {
+          const epic = { key: epicKey, title: String(e.title ?? ''), lane: laneKey, features: [] };
+          if (!once(epics, 'epic', epicKey, `lane ${laneKey}`, epic)) continue;
+          lane.epics.push(epicKey);
+          for (const [featureKey, f] of entries(e.features)) {
+            const feature = { key: featureKey, title: String(f.title ?? ''), epic: epicKey, lane: laneKey, stories: [] };
+            if (!once(features, 'feature', featureKey, `epic ${epicKey}`, feature)) continue;
+            epic.features.push(featureKey);
+            for (const [storyKey, st] of entries(f.stories)) {
+              if (once(stories, 'story', storyKey, `feature ${featureKey}`, { key: storyKey, title: String(st.title ?? ''), feature: featureKey, epic: epicKey, lane: laneKey })) feature.stories.push(storyKey);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // milestones.yaml, which the TaskSet names once the delivery order is planned.
+  let milestones = null;
+  const msName = isObject(taskset) && !v1 && typeof taskset.milestones === 'string' ? taskset.milestones : null;
+  if (msName) {
+    const f = join(planDir, msName);
+    if (!existsSync(f)) error(msName, `missing: the TaskSet names ${msName}, which doesn't exist`);
+    else {
+      try {
+        const doc = readDoc(f).value;
+        if (milestonesSchema) for (const e of checkSchema(milestonesSchema, doc)) error(msName, `schema: ${e}`);
+        milestones = (Array.isArray(doc?.milestones) ? doc.milestones : []).filter((m) => isObject(m) && typeof m.key === 'string').map((m) => ({ key: m.key, title: String(m.title ?? m.key), features: arr(m.features), stories: arr(m.stories), tasks: arr(m.tasks) }));
+      } catch (e) {
+        error(msName, `cannot be read: ${e.message}`);
+      }
+    }
+  } else if (isObject(taskset) && !v1) warn('milestones.yaml', 'no milestones yet: plan the delivery order with /helix milestones; the loop runs only a plan with milestones');
 
   const tasks = readDir(join(planDir, 'tasks'), /^T-\d+$/, problems);
   const human = readDir(join(planDir, 'human'), /^HT-\d+$/, problems);
 
-  // Schema, as `helix-loop validate` runs it with ajv.
+  // Schema, as `helix-loop validate` runs it with ajv. Tasks still in the version 1 shape are one problem, not one each.
   const schemaPaths = new Map();
+  let legacy = 0;
   for (const [docs, schema] of [[tasks, taskSchema], [human, humanSchema]]) {
     if (!schema) continue;
     for (const [id, { value }] of docs) {
-      const errs = checkSchema(schema, value);
+      const old = docs === tasks && isObject(value) && V1_FIELDS.some((k) => k in value);
+      if (old) legacy++;
+      const errs = checkSchema(schema, value).filter((e) => !old || !(V1_FIELDS.some((k) => e === `/ must NOT have additional property '${k}'`) || e === "/ must have required property 'story'"));
       schemaPaths.set(id, errs.map((e) => e.split(' ')[0]));
       for (const e of errs) error(id, `schema: ${e}`);
     }
   }
+  if (legacy && !v1) error('taskset.yaml', `${legacy} task${legacy === 1 ? '' : 's'} still name \`epic\`, \`stage\` or \`feature\`, as a version 1 TaskSet's did; version 2 tasks name their \`story\`. Convert the plan as docs/migrating.md describes under "From a version 1 TaskSet"`);
 
   // Normalised, as the loop loads them.
-  const T = new Map([...tasks].map(([id, { value }]) => [id, { ...value, blocked_by: arr(value.blocked_by), reqs: arr(value.reqs), acceptance: arr(value.acceptance) }]));
+  const T = new Map([...tasks].map(([id, { value }]) => [id, { ...value, blocked_by: arr(value.blocked_by), reqs: arr(value.reqs), acceptance: arr(value.acceptance), placeholder_for: arr(value.placeholder_for), wires: arr(value.wires) }]));
   const H = new Map([...human].map(([id, { value }]) => [id, { ...value, blocked_by: arr(value.blocked_by) }]));
   const exists = (id) => T.has(id) || H.has(id);
 
-  // Dependencies: every blocker resolves, none is the task itself, none sits in a later stage, only
-  // design work waits on design work, and there is no cycle.
+  // Dependencies: every blocker resolves, none is the task itself, and there is no cycle.
   const edges = new Map();
   for (const [id, t] of T) edges.set(id, t.blocked_by);
   for (const [id, h] of H) edges.set(id, h.blocked_by);
@@ -621,40 +676,125 @@ export function validateTaskSet(planDir, opts = {}) {
       else if (!exists(d)) error(id, `blocked_by ${d}, which does not exist`);
     }
   }
-  for (const [id, t] of T) {
-    for (const d of t.blocked_by) {
-      const dep = T.get(d);
-      if (dep && stages.indexOf(dep.stage) > stages.indexOf(t.stage)) error(id, `blocked by ${d} in ${dep.stage}, a later stage than its own ${t.stage}`);
-      if (dep?.role === 'design' && t.role !== 'design') error(id, `blocked by ${d}, a design-role task; only design-role tasks may wait on design work`);
-    }
-  }
   for (const cycle of findCycles(edges, exists)) error(cycle[0], `dependency cycle: ${cycle.join(' → ')}`);
 
-  // Lanes and epics: every task is in a lane its repo names and an epic that lane declares.
-  if (taskset?.lanes) {
-    const lanes = Object.entries(taskset.lanes);
-    const used = new Set();
-    for (const [id, t] of T) {
-      const lane = lanes.find(([key, l]) => l?.repo === t.repo) ?? lanes.find(([key]) => key === t.repo);
-      if (!lane) {
-        error(id, `repo ${t.repo} is not a lane in taskset.yaml`);
-        continue;
-      }
-      const [laneKey, l] = lane;
-      if (!t.epic) {
-        error(id, `has no epic; set epic to one of lane ${laneKey}'s epics (${Object.keys(l.epics ?? {}).join(', ')})`);
-        continue;
-      }
-      const epic = l.epics?.[t.epic];
-      if (!epic) {
-        error(id, `epic ${t.epic} is not declared in lane ${laneKey} in taskset.yaml`);
-        continue;
-      }
-      used.add(`${laneKey}/${t.epic}`);
-      if (epic.stage && t.stage && epic.stage !== t.stage) warn(id, `stage ${t.stage} differs from its epic ${t.epic}'s stage ${epic.stage}: leave the epic's stage out when its tasks span stages`);
+  // The hierarchy: every task in a declared story of the lane that builds its repo; every level with children.
+  if (stories.size || lanes.size) {
+    const byStory = new Map();
+    for (const [id, t] of T) byStory.set(t.story, [...(byStory.get(t.story) ?? []), id]);
+    const days = (id, ...texts) => {
+      for (const x of texts) if (DAY_N.test(x)) error(id, `"${x}" says "Day N": name the outcome; the order is the milestones'`);
+    };
+    const size = (level, key, n) => {
+      const [min, max, many, one] = SIZES[level];
+      if (n && (n < min || n > max)) warn(key, `${level} has ${n} ${n === 1 ? one : many}; ${min}–${max} is the usual size`);
+    };
+    for (const l of lanes.values()) {
+      days(l.key, l.key);
+      if (!l.epics.length) error(l.key, 'lane has no epics');
     }
-    for (const [laneKey, l] of lanes) {
-      for (const key of Object.keys(l?.epics ?? {})) if (!used.has(`${laneKey}/${key}`)) warn(`${laneKey}/${key}`, 'epic has no tasks');
+    for (const e of epics.values()) {
+      days(e.key, e.key, e.title);
+      if (!e.features.length) error(e.key, 'epic has no features');
+      size('epic', e.key, e.features.length);
+    }
+    for (const f of features.values()) {
+      days(f.key, f.key, f.title);
+      if (!f.stories.length) error(f.key, 'feature has no stories');
+      size('feature', f.key, f.stories.length);
+    }
+    for (const st of stories.values()) {
+      days(st.key, st.key, st.title);
+      const n = byStory.get(st.key)?.length ?? 0;
+      if (!n) error(st.key, 'story has no tasks');
+      size('story', st.key, n);
+    }
+    for (const [id, t] of T) {
+      if (typeof t.title === 'string') days(id, t.title);
+      if (t.story === undefined) continue; // the schema reports it
+      const st = stories.get(t.story);
+      if (!st) {
+        error(id, `story ${t.story} is not declared in taskset.yaml`);
+        continue;
+      }
+      const lane = lanes.get(st.lane);
+      if (lane.repo !== t.repo) error(id, `builds ${t.repo}, but its story ${t.story} is in lane ${lane.key}, which builds ${lane.repo}`);
+    }
+    for (const [id, h] of H) if (h.story !== undefined && !stories.has(h.story)) error(id, `story ${h.story} is not declared in taskset.yaml`);
+  }
+
+  // The milestones: every task in exactly one, most specific first (task, story, feature); no task waits on a later
+  // one; every placeholder wired in by exactly one task, in its dependencies' milestone or later.
+  if (milestones) {
+    const seen = new Set();
+    for (const m of milestones) {
+      if (seen.has(m.key)) error(m.key, 'milestone is declared twice');
+      seen.add(m.key);
+      if (DAY_N.test(m.key) || DAY_N.test(m.title)) error(m.key, `milestone "${m.title}" says "Day N": name the outcome someone can see`);
+      for (const f of m.features) if (!features.has(f)) error(m.key, `names feature ${f}, which taskset.yaml doesn't declare`);
+      for (const st of m.stories) if (!stories.has(st)) error(m.key, `names story ${st}, which taskset.yaml doesn't declare`);
+      for (const t of m.tasks) if (!T.has(t)) error(m.key, `names task ${t}, which does not exist`);
+    }
+    const named = (pick) => {
+      const out = new Map();
+      for (const m of milestones) for (const k of pick(m)) out.set(k, [...(out.get(k) ?? []), m.key]);
+      return out;
+    };
+    const byTask = named((m) => m.tasks);
+    const byStoryKey = named((m) => m.stories);
+    const byFeature = named((m) => m.features);
+    const of = new Map();
+    const count = new Map(milestones.map((m) => [m.key, 0]));
+    for (const [id, t] of T) {
+      const feature = stories.get(t.story)?.feature;
+      const found = [['task', byTask.get(id)], ['story', byStoryKey.get(t.story)], ['feature', feature ? byFeature.get(feature) : undefined]].find(([, list]) => list?.length);
+      if (!found) {
+        error(id, `is in no milestone: name its feature, its story (${t.story}) or the task itself in milestones.yaml`);
+        continue;
+      }
+      const [by, list] = found;
+      if (list.length > 1) error(id, `is in ${list.length} milestones by its ${by} (${list.join(', ')}); name it in one`);
+      of.set(id, list[0]);
+      count.set(list[0], count.get(list[0]) + 1);
+    }
+    for (const [key, n] of count) if (!n && seen.has(key)) warn(key, 'milestone has no tasks: what it names belongs to more specific milestones');
+    const index = new Map(milestones.map((m, i) => [m.key, i]));
+    const at = (id) => index.get(of.get(id)) ?? -1;
+    const title = (key) => milestones.find((m) => m.key === key)?.title ?? key;
+    for (const [id, t] of T) {
+      if (!of.has(id)) continue;
+      for (const d of t.blocked_by) {
+        if (!of.has(d) || at(d) <= at(id)) continue;
+        error(id, `waits on ${d}, which is in a later milestone (${title(of.get(d))}, after ${title(of.get(id))}): pull ${d} forward, or build ${id} against a placeholder (placeholder_for: [${d}]) with a wiring task in ${of.get(d)} or later`);
+      }
+    }
+    const wiring = new Map();
+    for (const [id, w] of T) for (const p of w.wires) wiring.set(p, [...(wiring.get(p) ?? []), id]);
+    for (const [id, t] of T) {
+      for (const p of t.placeholder_for) {
+        if (!T.has(p)) error(id, `placeholder_for ${p}, which does not exist`);
+        if (t.blocked_by.includes(p)) error(id, `placeholder_for ${p}, but also blocked_by it: a placeholder means it doesn't wait`);
+      }
+      if (t.placeholder_for.length) {
+        const w = wiring.get(id) ?? [];
+        if (w.length !== 1) error(id, w.length ? `is wired by ${w.length} tasks (${w.join(', ')}); one wiring task replaces its placeholder` : `builds against a placeholder for ${t.placeholder_for.join(', ')}, but no task wires it in: add a task with wires: [${id}]`);
+      }
+      for (const p of t.wires) {
+        const ph = T.get(p);
+        if (!ph) {
+          error(id, `wires ${p}, which does not exist`);
+          continue;
+        }
+        if (!ph.placeholder_for.length) {
+          error(id, `wires ${p}, which has no placeholder_for`);
+          continue;
+        }
+        const needs = [p, ...ph.placeholder_for];
+        const missing = needs.filter((d) => !t.blocked_by.includes(d));
+        if (missing.length) error(id, `wires ${p}, so it is blocked_by ${needs.join(', ')}; add ${missing.join(', ')}`);
+        const late = needs.filter((d) => T.has(d) && at(d) > at(id));
+        if (late.length && at(id) >= 0) error(id, `wires ${p}, but ${late.join(', ')} ${late.length === 1 ? 'is' : 'are'} in a later milestone: a wiring task goes in its dependencies' milestone or later`);
+      }
     }
   }
 

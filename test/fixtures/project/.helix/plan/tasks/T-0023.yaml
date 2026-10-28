@@ -1,0 +1,14 @@
+id: T-0023
+repo: acme-app
+story: open-shared-link
+area: sharing/gone
+title: "A link to a page taken down says it is no longer published"
+reqs: [PB-2]
+spec: ["§11 Requirements"]
+acceptance:
+  - "e2e: [PB-2] the link of an unpublished page shows \"no longer published\""
+blocked_by: [T-0014]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

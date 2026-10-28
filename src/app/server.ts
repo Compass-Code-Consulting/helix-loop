@@ -28,7 +28,6 @@ import { estimateLevels, monitorChanges, monitorShouldRun, monitorTurnCosts } fr
 import { listPrompts, monitorPromptName, resetPrompt, savePrompt } from './prompts.ts';
 import { loadSettings, saveSettings } from './settings.ts';
 import { appState, loopStatus, mapModel, metricsModel, readReports, snapshot, type Snapshot } from './state.ts';
-import { readTaskSetFile } from './taskset.ts';
 import { addComment, addMessage, addReply, allThreads, decide, isTarget, newConversationTarget, thread, ThreadError } from './threads.ts';
 import { buildView, helixSummary, mergeBuckets, pilotView, resolvedRecord, welcome, type View } from './views.ts';
 import * as ops from '../ops/index.ts';
@@ -218,7 +217,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     }
     const parts = rel.split(sep);
     const [a, b] = parts;
-    if (a === 'plan' && (b === 'tasks' || b === 'human' || b === 'taskset.yaml')) return [w, 'plan'];
+    if (a === 'plan' && (b === 'tasks' || b === 'human' || b === 'taskset.yaml' || b === 'milestones.yaml' || b === 'history')) return [w, 'plan'];
     if (a === 'config.yaml' || a === 'helix') return [w, 'config'];
     if (a === 'app.yaml') return w === 'real' ? [w, 'settings'] : undefined;
     if (a !== 'runs') return undefined;
@@ -658,13 +657,17 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
           forget(agent);
           return reply(res, 200, { ok: true });
         }
-        case '/api/taskset/init':
-          if (readTaskSetFile(roots.real)) throw new HttpError(409, '.helix/plan/taskset.yaml exists already');
-          return reply(res, 200, cliJob('real', 'Write the TaskSet: one epic per lane and feature', ['taskset', 'init']));
         case '/api/taskset/import': {
           const from = String(body.path ?? '').replace(/^~(?=\/)/, process.env.HOME ?? '~');
           if (!/^\/[\w ./@-]+$/.test(from) || from.includes('..')) throw new HttpError(400, 'an absolute path to a TaskSet folder or zip');
           return reply(res, 200, cliJob('real', `Check a TaskSet against the running plan`, ['taskset', 'import', from, ...(body.apply ? ['--apply'] : []), ...(body.dry ? ['--dry-run'] : [])]));
+        }
+        case '/api/milestones/check':
+        case '/api/milestones/apply': {
+          const from = String(body.path ?? '').replace(/^~(?=\/)/, process.env.HOME ?? '~');
+          if (!/^\/[\w ./@-]+$/.test(from) || from.includes('..')) throw new HttpError(400, 'an absolute path to a Milestones folder');
+          const apply = path.endsWith('/apply');
+          return reply(res, 200, cliJob('real', apply ? 'Apply Helix Milestones' : 'Check Helix Milestones against the plan', ['milestones', apply ? 'apply' : 'check', from]));
         }
         case '/api/skill/pack':
           return reply(res, 200, await packSkill(PACKAGE_ROOT, join(paths(roots.real).runs, 'helix-skill.zip')));
@@ -831,23 +834,32 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
   function tasksetSummary() {
     const v = view('real');
     const plan = snap('real').plan;
-    const file = readTaskSetFile(roots.real);
+    const ts = plan.taskset;
     const problems = snap('real').problems;
     const tooBig = [...plan.tasks.values()].filter((t) => t.status !== 'done' && t.estimate_passes > 1).length;
     const noTest = [...plan.tasks.values()].filter((t) => !t.acceptance?.length).length;
+    const forward = problems.filter((p) => /in a later milestone/.test(p.message)).length;
+    const next = v.board.milestones.find((m) => !m.reached);
     return {
-      file: !!file,
-      lanes: v.board.lanes.length,
-      epics: v.board.epics.length,
+      file: !!ts,
+      revision: ts?.revision,
+      lanes: ts?.lanes.length ?? 0,
+      epics: ts?.epics.size ?? 0,
+      features: ts?.features.size ?? 0,
+      stories: ts?.stories.size ?? 0,
       tasks: plan.tasks.size,
       human: plan.human.size,
       deps: [...plan.tasks.values()].reduce((n, t) => n + t.blocked_by.length, 0),
       critical: v.board.criticalPath.length,
       problems: problems.length,
+      milestones: { count: v.board.milestones.length, reached: v.board.milestones.filter((m) => m.reached).length, next: next && { title: next.title, at: next.at }, placeholders: [...plan.tasks.values()].filter((t) => t.placeholder_for?.length).length },
       checks: [
-        file
-          ? { ok: !v.board.missingEpics.length, text: v.board.missingEpics.length ? `${v.board.missingEpics.length} tasks name no declared epic` : 'Every task sits in a lane and an epic' }
-          : { ok: false, warn: true, text: 'Epics are derived from each task\'s feature until .helix/plan/taskset.yaml is written' },
+        ts
+          ? { ok: !v.board.unplaced.length, text: v.board.unplaced.length ? `${v.board.unplaced.length} tasks name a story the TaskSet doesn't declare` : 'Every task sits in a story, feature, epic and lane' }
+          : { ok: false, text: 'No version 2 TaskSet in .helix/plan/taskset.yaml: helix-loop validate says why' },
+        plan.milestones
+          ? { ok: !forward, text: forward ? `${forward} dependencies point to a later milestone` : 'Every task is in a milestone, and none waits on a later one' }
+          : { ok: false, text: 'No Helix Milestones yet: the loop runs only a plan with a delivery order' },
         { ok: !problems.some((p) => /cycle/i.test(p.message)), text: `No dependency cycles; ${v.board.criticalPath.length} tasks on the critical path` },
         { ok: !problems.some((p) => /requirement/i.test(p.message)), text: 'Every requirement maps to at least one task' },
         { ok: tooBig === 0, warn: tooBig > 0, text: tooBig ? `${tooBig} open tasks are estimated at more than one pass` : 'Every task fits one pass' },

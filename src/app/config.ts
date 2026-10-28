@@ -60,7 +60,7 @@ export const CONTROLS: Control[] = [
   { key: 'union_merge_paths', group: 'merge', label: 'Union-merged files', note: 'Rebases keep both sides', type: 'list' },
   { key: 'forbidden_paths', group: 'safety', label: 'Forbidden paths', note: 'A pass touching them is refused', type: 'list' },
   { key: 'agent_network.allowed_domains', group: 'safety', label: 'Network allowlist', note: 'Claude Code sandbox only', type: 'list' },
-  { key: 'release.every_merged_tasks', group: 'safety', label: 'Release every', note: 'Or when a stage closes', type: 'int', unit: 'merged', min: 1, max: 10_000 },
+  { key: 'release.every_merged_tasks', group: 'safety', label: 'Release every', note: 'And when a milestone is reached', type: 'int', unit: 'merged', min: 1, max: 10_000 },
   { key: 'release.review_paths', group: 'safety', label: 'Review before tagging', note: 'Always asks, at every pilot level', type: 'list' },
 ];
 

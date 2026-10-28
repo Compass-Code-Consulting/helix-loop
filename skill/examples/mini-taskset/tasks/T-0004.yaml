@@ -1,8 +1,7 @@
 id: T-0004
 repo: acme-app
-stage: day1
+story: export-csv
 area: web/admin-waitlist
-epic: waitlist-core
 title: An Admin downloads the confirmed sign-ups as a CSV file from the admin screen
 reqs: [WL-5]
 spec: ["§4 Waitlist", "§4 Requirements"]

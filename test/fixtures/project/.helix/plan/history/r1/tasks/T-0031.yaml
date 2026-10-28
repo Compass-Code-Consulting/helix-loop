@@ -1,0 +1,15 @@
+id: T-0031
+repo: acme-website
+story: start-workspace
+area: site/signup
+title: "The sign-up button starts a workspace in the app"
+reqs: [WEB-2, NAV-2]
+spec: ["§1", "§19"]
+acceptance:
+  - "e2e: [WEB-2] Sign up on the website lands on the app's sign-in"
+  - "e2e: [NAV-2] the sign-in screen opens at its own URL"
+blocked_by: [T-0029, T-0003]
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []

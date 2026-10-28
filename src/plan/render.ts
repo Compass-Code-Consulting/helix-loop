@@ -1,96 +1,171 @@
-import type { TaskSet } from '../app/taskset.ts';
 import type { ProjectInfo } from '../config.ts';
 import type { SpecIndex } from '../spec/index.ts';
 import type { HumanTask, MapModel, Plan, Task } from '../types.ts';
-import { stageIndex, stagesOf, stageTitle } from './stages.ts';
+import { membership, wiringOf } from './milestones.ts';
 import type { Synthetic } from './requirements.ts';
+import { tasksByStory, trailOf } from './taskset.ts';
 
-// Renders the plan data into the two documents people read: the Implementation Plan, Lane › Epic › Task as the
-// TaskSet orders them, and the Human Implementation Plan for the owner. Generated after every plan change; never
-// edited by hand.
+// Renders the plan data into the two documents people read: the Implementation Plan, with the milestones in
+// delivery order and then the scope as Lane › Epic › Feature › Story › Task, and the Human Implementation Plan for
+// the owner. Generated after every plan change; never edited by hand.
 
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n+/g, ' ');
 const passes = (ts: Task[]) => ts.reduce((s, t) => s + t.estimate_passes, 0);
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const formats = (timeZone: string) => ({
   date: (iso: string) => new Date(iso).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone, timeZoneName: 'short' }),
   day: (iso: string) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone }),
 });
 
-// The stages an epic's tasks fall in, as "Day 1–Day 3" or "Day 2"; nothing for a plan without stages.
-function stageSpan(plan: Plan, tasks: Task[]): string {
-  const stages = stagesOf(plan);
-  const at = [...new Set(tasks.filter((t) => t.stage).map((t) => stageIndex(stages, t.stage)))].sort((a, b) => a - b);
-  if (!at.length) return '';
-  const label = (i: number) => stageTitle(plan, stages[i]!).split(':')[0]!;
-  return at.length === 1 ? label(at[0]!) : `${label(at[0]!)}–${label(at.at(-1)!)}`;
-}
+// When each milestone was reached, or is projected to be (app/board.ts), for the plan's milestones section.
+export type MilestoneDates = Map<string, { at?: number; reached: boolean }>;
 
-export function renderImplementationPlan(plan: Plan, map: MapModel, index: SpecIndex, synthetic: Synthetic[], taskset: TaskSet, info: ProjectInfo): string {
-  const { date } = formats(info.timezone);
+export function renderImplementationPlan(plan: Plan, map: MapModel, index: SpecIndex, synthetic: Synthetic[], info: ProjectInfo, dates: MilestoneDates = new Map()): string {
+  const { date, day } = formats(info.timezone);
   const tasks = [...plan.tasks.values()];
+  const ts = plan.taskset;
   const byId = new Map(map.nodes.map((n) => [n.id, n]));
-  const epicTasks = (ids: string[]) => ids.map((id) => plan.tasks.get(id)).filter((t): t is Task => !!t);
-  const done = (ts: Task[]) => ts.filter((t) => t.status === 'done').length;
-  const hasStages = stagesOf(plan).length > 0;
+  const byStory = tasksByStory(plan);
+  const done = (list: Task[]) => list.filter((t) => t.status === 'done').length;
+  const member = membership(plan);
+  const ms = plan.milestones ?? [];
+  const msTitle = new Map(ms.map((m, i) => [m.key, `${i + 1}. ${m.title}`]));
+  const wiring = wiringOf(plan);
+  const order = (list: Task[]) => [...list].sort((a, b) => (byId.get(a.id)?.es ?? 0) - (byId.get(b.id)?.es ?? 0) || a.id.localeCompare(b.id));
+  const ofFeature = (key: string) => (ts?.features.get(key)?.stories ?? []).flatMap((s) => byStory.get(s) ?? []);
+  const ofEpic = (key: string) => (ts?.epics.get(key)?.features ?? []).flatMap(ofFeature);
+  const ofLane = (keys: string[]) => keys.flatMap(ofEpic);
   const out: string[] = [];
   out.push(`# ${info.name} Implementation Plan`);
   out.push('');
-  out.push(`Generated ${date(map.generatedAt)} from the plan data in \`.helix/plan/\`, against spec v${index.version}.`);
-  out.push('Never edit this file: change the TaskSet and the task files, and regenerate it with `helix-loop plan render`.');
+  out.push(`Generated ${date(map.generatedAt)} from the plan data in \`.helix/plan/\`, against spec v${index.version}${ts ? `, TaskSet revision ${ts.revision}` : ''}.`);
+  out.push('Never edit this file: change the TaskSet, the milestones and the task files, and regenerate it with `helix-loop plan render`.');
   out.push('');
   out.push('## Summary');
   out.push('');
-  out.push(`- **Tasks:** ${tasks.length} in ${taskset.lanes.length} lane${taskset.lanes.length === 1 ? '' : 's'} and ${taskset.lanes.reduce((n, l) => n + l.epics.length, 0)} epics, estimated at ${passes(tasks)} passes.`);
+  if (ts) out.push(`- **Tasks:** ${tasks.length} in ${plural(ts.lanes.length, 'lane')}, ${plural(ts.epics.size, 'epic')}, ${plural(ts.features.size, 'feature')} and ${plural(ts.stories.size, 'story', 'stories')}, estimated at ${passes(tasks)} passes.`);
+  else out.push(`- **Tasks:** ${tasks.length}, estimated at ${passes(tasks)} passes, with no version 2 TaskSet: run \`helix-loop validate\`.`);
   out.push(`- **Status:** ${map.totals.done} done, ${map.totals.ready} ready, ${map.totals.claimed} in progress, ${map.totals.needsHuman} waiting on a person, ${map.totals.parked} parked.`);
+  const next = ms.find((m) => !dates.get(m.key)?.reached);
+  if (ms.length) out.push(`- **Milestones:** ${ms.length}, ${ms.filter((m) => dates.get(m.key)?.reached).length} reached${next ? `; next is ${next.title}${dates.get(next.key)?.at ? `, projected ${day(new Date(dates.get(next.key)!.at!).toISOString())}` : ''}` : ''}.`);
+  else out.push('- **Milestones:** none yet. Plan them with the Helix skill (`/helix milestones`) and apply them with `helix-loop milestones apply`.');
   out.push(`- **Projected finish:** ${date(map.projectedFinish)}, at ${Math.round(map.passHours * 60)} minutes per pass with ${map.agents.length} agents.`);
   out.push(`- **Critical path:** ${map.criticalPath.length} steps; the full chain is listed at the end.`);
   const pinned = tasks.filter((t) => t.agent);
   if (pinned.length) out.push(`- **Pinned:** ${pinned.length} tasks run only on ${[...new Set(pinned.map((t) => `${t.agent}${t.role === 'design' ? ' in the design role' : ''}`))].join(' or ')}.`);
-  if (taskset.derived) out.push('- **Epics:** derived from each task\'s feature, since the plan has no `taskset.yaml` yet (`helix-loop taskset init` writes one).');
   out.push('');
-  if (hasStages) {
-    out.push('Each task also belongs to a stage. A stage opens when every task in earlier stages is done, waiting on a person, or design work; inside the open stages the loop runs the critical path first.');
+
+  // The milestones, in delivery order.
+  if (ms.length) {
+    out.push('## Milestones');
     out.push('');
-  }
-  out.push(`| Lane | Epic | Tasks | Done | Passes |${hasStages ? ' Stages |' : ''}`);
-  out.push(`| --- | --- | --- | --- | --- |${hasStages ? ' --- |' : ''}`);
-  for (const l of taskset.lanes) {
-    for (const e of l.epics) {
-      const ts = epicTasks(e.tasks);
-      if (!ts.length) continue;
-      out.push(`| ${l.name} | ${cell(e.title)} | ${ts.length} | ${done(ts)} | ${passes(ts)} |${hasStages ? ` ${stageSpan(plan, ts)} |` : ''}`);
+    out.push('The order the work is delivered in: each is a demoable outcome. Milestones are a priority, not a gate: the loop takes ready work in the earliest milestone not yet reached first, and later work when nothing earlier is ready. When a milestone is reached, each lane it touched is released.');
+    out.push('');
+    out.push('| Milestone | Tasks | Done | Passes | Reached or projected |');
+    out.push('| --- | --- | --- | --- | --- |');
+    for (const m of ms) {
+      const list = (member.tasks.get(m.key) ?? []).map((id) => plan.tasks.get(id)!);
+      const d = dates.get(m.key);
+      out.push(`| ${cell(msTitle.get(m.key)!)} | ${list.length} | ${done(list)} | ${passes(list)} | ${d?.at ? `${d.reached ? 'reached' : 'projected'} ${day(new Date(d.at).toISOString())}` : '—'} |`);
+    }
+    out.push('');
+    for (const m of ms) {
+      const list = (member.tasks.get(m.key) ?? []).map((id) => plan.tasks.get(id)!);
+      const d = dates.get(m.key);
+      out.push(`### ${msTitle.get(m.key)}`);
+      out.push('');
+      out.push(`**Demo:** ${m.demo}`);
+      out.push('');
+      out.push(`${plural(list.length, 'task')}, ${done(list)} done, ${passes(list)} passes.${d?.at ? ` ${d.reached ? 'Reached' : 'Projected'} ${date(new Date(d.at).toISOString())}.` : ''}`);
+      out.push('');
+      if (m.features.length) out.push(`- **Features:** ${m.features.map((f) => `${ts?.features.get(f)?.title ?? f} (\`${f}\`)`).join(', ')}.`);
+      if (m.stories.length) out.push(`- **Stories, from features placed later:** ${m.stories.map((s) => `${ts?.stories.get(s)?.title ?? s} (\`${s}\`)`).join(', ')}.`);
+      if (m.tasks.length) out.push(`- **Tasks, from stories placed elsewhere:** ${m.tasks.map((id) => `${id} ${plan.tasks.get(id)?.title ?? ''}`.trim()).join('; ')}.`);
+      const placeholders = list.filter((t) => t.placeholder_for?.length);
+      for (const t of placeholders) out.push(`- **Placeholder:** ${t.id} is built before ${t.placeholder_for!.join(', ')}, against a placeholder; ${wiring.get(t.id)?.map((w) => `${w.id} wires it in${member.of.get(w.id) ? ` (${msTitle.get(member.of.get(w.id)!)})` : ''}`).join(', ') || 'nothing wires it in yet'}.`);
+      for (const w of list.filter((t) => t.wires?.length)) out.push(`- **Wiring:** ${w.id} replaces the placeholder${w.wires!.length === 1 ? '' : 's'} in ${w.wires!.join(', ')} with the real ${w.wires!.flatMap((p) => plan.tasks.get(p)?.placeholder_for ?? []).join(', ')}.`);
+      out.push('');
     }
   }
-  out.push(`| **Total** | | ${tasks.length} | ${done(tasks)} | ${passes(tasks)} |${hasStages ? ' |' : ''}`);
-  out.push('');
-  for (const l of taskset.lanes) {
-    const laneTasks = l.epics.flatMap((e) => epicTasks(e.tasks));
-    if (!laneTasks.length) continue;
-    out.push(`## ${l.name}`);
+
+  // The scope, Lane › Epic › Feature › Story › Task.
+  if (ts) {
+    out.push('## Scope');
     out.push('');
-    out.push(`${laneTasks.length} tasks in ${l.epics.length} epics, ${done(laneTasks)} done, ${passes(laneTasks)} passes.`);
+    out.push('Lane › Epic › Feature › Story › Task, in the TaskSet\'s reading order. Within a story, tasks are listed in the order the dependency map can start them.');
     out.push('');
-    for (const e of l.epics) {
-      const rows = epicTasks(e.tasks).sort((a, b) => (byId.get(a.id)?.es ?? 0) - (byId.get(b.id)?.es ?? 0) || a.id.localeCompare(b.id));
-      if (!rows.length) continue;
-      const span = stageSpan(plan, rows);
-      out.push(`### ${e.title}`);
-      out.push('');
-      out.push(`${rows.length} tasks, ${done(rows)} done, ${passes(rows)} passes${span ? `, in ${span}` : ''}.`);
-      out.push('');
-      out.push(`| Task | Title |${hasStages ? ' Stage |' : ''} Requirements | Waits on | Passes | Status |`);
-      out.push(`| --- | --- |${hasStages ? ' --- |' : ''} --- | --- | --- | --- |`);
-      for (const t of rows) {
-        const crit = byId.get(t.id)?.critical ? ' ◆' : '';
-        const who = t.agent ? ` (${t.agent}${t.role ? `, ${t.role}` : ''})` : '';
-        const stage = hasStages ? ` ${t.stage ? stageTitle(plan, t.stage).split(':')[0] : '—'} |` : '';
-        out.push(`| ${t.id}${crit} | ${cell(t.title)}${who} |${stage} ${t.reqs.join(', ')} | ${t.blocked_by.join(', ') || '—'} | ${t.estimate_passes} | ${t.status} |`);
+    out.push('| Lane | Epic | Features | Stories | Tasks | Done | Passes |');
+    out.push('| --- | --- | --- | --- | --- | --- | --- |');
+    for (const l of ts.lanes) {
+      for (const k of l.epics) {
+        const e = ts.epics.get(k)!;
+        const list = ofEpic(k);
+        out.push(`| ${l.key} | ${cell(e.title)} | ${e.features.length} | ${e.features.reduce((n, f) => n + (ts.features.get(f)?.stories.length ?? 0), 0)} | ${list.length} | ${done(list)} | ${passes(list)} |`);
       }
+    }
+    out.push(`| **Total** | | ${ts.features.size} | ${ts.stories.size} | ${tasks.length} | ${done(tasks)} | ${passes(tasks)} |`);
+    out.push('');
+    for (const l of ts.lanes) {
+      const laneTasks = ofLane(l.epics);
+      out.push(`## ${l.key}`);
       out.push('');
+      out.push(`Builds \`${l.repo}\`: ${plural(l.epics.length, 'epic')}, ${plural(laneTasks.length, 'task')}, ${done(laneTasks)} done, ${passes(laneTasks)} passes.`);
+      out.push('');
+      for (const ek of l.epics) {
+        const e = ts.epics.get(ek)!;
+        out.push(`### ${e.title}`);
+        out.push('');
+        out.push(`${e.outcome} (\`${e.key}\`: ${plural(e.features.length, 'feature')}, ${done(ofEpic(ek))} of ${plural(ofEpic(ek).length, 'task')} done.)`);
+        out.push('');
+        for (const fk of e.features) {
+          const f = ts.features.get(fk)!;
+          out.push(`#### ${f.title}`);
+          out.push('');
+          out.push(`${f.capability ? `${f.capability} ` : ''}(\`${f.key}\`: ${plural(f.stories.length, 'story', 'stories')}, ${done(ofFeature(fk))} of ${plural(ofFeature(fk).length, 'task')} done.)`);
+          out.push('');
+          for (const sk of f.stories) {
+            const st = ts.stories.get(sk)!;
+            const rows = order(byStory.get(sk) ?? []);
+            out.push(`##### ${st.title}`);
+            out.push('');
+            out.push(`${st.need} (\`${st.key}\`)`);
+            out.push('');
+            if (!rows.length) {
+              out.push('No tasks yet.');
+              out.push('');
+              continue;
+            }
+            out.push('| Task | Title | Milestone | Requirements | Waits on | Passes | Status |');
+            out.push('| --- | --- | --- | --- | --- | --- | --- |');
+            for (const t of rows) out.push(taskRow(t));
+            out.push('');
+          }
+        }
+      }
     }
   }
-  out.push('◆ marks a task on the critical path.');
+  const stray = tasks.filter((t) => !ts?.stories.has(t.story));
+  if (stray.length) {
+    out.push('## Not in the TaskSet');
+    out.push('');
+    out.push('These tasks name a story the TaskSet does not declare; `helix-loop validate` reports each.');
+    out.push('');
+    out.push('| Task | Title | Milestone | Requirements | Waits on | Passes | Status |');
+    out.push('| --- | --- | --- | --- | --- | --- | --- |');
+    for (const t of order(stray)) out.push(taskRow(t));
+    out.push('');
+  }
+  out.push('◆ marks a task on the critical path; ⧉ one built against a placeholder; ⇄ a task that wires one in.');
   out.push('');
+
+  function taskRow(t: Task): string {
+    const crit = byId.get(t.id)?.critical ? ' ◆' : '';
+    const mark = t.placeholder_for?.length ? ` ⧉ (placeholder for ${t.placeholder_for.join(', ')})` : t.wires?.length ? ` ⇄ (wires ${t.wires.join(', ')})` : '';
+    const who = t.agent ? ` (${t.agent}${t.role ? `, ${t.role}` : ''})` : '';
+    const m = member.of.get(t.id);
+    return `| ${t.id}${crit} | ${cell(t.title)}${who}${mark} | ${m ? cell(msTitle.get(m)!) : '—'} | ${t.reqs.join(', ')} | ${t.blocked_by.join(', ') || '—'} | ${t.estimate_passes} | ${t.status} |`;
+  }
+
   out.push('## Requirement coverage');
   out.push('');
   out.push('Every requirement in the spec and every synthetic requirement, with the tasks that deliver it.');
@@ -109,8 +184,8 @@ export function renderImplementationPlan(plan: Plan, map: MapModel, index: SpecI
   out.push('');
   for (const id of map.criticalPath) {
     const n = byId.get(id)!;
-    const e = taskset.epicOf.get(id);
-    out.push(`1. ${id} (${n.kind === 'human' ? 'human step' : `${e ? `${e.lane} › ${e.title}` : 'no epic'}`}): ${n.title}`);
+    const where = trailOf(ts, plan.tasks.get(id)?.story);
+    out.push(`1. ${id} (${n.kind === 'human' ? 'human step' : where.story ? `${where.lane!.key} › ${where.feature!.title} › ${where.story.title}` : 'not in the TaskSet'}): ${n.title}`);
   }
   out.push('');
   return out.join('\n');
@@ -118,6 +193,8 @@ export function renderImplementationPlan(plan: Plan, map: MapModel, index: SpecI
 
 export function renderHumanPlan(plan: Plan, map: MapModel, info: ProjectInfo): string {
   const { date, day } = formats(info.timezone);
+  const member = membership(plan);
+  const msTitle = new Map((plan.milestones ?? []).map((m) => [m.key, m.title]));
   const byId = new Map(map.nodes.map((n) => [n.id, n]));
   const isDone = (id: string) => (plan.tasks.get(id)?.status ?? plan.human.get(id)?.status) === 'done';
   const waitsOn = (h: HumanTask) => h.blocked_by.filter((d) => !isDone(d));
@@ -161,7 +238,7 @@ export function renderHumanPlan(plan: Plan, map: MapModel, info: ProjectInfo): s
   out.push(`- **Steps:** ${all.length}: ${all.filter((h) => h.status === 'todo').length} to do, ${all.filter((h) => h.status === 'in_progress').length} in progress, ${done.length} done; ${fastFollow.length} of the open ones are for the fast follow.`);
   out.push(`- **Start now:** ${now.length} steps wait on nothing else.`);
   const lateSteps = launch.filter(late);
-  if (lateSteps.length) out.push(`- **Late for the build:** ${lateSteps.map((h) => h.id).join(', ')} gate builder tasks that could already run; until they're done those tasks wait (they never hold a stage).`);
+  if (lateSteps.length) out.push(`- **Late for the build:** ${lateSteps.map((h) => h.id).join(', ')} gate builder tasks that could already run; until they're done those tasks wait, and the loop takes other work.`);
   if (map.humanFinish && launchPath.size) {
     out.push(`- **Last human step done:** no earlier than ${day(map.humanFinish)} at the lead times planned here, set by ${[...launchPath].join(' → ')}.`);
   }
@@ -201,7 +278,8 @@ export function renderHumanPlan(plan: Plan, map: MapModel, info: ProjectInfo): s
     out.push(`- **Agent can help:** ${h.agent_can_help}.`);
     if (h.blocked_by.length) out.push(`- **Waits on:** ${h.blocked_by.map((d) => `${d}${isDone(d) ? ' (done)' : ''}`).join(', ')}.`);
     const b = blocks.get(h.id) ?? [];
-    if (b.length) out.push(`- **Blocks:** ${b.map((t) => `${t.id}${t.stage ? ` (${stageTitle(plan, t.stage)})` : ''}`).join(', ')}.`);
+    if (b.length) out.push(`- **Blocks:** ${b.map((t) => `${t.id}${member.of.has(t.id) ? ` (${msTitle.get(member.of.get(t.id)!)})` : ''}`).join(', ')}.`);
+    if (h.story && plan.taskset?.stories.has(h.story)) out.push(`- **Serves:** ${plan.taskset.stories.get(h.story)!.title} (\`${h.story}\`).`);
     if (h.tools?.length) out.push(`- **Tools:** ${h.tools.join(', ')}.`);
     if (h.secrets?.length) out.push(`- **Credentials:** ${h.secrets.map((s) => `${s.name}, kept in ${s.stored_in}`).join('; ')}.`);
     if (h.handoff_prompt) {

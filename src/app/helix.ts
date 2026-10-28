@@ -8,7 +8,9 @@ import { builderEnv } from '../agents/adapter.ts';
 import { loadConfig, logFile, monitorModel, monitorOf, paths, type Config } from '../config.ts';
 import { readLedger } from '../ledger.ts';
 import { hashToken, newToken } from '../live.ts';
+import { membership } from '../plan/milestones.ts';
 import { loadPlan } from '../plan/store.ts';
+import { trailOf } from '../plan/taskset.ts';
 import { run } from '../proc.ts';
 import { loadIndex, sliceSection } from '../spec/index.ts';
 import type { AgentName, Task } from '../types.ts';
@@ -82,27 +84,32 @@ export const ASSISTANT_TOOLS: Tool<HelixContext>[] = [
   },
   {
     name: 'find_tasks',
-    description: 'Tasks matching every filter given: text in the id, title or summary, and area, feature, repo, stage or status. At most 40, each as one line.',
+    description: 'Tasks matching every filter given: text in the id, title or summary; area; under (a story, feature, epic or lane key: the tasks under it); repo; milestone (its key); status. At most 40, each as one line.',
     inputSchema: {
       type: 'object',
-      properties: { text: { type: 'string' }, area: { type: 'string' }, feature: { type: 'string' }, repo: { type: 'string' }, stage: { type: 'string' }, status: { type: 'string' } },
+      properties: { text: { type: 'string' }, area: { type: 'string' }, under: { type: 'string' }, repo: { type: 'string' }, milestone: { type: 'string' }, status: { type: 'string' } },
       additionalProperties: false,
     },
     call: (args, { root }) => {
       const f = (k: string) => str(args, k, 200, false)?.toLowerCase();
-      const [text, area, feature, repo, stage, status] = ['text', 'area', 'feature', 'repo', 'stage', 'status'].map(f);
+      const [text, area, under, repo, milestone, status] = ['text', 'area', 'under', 'repo', 'milestone', 'status'].map(f);
       const plan = planOf(root);
+      const member = membership(plan);
+      const trail = (story: string) => {
+        const t = trailOf(plan.taskset, story);
+        return [t.story?.key, t.feature?.key, t.epic?.key, t.lane?.key];
+      };
       const hits = [...plan.tasks.values()].filter(
         (t) =>
           (!text || `${t.id} ${t.title} ${t.summary ?? ''}`.toLowerCase().includes(text)) &&
           (!area || t.area.toLowerCase().includes(area)) &&
-          (!feature || (t.feature ?? '').toLowerCase().includes(feature)) &&
+          (!under || trail(t.story).includes(under)) &&
           (!repo || t.repo === repo) &&
-          (!stage || t.stage === stage) &&
+          (!milestone || member.of.get(t.id) === milestone) &&
           (!status || t.status === status),
       );
       const human = text ? [...plan.human.values()].filter((h) => `${h.id} ${h.title}`.toLowerCase().includes(text)) : [];
-      const lines = [...hits.map((t) => `${t.id} [${t.status}] ${t.stage} ${t.area}: ${t.title}`), ...human.map((h) => `${h.id} [${h.status}] human: ${h.title}`)];
+      const lines = [...hits.map((t) => `${t.id} [${t.status}] ${t.story} ${t.area}: ${t.title}`), ...human.map((h) => `${h.id} [${h.status}] human: ${h.title}`)];
       return lines.length ? `${lines.slice(0, 40).join('\n')}${lines.length > 40 ? `\n… and ${lines.length - 40} more; narrow the filters` : ''}` : 'No task matches.';
     },
   },
@@ -233,18 +240,18 @@ export const ASSISTANT_TOOLS: Tool<HelixContext>[] = [
   {
     name: 'propose_task',
     description:
-      'Propose a new task, for example one half of a split. the owner accepts or declines it in the app; nothing is created until they accept. Give repo, stage, area, feature, title, reqs, spec, acceptance, blocked_by and estimate_passes as a planner would.',
+      'Propose a new task, for example one half of a split. the owner accepts or declines it in the app; nothing is created until they accept. Give repo, story (one the TaskSet declares, in the lane that builds the repo), area, title, reqs, spec, acceptance, blocked_by and estimate_passes as a planner would.',
     inputSchema: {
       type: 'object',
       properties: {
         task: {
           type: 'object',
           properties: {
-            repo: { type: 'string' }, stage: { type: 'string' }, area: { type: 'string' }, feature: { type: 'string' }, title: { type: 'string' },
+            repo: { type: 'string' }, story: { type: 'string' }, area: { type: 'string' }, title: { type: 'string' },
             reqs: { type: 'array', items: { type: 'string' } }, spec: { type: 'array', items: { type: 'string' } }, acceptance: { type: 'array', items: { type: 'string' } },
             blocked_by: { type: 'array', items: { type: 'string' } }, estimate_passes: { type: 'number' }, priority: { enum: ['fix_first', 'normal'] }, agent: { enum: ['claude', 'codex'] }, notes: { type: 'string' },
           },
-          required: ['repo', 'stage', 'area', 'title', 'reqs', 'spec', 'acceptance', 'blocked_by', 'estimate_passes'],
+          required: ['repo', 'story', 'area', 'title', 'reqs', 'spec', 'acceptance', 'blocked_by', 'estimate_passes'],
           additionalProperties: false,
         },
         why: { type: 'string', description: 'One sentence the owner reads beside the proposal.' },
@@ -308,7 +315,7 @@ const CHANGE_SCHEMA = {
     type: 'object',
     properties: {
       op: { enum: ['hand_back', 'park', 'note', 'add_dep', 'remove_dep', 'new_task', 'pause'] },
-      task: { description: 'A task id; for new_task, the new task as a planner writes it (repo, stage, area, feature, title, reqs, spec, acceptance, blocked_by, estimate_passes, priority).' },
+      task: { description: 'A task id; for new_task, the new task as a planner writes it (repo, story, area, title, reqs, spec, acceptance, blocked_by, estimate_passes, priority).' },
       note: { type: 'string' },
       on: { type: 'string', description: 'add_dep, remove_dep: the task or human task it waits on' },
       ref: { type: 'string', description: 'new_task: a name such as "new:1" other changes may use as its id' },

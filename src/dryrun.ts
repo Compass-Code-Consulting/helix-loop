@@ -13,7 +13,8 @@ import type { Task } from './types.ts';
 // The fake CLIs' launchers: beside the sources in a checkout, compiled under dist/ when installed.
 export const FAKES = import.meta.url.endsWith('.ts') ? asset('fakes') : asset('dist', 'fakes');
 
-// The parts of a project a loop reads but never writes: the spec index, the prompts and the TaskSet's file.
+// The parts of a project a loop reads but never writes: the spec index, the prompts, the TaskSet's file and its
+// milestones.
 export function seedControlPlane(root: string, from: string): void {
   const src = paths(from);
   const p = paths(root);
@@ -22,6 +23,7 @@ export function seedControlPlane(root: string, from: string): void {
   cpSync(src.specIndex, p.specIndex);
   cpSync(src.prompts, p.prompts, { recursive: true });
   if (existsSync(src.taskset)) cpSync(src.taskset, p.taskset);
+  if (existsSync(src.milestones)) cpSync(src.milestones, p.milestones);
 }
 
 // One throwaway repository per product repo, each with a skeleton commit on main.

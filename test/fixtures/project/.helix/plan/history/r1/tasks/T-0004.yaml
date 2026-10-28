@@ -1,0 +1,18 @@
+id: T-0004
+repo: acme-app
+story: operator-health
+area: ops/health
+title: "The health check reports the version and whether the database answers"
+reqs: [OPS-1]
+spec: ["§24"]
+acceptance:
+  - "integration: [OPS-1] GET /health answers the version and database: ok, or 503 when the database is down"
+blocked_by: [T-0001]
+estimate_passes: 0.5
+status: done
+claimed_by: null
+attempts:
+  - agent: codex
+    outcome: merged
+    at: "2026-10-25T13:00:00Z"
+    log: runs/logs/2026-10-25/T-1-codex-1.log

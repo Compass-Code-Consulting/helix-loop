@@ -1,0 +1,14 @@
+id: T-0017
+repo: acme-app
+story: jobs-retry
+area: platform/jobs-report
+title: "A job that fails three times is reported, with its error"
+reqs: [PLT-3]
+spec: ["§10 Background jobs"]
+acceptance:
+  - "integration: [PLT-3] a job failing three times is recorded as failed with its last error"
+blocked_by: [T-0016]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

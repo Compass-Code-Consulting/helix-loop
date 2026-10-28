@@ -1,8 +1,7 @@
 id: T-0003
 repo: acme-app
-stage: day1
+story: fair-joining
 area: api/rate-limits
-epic: waitlist-core
 title: Joining the waitlist is limited to 5 attempts a minute per client address
 reqs: [WL-4]
 spec: ["§4 Requirements"]

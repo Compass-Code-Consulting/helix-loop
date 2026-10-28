@@ -1,23 +1,38 @@
-# Example Helix TaskSet: a product waitlist, built in two lanes.
-# The app lane takes sign-ups and sends the confirmation; the website lane shows the form.
-# Lanes are the repositories the project's config names; stages are this TaskSet's own milestones.
-version: 1
-stages:
-  - { key: day0, title: "Day 0: Skeleton" }
-  - { key: day1, title: "Day 1: Waitlist" }
+# Example Helix TaskSet: a product waitlist, in one lane.
+# The scope reads Lane › Epic › Feature › Story › Task; each task names its story.
+# The order the work is delivered in is milestones.yaml, planned after this TaskSet: that made revision 2.
+version: 2
+revision: 2
+milestones: milestones.yaml
 # Both finish dates: project complete counts the human tasks' lead times (HT-1 waits up to two days on
 # domain verification); code complete leaves them out.
 timelines: [code, project]
 lanes:
-  acme-app:
+  app:
     repo: acme-app
     epics:
-      waitlist-core:
-        title: Waitlist sign-up, confirmation and export
-        stage: day1
-  acme-website:
-    repo: acme-website
-    epics:
-      waitlist-page:
-        title: Waitlist form and confirmation page
-        stage: day1
+      trusted-waitlist:
+        title: A waitlist people can trust
+        outcome: Visitors join the waitlist once, confirm their address, and the team exports exactly who is waiting.
+        features:
+          join-waitlist:
+            title: Join the waitlist
+            capability: A visitor joins from the public waitlist page with an email address, and no script can flood the list.
+            stories:
+              join-with-email:
+                title: Join with an email address
+                need: As a visitor, I want to join the waitlist with my email address, so that I hear when the product opens.
+              # An enabler story, written from whoever it protects.
+              fair-joining:
+                title: Joining stays fair under load
+                need: As the waitlist's owner, I want joining limited per client, with a plain message when someone sends too fast, so that a script can't flood the list.
+          confirmed-signups:
+            title: Confirmed sign-ups
+            capability: A visitor confirms their address in one click, and an Admin exports the confirmed list.
+            stories:
+              confirm-address:
+                title: Confirm my address
+                need: As a visitor, I want to confirm my address with one click, so that only my real address is on the list.
+              export-csv:
+                title: Download who is waiting
+                need: As an Admin, I want to download the confirmed sign-ups as a CSV file, so that I can invite them in waves.

@@ -1,47 +1,78 @@
 # From spec to TaskSet
 
-`/helix taskset` turns a hardened spec into a TaskSet: lanes and epics, atomic tasks, human tasks, and the dependencies between them.
-The loop then schedules from that graph: the critical path first, two builders never in the same area, and, when the plan has stages, a stage opening only when the earlier ones are done.
+`/helix taskset` turns a hardened spec into a TaskSet: the scope as Lane › Epic › Feature › Story › Task, the human tasks, and the dependencies between them.
+The TaskSet says what to build, not when: its first revision orders nothing beyond the dependencies.
+The order comes next, from `/helix milestones` ([milestones.md](milestones.md)), which the loop then follows: the earliest milestone's ready work first, the critical path within it, and two builders never in the same area.
 A good decomposition keeps every builder busy on work that is ready, and never asks one to build something it cannot finish and test in one pass.
+
+## The hierarchy
+
+| Level | What it is | Size in a team's terms | Size in the loop's terms |
+| --- | --- | --- | --- |
+| Lane | One repository the loop builds. Every epic lives in exactly one lane. | — | — |
+| Epic | A large strategic outcome, named for the outcome, not the code: "Social publishing", not "Publishing service". | A quarter, several sprints | 2–8 features |
+| Feature | A deliverable product capability a user would recognise, built as a vertical slice: "Network connections". | 1–2 sprints | 2–6 stories |
+| User story | One specific, user-centred need, small enough to demo on its own. | 1 sprint | 2–8 tasks |
+| Task | One concrete technical step, closed by its acceptance tests. | 1–2 days | One builder pass (`estimate_passes` 1–3) |
+
+- **Epics are outcomes.** Name what becomes true for people: "Social publishing", "A waitlist people can trust".
+  Each epic states its `outcome` in a sentence.
+- **Features are capabilities, built as vertical slices.** A feature cuts through every layer it needs (data, operations, screen) so it works end to end; "the database layer" is not a feature.
+  Each may state its `capability` in a sentence.
+- **Stories are needs, and they are INVEST**: Independent, Negotiable, Valuable, Estimable, Small and Testable.
+  A story names the person it serves in its `need`: "As a marketer, I want to connect my company's LinkedIn Page, so that Mushy can publish to it and read its metrics."
+- **Enabler stories** carry platform and infrastructure work, written from whoever benefits: the operator, the support agent, the owner, a developer using the API, or the end user it protects.
+  "As a workspace owner, I want my tokens encrypted at rest, so that a database leak exposes nothing."
+- **Tasks are steps**, each one pass with its acceptance tests; see [atomic-tasks.md](atomic-tasks.md).
+- **Outside the sizes** is a warning, not an error: fix it, or say why in your report.
+- **No days.** Nothing in a title or a key may say "Day N": the order is the milestones', and they name outcomes.
 
 ## The TaskSet
 
 ```
 plan/
-  taskset.yaml          lanes and their epics, in order
+  taskset.yaml          Lane › Epic › Feature › Story
+  milestones.yaml       the delivery order, written later by /helix milestones
   tasks/T-####.yaml     one file per task, named by its ID
   human/HT-##.yaml      one file per human task, named by its ID
-  schema/               taskset, task and human schemas
+  schema/               taskset, milestones, task and human schemas
 ```
 
 ```yaml
 # taskset.yaml
-version: 1
-stages:                     # optional milestones, in order; leave out for no stage gating
-  - { key: day0, title: "Day 0: Skeleton" }
-  - { key: day1, title: "Day 1: Foundation" }
-timelines: [code, project]  # the finish dates the app shows; [project] for one
+version: 2
+revision: 1                       # 1 for the TaskSet as first planned; each Milestones application adds one
+timelines: [code, project]        # the finish dates the app shows; [project] for one
 lanes:
-  web-app:                  # the lane's key
-    repo: web-app           # the repository it builds; tasks name it in `repo`
+  app:                            # the lane's key
+    repo: acme-app                # the repository it builds; tasks name it in `repo`
     epics:
-      sign-in:              # the epic's key; tasks name it in `epic`
-        title: Sign-in with passkeys and email codes
+      social-publishing:          # keys are unique across the whole TaskSet, at each level
+        title: Social publishing
+        outcome: Marketers plan, approve and publish to every connected network from one queue.
+        features:
+          network-connections:
+            title: Network connections
+            capability: Connect, reconnect and disconnect each network's accounts, with their history backfilled.
+            stories:
+              connect-linkedin-page:
+                title: Connect a LinkedIn Page
+                need: As a marketer, I want to connect my company's LinkedIn Page, so that Mushy can publish to it and read its metrics.
 ```
 
-The hierarchy is Lane › Epic › Task.
-Each task carries `repo` (its lane) and `epic` (its epic's key in that lane), and, when the plan has stages, `stage`.
-Stages are milestones a task belongs to, not a level of the hierarchy: an epic may have tasks in several stages.
+Each task names its story in `story`; its feature, epic and lane follow, and the lane's `repo` must be the task's `repo`.
+The YAML's order is reading order only.
+Keys are lowercase words joined by hyphens; titles are 3 to 80 characters and say what the user gets.
 `timelines` is the owner's choice of finish dates: Project complete is when everything is done, human tasks and their lead times included, and Code complete is when the last builder task would merge if every human task were done the moment it is needed.
 With both, a wait for an account or a D-U-N-S number moves Project complete but not Code complete; leaving the field out means both.
 See [atomic-tasks.md](atomic-tasks.md) for the task file and [human-tasks.md](human-tasks.md) for the human task file.
-`examples/mini-taskset/` is a complete small TaskSet.
+`examples/mini-taskset/` is a complete small TaskSet, with its milestones.
 
 ## Order of work
 
 ### 1. Read the spec for structure, not detail
 
-List the repositories (§0), the milestones the build plan names, if any, and what each one gates, the module map, the requirement prefixes, and the human tasks the spec already names.
+List the repositories (§0), the epics, features and user stories the spec names, the demoable outcomes its build plan names, the module map, the requirement prefixes, and the human tasks the spec already names.
 Read the hardening findings: tasks are planned on the resolutions, and cite them in notes as `Assumption SH-n`.
 
 ### 2. Lanes
@@ -52,7 +83,7 @@ A repository the spec defers to a later phase gets no lane yet.
 
 ### 3. The walking skeleton, first
 
-Before any feature, plan each lane's skeleton:
+Before any feature, plan each lane's skeleton, as enabler stories ("As a developer, I want one command that checks the whole repository, so that a broken change never merges"):
 
 - the repository, its real entry point, and its full check (typecheck, lint, unit tests) in one command;
 - integration tests against the real database, and end-to-end tests that start the built product and drive it through its real entry point, with an accessibility check;
@@ -60,30 +91,23 @@ Before any feature, plan each lane's skeleton:
 - CI running the same check;
 - the shared packages every feature uses: configuration, the design system, the stand-ins for external services, the seed data generator.
 
-Without these, the first day builds disconnected modules that pass their own tests and do nothing (lesson L1 below).
-They go first (in the first stage, when there are stages), and features depend on them.
+Without these, the first passes build disconnected modules that pass their own tests and do nothing (lesson L1 below).
+Features depend on them, and `/helix milestones` puts them in the first milestone.
 
-### 4. Epics
+### 4. Epics, features and stories
 
-An epic is one capability inside one lane: "Sign-in with passkeys and email codes", "Waitlist form and confirmation page".
-It is the unit the loop's map folds to, and the unit a person reads progress in.
+Work top down, from the spec's epics (outcomes), features (capabilities) and user stories (needs).
 
-- **One capability, one lane.** A feature that spans two lanes is two epics, linked by task dependencies.
-- **Capabilities, not days.** Group by what the user gets, never by when it is built: an epic's tasks may fall in several stages, and each task carries its own `stage`.
-- **Three to fifteen tasks** is the usual size. Fewer, and it is probably part of a neighbour; more, and it is probably two capabilities.
-- **Keys** are lowercase words joined by hyphens (`sign-in`, `waitlist-page`); titles say what the user gets, in plain words.
-- **Declared in build order** within each lane in `taskset.yaml`: by the earliest stage an epic reaches, then by what it waits on.
-
-### Stages (optional)
-
-Stages are milestones: "Day 0: the skeleton", "Beta: ready for the first users".
-Declare them in order under `stages` when the spec's build plan has gates worth holding work behind; a task in a later stage waits until every earlier stage is settled.
-Leave them out when it doesn't: the loop then schedules by dependencies alone.
+- **One lane each.** An epic lives in one lane; a capability that spans two repositories is two features, one per lane, linked by task dependencies.
+- **Capabilities, not layers, and never days.** Group by what the user gets, never by when it is built or which layer it touches.
+- **Each story demoable on its own.** If a story's tasks can't be shown working without another story, merge them, or cut differently.
+- **Stories for every need**, including the enablers: no task is "infrastructure" without someone it serves.
+- **Every epic has a feature, every feature a story, every story a task**; the validator reports an empty one.
 
 ### 5. Tasks
 
-Cut each epic into atomic tasks with [atomic-tasks.md](atomic-tasks.md).
-Inside an epic, the usual order is: data model and operations, then the screen, then edge cases, then the empty, loading and error states.
+Cut each story into atomic tasks with [atomic-tasks.md](atomic-tasks.md).
+Inside a story, the usual order is: data model and operations, then the screen, then edge cases, then the empty, loading and error states.
 Prefer vertical slices (an operation, its handler, its migration and the screen element that uses it) over one task per layer.
 
 ### 6. Human tasks
@@ -95,7 +119,7 @@ Block a task on a human task only when it truly cannot be built and tested witho
 ### 7. Dependencies
 
 - **Honest edges.** Every edge lengthens the critical path. Block only on what the task needs to be built and tested, not on what it is "related to".
-- **Same stage or earlier.** With stages, a task may wait only on work in its own stage or an earlier one; otherwise its stage can never close.
+- **Dependencies, not order.** Don't add an edge to say what should come first: the milestones say that. An edge is a real need.
 - **Across lanes** by task ID, like any other edge: the website's pricing page waits on the app task that serves the pricing endpoint.
 - **No cycles.** If two tasks need each other, the cut is wrong: merge them, or move the shared part into a third task both wait on.
 - **Look at the longest chain.** If one chain is much longer than the rest, the loop will finish late with idle builders; split the long tasks on it or move work off it.
@@ -109,14 +133,15 @@ Block a task on a human task only when it truly cannot be built and tested witho
 ### 9. Validate and report
 
 Run `node scripts/validate.mjs <plan-dir> --reqs <requirements list>` until it reports no errors, and fix or justify each warning.
-Then report: tasks by lane and epic (and by stage, when there are stages), total estimated passes, the longest dependency chain, the human tasks with the longest lead times, the hardening findings you raised, and anything the owner must decide.
+Then report: counts by lane, epic, feature and story, total estimated passes, the longest dependency chain, the human tasks with the longest lead times, the size warnings you kept and why, the hardening findings you raised, and anything the owner must decide.
+Once the owner imports it (`helix-loop taskset import`), plan the delivery order with `/helix milestones`.
 
 ## Planning in parallel
 
 For a large spec, several planners can each take some sections, with a shared brief:
 
 - **ID ranges** per planner (`T-1000` to `T-1299`, `HT-140` to `HT-149`) so files never collide.
-- **Capabilities** as the contract between planners: a named piece of shared work (`cap:job-queue`) with an owner, a stage, and what it provides. A planner depends on another's work only through a capability, and the owner lists the tasks that complete it; when the plans are merged, each `cap:` reference is replaced by those tasks.
+- **Capabilities** as the contract between planners: a named piece of shared work (`cap:job-queue`) with an owner and what it provides. A planner depends on another's work only through a capability, and the owner lists the tasks that complete it; when the plans are merged, each `cap:` reference is replaced by those tasks.
 - **Staging folders**, one per planner, checked with the same validator before they are merged into the TaskSet.
 - **Findings, not improvisation**: a planner that needs work no capability provides records it as a missing capability instead of planning it.
 
@@ -124,7 +149,7 @@ For a large spec, several planners can each take some sections, with a shared br
 
 From a previous loop that ran 360 passes over eight days:
 
-- **L1 Disconnected code.** The first day built 16 modules loaded only by their own tests, and a blank page passed the check. Hence the walking skeleton first, and "done means reachable" in every task.
+- **L1 Disconnected code.** The first passes built 16 modules loaded only by their own tests, and a blank page passed the check. Hence the walking skeleton first, and "done means reachable" in every task.
 - **L2 Files read every pass grew without limit.** Hence builders get one task and the spec sections it cites, never the whole plan.
 - **L5 Naive completion.** Work waiting on a person looked like work left to do. Hence task state is data, and human tasks are explicit.
 - **L9 Hotspot files.** A few shared files took 70 to 80 commits each and would have conflicted under parallel builders. Hence one module per route, connector and job, and areas.

@@ -1,0 +1,14 @@
+id: T-0034
+repo: acme-docs
+story: learn-publishing
+area: docs/publishing
+title: "A guide walks a member through publishing their first note"
+reqs: [DOC-1]
+spec: ["§11"]
+acceptance:
+  - "e2e: [DOC-1] the publishing guide is linked from the index and shows each step"
+blocked_by: [T-0033, T-0012]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

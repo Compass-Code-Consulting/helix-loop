@@ -72,7 +72,7 @@ Then, for each screen, the parts a builder cannot infer:
 - Every screen task names its design reference in `notes` and has at least one end-to-end test that opens the screen and runs the accessibility check.
 - Every screen with shareable state has a test that copies the link and opens it as someone else.
 - State work is planned explicitly: the empty, loading and error states are acceptance tests, not polish left for later.
-- A **look pass** per stage or milestone (screenshots at a wide and a narrow width, light and dark) is run by a reviewer, not by the builder; it files fix-first tasks for what it finds.
+- A **look pass** per milestone (screenshots at a wide and a narrow width, light and dark) is run by a reviewer, not by the builder; it files fix-first tasks for what it finds.
 
 ## Checklist
 

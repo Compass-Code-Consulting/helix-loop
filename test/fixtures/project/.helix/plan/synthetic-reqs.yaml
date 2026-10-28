@@ -1,0 +1,25 @@
+# Requirements the spec describes in prose, with the section each comes from.
+- id: SKL-1
+  title: "Each repo builds, deploys and answers on its own"
+  source: "§15"
+- id: AUTH-1
+  title: "A member signs in with a code sent to their email"
+  source: "§1"
+- id: WS-1
+  title: "A member writes and edits a note in their workspace"
+  source: "§1"
+- id: WS-2
+  title: "Members of a workspace see each other's notes"
+  source: "§2"
+- id: WEB-1
+  title: "The website explains the product"
+  source: "§1"
+- id: WEB-2
+  title: "The website lists the plans and starts a workspace"
+  source: "§1"
+- id: DOC-1
+  title: "The docs explain publishing, sharing and unpublishing"
+  source: "§11"
+- id: DOC-2
+  title: "The docs explain the workspace"
+  source: "§2"

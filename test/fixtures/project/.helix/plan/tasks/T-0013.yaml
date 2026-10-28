@@ -1,0 +1,14 @@
+id: T-0013
+repo: acme-app
+story: publish-own-note
+area: publishing/page
+title: "A published page has no editing controls and no workspace data"
+reqs: [PB-15]
+spec: ["§11 Requirements"]
+acceptance:
+  - "e2e: [PB-15] the public page has no edit button and names no other note"
+blocked_by: [T-0012]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

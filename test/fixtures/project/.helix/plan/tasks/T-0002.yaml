@@ -1,0 +1,19 @@
+id: T-0002
+repo: acme-app
+story: sign-in-with-code
+area: platform/config
+title: "Every setting is read from the environment once, with documented defaults"
+reqs: [PLT-1, PLT-2]
+spec: ["§10 Configuration"]
+acceptance:
+  - "unit: [PLT-1] start-up refuses to run without DATABASE_URL and names it"
+  - "unit: [PLT-2] a missing LOG_LEVEL falls back to info"
+blocked_by: [T-0001]
+estimate_passes: 1
+status: done
+claimed_by: null
+attempts:
+  - agent: codex
+    outcome: merged
+    at: "2026-10-25T11:00:00Z"
+    log: runs/logs/2026-10-25/T-1-codex-1.log

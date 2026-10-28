@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFile
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import type { HumanTask, Plan, Task } from '../types.ts';
-import { namedStages, readStages, stageLabel } from './stages.ts';
+import { milestonesPath, readMilestones } from './milestones.ts';
+import { readTaskSet } from './taskset.ts';
 
 // The plan is data: one YAML file per task. While it runs, the loop writes the tasks it holds, and a
 // person may edit one it isn't running (loop.ts reloadPlan). Every loop write is atomic (temp file, then
@@ -28,10 +29,12 @@ export function loadPlan(tasksDir: string, humanDir: string): Plan {
   for (const [id, { value }] of readDir<Task>(tasksDir)) tasks.set(id, normaliseTask(value));
   const human = new Map<string, HumanTask>();
   for (const [id, { value }] of readDir<HumanTask>(humanDir)) human.set(id, value);
-  // The TaskSet beside the tasks declares the stages and their order; without one, the tasks' own stages.
-  const declared = readStages(dirname(tasksDir));
-  const stages = declared?.map((s) => s.key) ?? namedStages(tasks.values());
-  return { tasks, human, stages, stageTitles: Object.fromEntries((declared ?? stages.map((key) => ({ key, title: stageLabel(key) }))).map((s) => [s.key, s.title])) };
+  // The TaskSet and its milestones beside the tasks: what each task's story is part of, and the delivery order.
+  const planDir = dirname(tasksDir);
+  const taskset = readTaskSet(planDir).def;
+  const file = milestonesPath(planDir, taskset);
+  const milestones = file ? readMilestones(file).defs : undefined;
+  return { tasks, human, ...(taskset ? { taskset } : {}), ...(milestones ? { milestones } : {}) };
 }
 
 // Fills the runtime fields a planner may leave out.
@@ -51,8 +54,8 @@ export function loadRaw(dir: string): { id: string; file: string; value: unknown
 }
 
 const FIELD_ORDER: (keyof Task)[] = [
-  'id', 'repo', 'stage', 'area', 'feature', 'epic', 'title', 'priority', 'agent', 'role', 'reqs', 'spec', 'acceptance',
-  'blocked_by', 'estimate_passes', 'status', 'summary', 'claimed_by', 'attempts', 'notes',
+  'id', 'repo', 'story', 'area', 'title', 'priority', 'agent', 'role', 'reqs', 'spec', 'acceptance',
+  'blocked_by', 'placeholder_for', 'wires', 'estimate_passes', 'status', 'summary', 'claimed_by', 'attempts', 'notes',
 ];
 
 export function writeTask(tasksDir: string, task: Task): void {

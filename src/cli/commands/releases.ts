@@ -4,7 +4,7 @@ import { loadPlan } from '../../plan/store.ts';
 import { approveRelease, describeBase, pendingApprovals, releaseRepo, releaseSettings, unreleased } from '../../release.ts';
 import { define, UsageError } from '../command.ts';
 
-// Releases: the loop tags them on its own (every N merged tasks, and when a stage closes); these cut one now,
+// Releases: the loop tags them on its own (every N merged tasks, and in each lane a milestone touched when it is reached); these cut one now,
 // approve one held for review, and list what waits.
 
 const repoOf = (root: string, repo: string) => {

@@ -1,0 +1,22 @@
+# Example Helix Milestones: the order the waitlist is delivered in, planned against revision 1 of the TaskSet.
+# A walking skeleton is folded into the first milestone here: the product is one small lane.
+version: 1
+taskset_revision: 1
+milestones:
+  # The thinnest path a visitor values: join from the page. The form's "too fast" state comes with it, built against
+  # a placeholder (T-0007), since the real limit (T-0003) is in the next milestone.
+  - key: first-sign-up
+    title: A visitor joins the waitlist
+    demo: Open the waitlist page, join with an address, see Check your inbox, and find one pending sign-up for it.
+    stories: [join-with-email]
+    tasks: [T-0007]
+  # The riskiest work next: real email, and the limit, with the wiring task that replaces T-0007's placeholder.
+  - key: confirmed-and-fair
+    title: Addresses are confirmed, and joining is fair
+    demo: Confirm an address from the email's link and land on the thank-you page; a sixth join within a minute is refused with Try again in a minute.
+    stories: [confirm-address, fair-joining]
+  # Breadth: the rest of the confirmed sign-ups feature, its export.
+  - key: export
+    title: The team exports who is waiting
+    demo: Sign in as an Admin, see the confirmed and pending counts, and download waitlist.csv with every confirmed address.
+    features: [confirmed-signups]

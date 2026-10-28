@@ -1,0 +1,14 @@
+id: T-0029
+repo: acme-website
+story: compare-plans
+area: site/pricing
+title: "The pricing page lists the plans"
+reqs: [WEB-2]
+spec: ["§1"]
+acceptance:
+  - "e2e: [WEB-2] the pricing page lists each plan with its price"
+blocked_by: [T-0025]
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []

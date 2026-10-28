@@ -1,0 +1,14 @@
+id: T-0021
+repo: acme-app
+story: copy-link
+area: sharing/toast
+title: "Copying a link says so, and offers the URL to select where the clipboard is blocked"
+reqs: [PB-20]
+spec: ["§11 Sharing"]
+acceptance:
+  - "e2e: [PB-20] with clipboard access denied, the URL is shown selected"
+blocked_by: [T-0020]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

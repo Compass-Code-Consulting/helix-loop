@@ -1,0 +1,14 @@
+id: T-0027
+repo: acme-website
+story: website-health
+area: site/health
+title: "The website reports its version at /health"
+reqs: [OPS-1]
+spec: ["§24"]
+acceptance:
+  - "integration: [OPS-1] GET /health answers the website's version"
+blocked_by: [T-0025]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

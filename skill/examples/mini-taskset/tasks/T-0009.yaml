@@ -1,0 +1,14 @@
+id: T-0009
+repo: acme-app
+story: export-csv
+area: web/admin-waitlist
+title: An Admin sees how many have confirmed and how many wait, above the export
+reqs: [WL-5]
+spec: ["§4 Waitlist"]
+acceptance:
+  - "e2e: [WL-5] the admin waitlist screen shows the confirmed and pending counts, which match the export"
+blocked_by: [T-0004]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

@@ -7,7 +7,7 @@ import type { LedgerEvent } from '../ledger.ts';
 import { loadPlan } from '../plan/store.ts';
 import type { HumanTask, Plan } from '../types.ts';
 import { runningTasks } from '../app/actions.ts';
-import type { Board } from '../app/board.ts';
+import { dependentsOf, downstream, type Board } from '../app/board.ts';
 import { undoChange, type Change } from '../app/changes.ts';
 import { applyChanges, applyRecorded } from '../app/fixes.ts';
 import { readReads } from '../app/helix.ts';
@@ -182,7 +182,11 @@ export function humanCard(plan: Plan, board: Board, id: string) {
   if (!h) throw new OpError(404, `no human task ${id}`);
   const b = board.human.find((x) => x.id === id);
   const waiting = [...[...plan.tasks.values()].filter((t) => t.blocked_by.includes(h.id) && t.status !== 'done'), ...[...plan.human.values()].filter((x) => x.blocked_by.includes(h.id) && x.status !== 'done')];
-  return { ...h, held: b?.held ?? 0, late: b?.late ?? false, latestStart: b?.latestStart, critical: b?.critical ?? false, steps: stepsOf(h), done: doneSteps(h), unblocks: waiting.map((t) => ({ id: t.id, title: t.title, status: t.status })) };
+  // The milestones its wait holds back: those with open work behind it, directly or not, in delivery order.
+  const behind = downstream(plan, dependentsOf(plan), h.id);
+  const holdsBack = h.status === 'done' ? [] : board.milestones.filter((m) => m.tasks.some((id) => behind.has(id))).map((m) => ({ key: m.key, title: m.title, n: board.milestones.indexOf(m) + 1 }));
+  const serves = h.story ? plan.taskset?.stories.get(h.story)?.title : undefined;
+  return { ...h, held: b?.held ?? 0, late: b?.late ?? false, latestStart: b?.latestStart, critical: b?.critical ?? false, steps: stepsOf(h), done: doneSteps(h), unblocks: waiting.map((t) => ({ id: t.id, title: t.title, status: t.status })), holdsBack, ...(serves ? { serves } : {}) };
 }
 
 // ---- a task's whole story ----
@@ -214,7 +218,9 @@ export async function taskStory(root: string, id: string, c: { snap?: Snapshot; 
     task,
     human: human && { ...human, steps: stepsOf(human), done: doneSteps(human) },
     board: v.board.tasks.find((t) => t.id === id) ?? v.board.human.find((h) => h.id === id),
-    epic: task ? v.board.epics.find((e) => e.tasks.includes(id)) : undefined,
+    trail: task || human?.story ? trailItems(v.board, task ? v.board.tasks.find((t) => t.id === id)!.story : `story:${human!.story}`) : [],
+    milestone: task ? v.board.milestones.find((m) => m.tasks.includes(id)) : undefined,
+    wiredBy: task ? [...plan.tasks.values()].filter((t) => t.wires?.includes(id)).map((t) => ({ id: t.id, title: t.title, status: t.status })) : [],
     running: runningTasks(root, plan).has(id),
     live,
     reports: readReports(root).filter((r) => r.task === id).slice(-30),
@@ -226,6 +232,14 @@ export async function taskStory(root: string, id: string, c: { snap?: Snapshot; 
     unblocks: [...plan.tasks.values()].filter((t) => t.blocked_by.includes(id)).map((t) => ({ id: t.id, title: t.title, status: t.status })),
     threads: Object.fromEntries(targets.map((t) => [t, threadsOf(t, readEntries(dir, t))])),
   };
+}
+
+// Where an item sits: its lane, epic, feature and story, outermost first, as the board names them.
+export function trailItems(board: Board, itemId: string): { id: string; level: string; key: string; title: string }[] {
+  const byId = new Map(board.items.map((i) => [i.id, i]));
+  const out = [];
+  for (let i = byId.get(itemId); i; i = i.parent ? byId.get(i.parent) : undefined) out.unshift({ id: i.id, level: i.level, key: i.key, title: i.title });
+  return out;
 }
 
 export async function remoteUrl(root: string, repo: string): Promise<string | undefined> {

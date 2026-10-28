@@ -1,0 +1,14 @@
+id: T-0016
+repo: acme-app
+story: jobs-retry
+area: platform/jobs
+title: "Background jobs run from a queue and retry three times with backoff"
+reqs: [PLT-3]
+spec: ["§10 Background jobs"]
+acceptance:
+  - "integration: [PLT-3] a job that fails twice succeeds on its third run, with backoff between"
+blocked_by: [T-0002]
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []

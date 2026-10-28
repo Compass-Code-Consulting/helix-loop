@@ -17,13 +17,14 @@ import { main } from '../src/cli/main.ts';
 import { COMMANDS } from '../src/cli/registry.ts';
 import { follow } from '../src/cli/watch.ts';
 import { FIXTURE } from './fixture.ts';
+import { storyOf, writeStructure } from './plans.ts';
 
 // The CLI's commands, driven through main() as a person's command line is, against a scratch copy of the Acme
 // fixture project. No real agent runs: the config names agent commands that don't exist, and an app port no app
 // listens on.
 
 function task(t: Partial<Task> & { id: string }): Task {
-  return { repo: 'acme-app', stage: 'day1', area: `area-${t.id.toLowerCase()}`, title: `CLI test task ${t.id}`, reqs: ['PB-14'], spec: ['PB-14'], acceptance: [`unit: [PB-14] behaviour of ${t.id}`], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...t };
+  return { repo: 'acme-app', area: `area-${t.id.toLowerCase()}`, title: `CLI test task ${t.id}`, reqs: ['PB-14'], spec: ['PB-14'], acceptance: [`unit: [PB-14] behaviour of ${t.id}`], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...t, story: t.story ?? storyOf(t.repo ?? 'acme-app') };
 }
 function human(h: Partial<HumanTask> & { id: string }): HumanTask {
   return { title: `CLI test human step ${h.id}`, done_check: 'Sam says it is done', lead_time_days: 1, agent_can_help: 'no', blocked_by: [], status: 'todo', ...h };
@@ -44,6 +45,7 @@ async function project(tasks: Task[] = [], humans: HumanTask[] = []): Promise<st
   const p = paths(root);
   for (const t of tasks) writeFileSync(join(p.tasks, `${t.id}.yaml`), stringify(t));
   for (const h of humans) writeFileSync(join(p.human, `${h.id}.yaml`), stringify(h));
+  writeStructure(root);
   const config = structuredClone(loadConfig(FIXTURE));
   config.agents.claude.command = join(root, 'no-such-claude');
   config.agents.codex.command = join(root, 'no-such-codex');

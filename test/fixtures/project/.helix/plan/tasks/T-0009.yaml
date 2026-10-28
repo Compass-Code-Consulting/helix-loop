@@ -1,0 +1,30 @@
+id: T-0009
+repo: acme-app
+story: find-notes
+area: notes/search
+title: "The search box narrows the list to the notes that match"
+reqs: [NAV-1]
+spec: ["§19"]
+acceptance:
+  - "e2e: [NAV-1] typing a word lists only the notes whose title or body holds it"
+blocked_by: [T-0008]
+estimate_passes: 1
+status: needs_human
+summary: "Stopped after 3 attempts: search returns notes from another workspace"
+claimed_by: null
+attempts:
+  - agent: codex
+    outcome: gate_failed
+    at: "2026-10-26T15:00:00Z"
+    log: runs/logs/2026-10-26/T-0009-codex-1.log
+    note: "the gate failed: e2e search returns notes from another workspace"
+  - agent: claude
+    outcome: gate_failed
+    at: "2026-10-26T17:00:00Z"
+    log: runs/logs/2026-10-26/T-0009-claude-2.log
+    note: "the gate failed: e2e search returns notes from another workspace"
+  - agent: codex
+    outcome: gate_failed
+    at: "2026-10-26T19:00:00Z"
+    log: runs/logs/2026-10-26/T-0009-codex-3.log
+    note: "the gate failed: e2e search returns notes from another workspace"

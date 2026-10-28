@@ -1,0 +1,21 @@
+id: T-0014
+repo: acme-app
+story: unpublish-note
+area: publishing/unpublish
+title: Unpublishing takes the page down within a minute, in the request until jobs exist
+reqs:
+  - PB-2
+spec:
+  - §11 Requirements
+acceptance:
+  - "e2e: [PB-2] an unpublished page answers 404 within a minute"
+  - "integration: [PB-2] until the job queue exists, unpublish removes the page in the request and says so in its result"
+blocked_by:
+  - T-0012
+placeholder_for:
+  - T-0016
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []
+notes: 'Built before the job queue (T-0016), against a placeholder: unpublish deletes the page row inside the request, behind the same unpublish(noteId) interface the job will use, and returns { removed: true, via: "request" }. If the delete fails, the request fails with "could not unpublish, try again" and nothing is half removed. T-0024 moves it onto the queue and removes this path.'

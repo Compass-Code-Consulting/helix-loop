@@ -119,7 +119,7 @@ json_merge: { package.json: "pnpm exec prettier --write" }
 # The metrics page (runs/metrics/) is kept as a history: a new version every N passes, each left as written.
 metrics_every_passes: 100
 
-# Release tags, per repo: every N merged tasks, when a §21 stage closes with unreleased work, and on
+# Release tags, per repo: every N merged tasks, in each lane a milestone touched when it is reached, and on
 # `helix-loop release <repo>`.
 release:
   every_merged_tasks: 150

@@ -2,13 +2,14 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "helix-loop/human.schema.json",
   "title": "Human Implementation Plan task",
-  "description": "A step only Daniel can do, sign or pay for. Never holds a secret value. Mirrors HumanTask in harness/src/types.ts.",
+  "description": "A step only the project's owner can do, sign or pay for. Never holds a secret value. Mirrors HumanTask in src/types.ts.",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "title", "done_check", "lead_time_days", "agent_can_help", "blocked_by", "status"],
   "properties": {
     "id": { "type": "string", "pattern": "^HT-\\d+$" },
     "title": { "type": "string", "minLength": 8 },
+    "story": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "Optional: the user story it clearly serves. Human tasks stay outside the hierarchy and the milestones, ordered by when each must start." },
     "done_check": { "type": "string", "minLength": 8 },
     "lead_time_days": { "type": "number", "minimum": 0 },
     "agent_can_help": { "enum": ["yes", "partly", "no"] },
@@ -25,6 +26,6 @@
     },
     "blocked_by": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^(T-\\d{4}|HT-\\d+)$" } },
     "status": { "enum": ["todo", "in_progress", "done"] },
-    "notes": { "type": "string", "description": "What Daniel recorded: the evidence a step is done, or why it waits." }
+    "notes": { "type": "string", "description": "What the owner recorded: the evidence a step is done, or why it waits." }
   }
 }

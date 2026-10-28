@@ -1,0 +1,14 @@
+id: T-0026
+repo: acme-website
+story: learn-the-product
+area: site/home
+title: "The home page explains Acme Notes and links to sign-up"
+reqs: [WEB-1]
+spec: ["§1"]
+acceptance:
+  - "e2e: [WEB-1] the home page names the product, its three uses and a sign-up link"
+blocked_by: [T-0025]
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []

@@ -1,6 +1,7 @@
 import { paths } from '../../config.ts';
 import { loadPlan } from '../../plan/store.ts';
-import { loadTaskSet } from '../../app/taskset.ts';
+import { membership } from '../../plan/milestones.ts';
+import { trailOf } from '../../plan/taskset.ts';
 import type { Plan, Task } from '../../types.ts';
 import * as ops from '../../ops/index.ts';
 import { withCli } from '../../ops/actor.ts';
@@ -34,15 +35,15 @@ async function land(ctx: Context): Promise<void> {
 const list = define({
   name: 'tasks',
   group: 'Tasks',
-  summary: 'The tasks: the open ones by default, filtered by status, lane, epic or stage',
+  summary: 'The tasks: the open ones by default, filtered by status, where they sit, or milestone',
   description: `Lists the builders' tasks, one line each: where it stands, its lane, its counted attempts and its title.
 "waiting" is a ready task behind work that isn't done; "needs you" stopped for a person.
 By default only open tasks show; --all adds the done ones.`,
   options: {
     status: { type: 'string', value: 'list', description: 'Only these states, comma-separated: ready, waiting, claimed, needs_human, parked, done' },
-    lane: { type: 'string', value: 'repo', description: 'Only this lane (repo)' },
-    epic: { type: 'string', value: 'key', description: 'Only this epic' },
-    stage: { type: 'string', value: 'stage', description: 'Only this stage' },
+    lane: { type: 'string', value: 'key', description: 'Only this lane (its key, or the repo it builds)' },
+    under: { type: 'string', value: 'key', description: 'Only the tasks under this epic, feature or story' },
+    milestone: { type: 'string', value: 'key', description: 'Only this milestone' },
     ready: { type: 'boolean', description: 'Only tasks that can start now' },
     failing: { type: 'boolean', description: 'Only open tasks whose last attempt failed' },
     grep: { type: 'string', value: 'text', description: 'Only tasks whose id, title or area holds this text' },
@@ -58,7 +59,8 @@ By default only open tasks show; --all adds the done ones.`,
     await land(ctx);
     const { root, opts } = ctx;
     const plan = loadPlan(paths(root).tasks, paths(root).human);
-    const epics = new Map(loadTaskSet(root, plan).lanes.flatMap((l) => l.epics.flatMap((e) => e.tasks.map((id) => [id, e.key] as const))));
+    const member = membership(plan);
+    const where = (t: Task) => trailOf(plan.taskset, t.story);
     const statuses = str(opts, 'status')?.split(',').map((s) => s.trim()).filter(Boolean);
     const words: Record<string, string> = { claimed: 'in a pass', needs_human: 'needs you' };
     const grep = str(opts, 'grep')?.toLowerCase();
@@ -68,15 +70,15 @@ By default only open tasks show; --all adds the done ones.`,
         if (statuses) return statuses.some((s) => s === t.status || (words[s] ?? s) === state);
         return opts.all || t.status !== 'done';
       })
-      .filter(({ t }) => !str(opts, 'lane') || t.repo === str(opts, 'lane'))
-      .filter(({ t }) => !str(opts, 'epic') || epics.get(t.id) === str(opts, 'epic'))
-      .filter(({ t }) => !str(opts, 'stage') || t.stage === str(opts, 'stage'))
+      .filter(({ t }) => !str(opts, 'lane') || t.repo === str(opts, 'lane') || where(t).lane?.key === str(opts, 'lane'))
+      .filter(({ t }) => !str(opts, 'under') || [where(t).epic?.key, where(t).feature?.key, t.story].includes(str(opts, 'under')))
+      .filter(({ t }) => !str(opts, 'milestone') || member.of.get(t.id) === str(opts, 'milestone'))
       .filter(({ state }) => !opts.ready || state === 'ready')
       .filter(({ t }) => !opts.failing || (t.status !== 'done' && FAILED.has(t.attempts.at(-1)?.outcome ?? '')))
       .filter(({ t }) => !grep || `${t.id} ${t.title} ${t.area}`.toLowerCase().includes(grep))
       .sort((a, b) => ORDER.indexOf(a.state) - ORDER.indexOf(b.state) || a.t.id.localeCompare(b.t.id));
     if (ctx.json) {
-      return json(ctx, rows.map(({ t, state }) => ({ id: t.id, title: t.title, status: t.status, state, lane: t.repo, epic: epics.get(t.id) ?? null, stage: t.stage ?? null, area: t.area, attempts: counted(t), lastOutcome: t.attempts.at(-1)?.outcome ?? null, blockedBy: t.blocked_by, waitingOn: t.blocked_by.filter((d) => !done(plan, d)) })));
+      return json(ctx, rows.map(({ t, state }) => ({ id: t.id, title: t.title, status: t.status, state, lane: where(t).lane?.key ?? null, repo: t.repo, epic: where(t).epic?.key ?? null, feature: where(t).feature?.key ?? null, story: t.story, milestone: member.of.get(t.id) ?? null, area: t.area, attempts: counted(t), lastOutcome: t.attempts.at(-1)?.outcome ?? null, blockedBy: t.blocked_by, waitingOn: t.blocked_by.filter((d) => !done(plan, d)) })));
     }
     if (!rows.length) return ctx.out('No task matches.');
     for (const l of table(rows.map(({ t, state }) => [t.id, state, t.repo, counted(t) ? `${counted(t)}×` : '', t.title]))) ctx.out(l);
@@ -98,8 +100,11 @@ async function showTask(ctx: Context): Promise<void> {
   const tz = timeZone(root);
   const plan = loadPlan(paths(root).tasks, paths(root).human);
   ctx.out(`${t.id} · ${t.title}`);
-  const facts = [stateOf(plan, t), t.repo, s.epic ? `epic ${s.epic.title}` : '', t.stage ? `stage ${t.stage}` : '', `area ${t.area}`, `estimate ${plural(t.estimate_passes, 'pass', 'passes')}`, s.board?.critical ? 'on the critical path' : '', t.priority === 'fix_first' ? 'fix first' : '', t.agent ? `pinned to ${t.agent}` : ''];
+  const facts = [stateOf(plan, t), t.repo, s.milestone ? `milestone ${s.milestone.title}` : '', `area ${t.area}`, `estimate ${plural(t.estimate_passes, 'pass', 'passes')}`, s.board?.critical ? 'on the critical path' : '', t.priority === 'fix_first' ? 'fix first' : '', t.agent ? `pinned to ${t.agent}` : ''];
   ctx.out(facts.filter(Boolean).join(' · '));
+  if (s.trail.length) ctx.out(s.trail.map((x) => x.title).join(' › '));
+  if (t.placeholder_for?.length) ctx.out(`Built against a placeholder for ${t.placeholder_for.join(', ')}${s.wiredBy.length ? `; ${s.wiredBy.map((w) => w.id).join(', ')} wires it in` : ''}`);
+  if (t.wires?.length) ctx.out(`Wires in the real ${t.wires.flatMap((id) => plan.tasks.get(id)?.placeholder_for ?? []).join(', ')} for ${t.wires.join(', ')}`);
   if (s.live) ctx.out(`In a pass: attempt ${s.live.attempt} on ${s.live.agent}, ${s.live.phase}, started ${ago(Date.parse(s.live.startedAt))}${s.live.progress ? `: ${s.live.progress}` : ''}. Follow it: helix-loop watch ${t.id}`);
   if ((t.status === 'needs_human' || t.status === 'parked') && (t.summary || t.attempts.at(-1)?.note)) {
     ctx.out('');
@@ -147,7 +152,7 @@ const show = define({
   name: 'task',
   group: 'Tasks',
   summary: 'Everything about one task: why it stopped, its attempts, notes and dependencies',
-  description: `Shows one task: its state, lane, epic and stage, why it stopped, each attempt and how it ended, its notes, what it waits on and what waits on it, its commits once merged, and what it cost.
+  description: `Shows one task: its state, where it sits (Lane › Epic › Feature › Story) and its milestone, any placeholder it builds against or wires in, why it stopped, each attempt and how it ended, its notes, what it waits on and what waits on it, its commits once merged, and what it cost.
 A human task's id (HT-##) shows that task, as \`helix-loop human show\` does.`,
   args: [{ name: 'id', description: 'The task, as T-####' }],
   examples: [['helix-loop task T-0042', 'Everything about T-0042']],

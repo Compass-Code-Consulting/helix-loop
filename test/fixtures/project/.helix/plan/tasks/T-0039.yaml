@@ -1,0 +1,14 @@
+id: T-0039
+repo: acme-docs
+story: invite-guide
+area: docs/invite
+title: "A guide explains inviting a teammate into the workspace"
+reqs: [DOC-2, WS-2]
+spec: ["§2"]
+acceptance:
+  - "e2e: [WS-2] the invite guide shows the invitation from both sides"
+blocked_by: [T-0037]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

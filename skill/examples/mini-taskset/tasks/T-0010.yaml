@@ -1,0 +1,17 @@
+id: T-0010
+repo: acme-app
+story: fair-joining
+area: web/waitlist-form
+title: The waitlist form shows Try again in a minute when the app's real limit refuses a join
+reqs: [WL-4, WL-6]
+spec: ["§4 Requirements", "§5 Waitlist page"]
+acceptance:
+  - "e2e: [WL-4, WL-6] a sixth join from one client within a minute, through the real endpoint, shows Try again in a minute"
+blocked_by: [T-0007, T-0003]
+wires: [T-0007]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []
+notes: |
+  Wires T-0007's 429 state to the real limit T-0003 added: drive the real endpoint past its limit, and delete the stand-in's 429 answer, which nothing needs any more.

@@ -1,0 +1,26 @@
+# The test project's Helix Milestones: the order Acme Notes is delivered in.
+version: 1
+taskset_revision: 1
+milestones:
+  - key: walking-skeleton
+    title: "The app builds, deploys and signs a person in"
+    demo: "Sign in with an email code, land in an empty workspace, and see the health check report the version."
+    features: [app-shell]
+    tasks: [T-0025, T-0033]
+  - key: write-and-find
+    title: "A team writes and finds its notes"
+    demo: "Two members write notes, see each other's, and find one with the search box."
+    features: [writing-notes]
+  - key: publish-a-page
+    title: "A member publishes a note as a public page"
+    demo: "Publish a note, open its link in a private window, copy the link, then unpublish it and see it gone."
+    features: [publishing, sharing]
+  - key: reliable-jobs
+    title: "Publishing runs on jobs that retry and act once"
+    demo: "Stop the worker halfway through a publish: the job retries, the page appears once, and unpublishing runs as a job."
+    features: [background-jobs]
+    tasks: [T-0024]
+  - key: website-and-help
+    title: "Visitors find Acme Notes, and members find help"
+    demo: "Open the website, compare the plans, sign up into the app, and read the publishing guide."
+    features: [home-page, pricing, publishing-guides, workspace-guides]

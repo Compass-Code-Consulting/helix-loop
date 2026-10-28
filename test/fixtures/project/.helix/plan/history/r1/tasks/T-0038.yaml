@@ -1,0 +1,14 @@
+id: T-0038
+repo: acme-docs
+story: learn-workspace
+area: docs/search
+title: "A guide explains the notes list and the search box"
+reqs: [DOC-2, NAV-1]
+spec: ["§19"]
+acceptance:
+  - "e2e: [NAV-1] the search guide shows a search and its results"
+blocked_by: [T-0037]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

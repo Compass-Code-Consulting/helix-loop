@@ -1,0 +1,18 @@
+id: T-0001
+repo: acme-app
+story: sign-in-with-code
+area: platform/skeleton
+title: "The app skeleton builds, deploys and answers its health check"
+reqs: [SKL-1]
+spec: ["§15"]
+acceptance:
+  - "e2e: [SKL-1] the deployed app answers GET / with the sign-in screen"
+blocked_by: []
+estimate_passes: 1
+status: done
+claimed_by: null
+attempts:
+  - agent: claude
+    outcome: merged
+    at: "2026-10-25T09:00:00Z"
+    log: runs/logs/2026-10-25/T-1-claude-1.log

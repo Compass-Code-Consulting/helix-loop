@@ -86,7 +86,7 @@ relock: { pnpm-lock.yaml: "pnpm install --lockfile-only --no-frozen-lockfile --p
 json_merge: { package.json: "" }
 metrics_every_passes: 100
 
-# Release tags, per repo: every N merged tasks, when a stage closes with unreleased work, and on
+# Release tags, per repo: every N merged tasks, in each lane a milestone touched when it is reached, and on
 # `helix-loop release run <repo>`. A release that changes a reviewed path waits for `helix-loop release approve`.
 release:
   every_merged_tasks: 150

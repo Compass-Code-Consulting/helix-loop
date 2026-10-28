@@ -7,8 +7,8 @@ import { compareWithOrigin } from './merge.ts';
 import type { HumanTask, RepoName } from './types.ts';
 
 // Release tags (Compass & Code's convention): v<YYYY>.<MM>.<DD>.<N>, annotated, where N counts that
-// day's releases of the repo from 1. A release is cut every `every_merged_tasks` merges, whenever a §21
-// stage closes with unreleased work, and on `helix-loop release run <repo>`; all three go through
+// day's releases of the repo from 1. A release is cut every `every_merged_tasks` merges, in each lane a
+// milestone touched when it is reached, and on `helix-loop release run <repo>`; all three go through
 // releaseRepo, with the same holds. A tag is what deploys: today straight to production; later the
 // same tag promotes through test, then staging, then production.
 //

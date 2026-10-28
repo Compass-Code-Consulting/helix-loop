@@ -31,13 +31,13 @@ Sections that don't apply are left out, not left empty.
 2. **Overview and principles.** What the product is, in one paragraph; the principles that settle trade-offs; goals; what is not in the first release.
 3. **Users and their jobs.** Personas and the jobs they hire the product for. Requirements trace back to these.
 4. **Launch scope.** What ships at launch and what follows, by name, so no planner has to infer it.
-5. **One section per feature area**, each ending with `### Requirements`.
-   Prose first (how it works, states, rules), then the numbered requirements.
+5. **One section per epic**, named for its outcome, with a subsection per feature, each ending with `### Requirements`.
+   Prose first (how it works, states, rules), then the user stories, then the numbered requirements (below).
 6. **Architecture and data model.** Stack choices with versions, the module layout, every entity with its fields and owner, tenancy and isolation, every external service behind an interface.
 7. **Security and privacy.** Authorization, secrets, retention, abuse, rate limits.
 8. **Quality bar.** A table of measurable targets (below).
 9. **UI and design system.** See [spec-design.md](spec-design.md).
-10. **Build plan.** The stages in order, what belongs in each, and the gate that closes each stage.
+10. **Build plan.** The demoable outcomes, in the order the owner wants to see them (below).
 11. **Risks and open questions.** Each open question names who answers it and by when.
 12. **Glossary.**
 13. **Appendices:** ownership and licences, the changelog, the human tasks known up front.
@@ -83,11 +83,39 @@ Set them before the first task, so parallel builders don't collide (one shared f
 Write targets a test or a measurement can check: availability, latency at a percentile, freshness, correctness (fixture tests that pin every formula), recovery, accessibility (WCAG 2.2 AA, axe with no serious violations), devices and widths, monitoring thresholds, load.
 Say when each target applies (from launch, before launch) and how it is measured.
 
+## Epics, features and user stories
+
+Write the spec so it decomposes cleanly into the TaskSet's hierarchy ([decompose.md](decompose.md)): epics are outcomes, features are capabilities, and user stories are needs.
+
+- **An epic is an outcome**, named for what becomes true for people: "Social publishing", not "Publishing service". Open its section with that outcome in a sentence.
+- **A feature is a capability** a user would recognise, delivered as a vertical slice through every layer it needs: "Network connections".
+- **A user story is one need**, small enough to demo on its own, written "As a …, I want …, so that …": "As a marketer, I want to connect my company's LinkedIn Page, so that Mushy can publish to it and read its metrics."
+  Platform work is an enabler story, written from whoever benefits: the operator, the support agent, the owner, a developer, or the end user it protects.
+- **Requirements belong to stories**: each story lists the requirement IDs that make it true, so a task that serves the story claims them.
+
+A feature section in this shape:
+
+```markdown
+### 11.2 Network connections
+
+Connect, reconnect and disconnect each network's accounts, with their history backfilled.
+
+User stories:
+
+- **Connect a LinkedIn Page.** As a marketer, I want to connect my company's LinkedIn Page, so that Mushy can publish to it and read its metrics. (CN-1, CN-2)
+- **Reconnect an expired account.** As a marketer, I want to be told when a connection expires and reconnect it in two clicks, so that nothing scheduled fails silently. (CN-5)
+
+#### Requirements
+
+- **CN-1 OAuth:** …
+```
+
 ## Build plan
 
-Name the stages in order and what belongs in each; the task schema's `stage` values come from here.
-Give each stage a gate: the tests that must pass before the next stage opens.
-A task may wait only on work in its own stage or an earlier one, so a stage's work must not need anything from later stages.
+Name the demoable outcomes the owner wants to see, in order: "A person signs in and sees an empty workspace", "A marketer schedules a post and sees it published", "Every network connects".
+Say what each lets the owner see or do, in a sentence; `/helix milestones` turns them into the TaskSet's milestones.
+Never plan by days or dates: an outcome is reached when its work is done, however long that takes, and the loop prefers the earliest outcome's work without ever holding the rest behind it.
+The first outcome is a walking skeleton (every repository built, deployed and reachable), and the second the thinnest end-to-end path a user values.
 
 ## Changes after the build starts
 
@@ -126,5 +154,6 @@ An example finding, from a real spec's hardening:
 - Every requirement has an ID, a number where it needs one, and its edge cases.
 - Every external service has an interface and a stand-in.
 - The module map gives parallel work separate areas.
-- Every stage has a gate.
+- Every epic names its outcome, every feature its capability, and every user story its person and need.
+- The build plan names demoable outcomes in order, never days.
 - The changelog's newest row is the current version.

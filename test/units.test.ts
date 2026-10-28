@@ -16,13 +16,14 @@ import { clipNote, clipSummary, NOTE_LIMIT } from '../src/summary.ts';
 import { computeMap, rankTasks } from '../src/map/graph.ts';
 import { validateGraph, validateReleaseHolds } from '../src/plan/validate.ts';
 import { PromptOverBudget, renderPrompt, RETRY_RESERVE_BYTES } from '../src/prompt.ts';
-import { conflictCount, countedAttempts, onlyHumanWorkLeft, openStage, pick } from '../src/sched/scheduler.ts';
+import { conflictCount, countedAttempts, onlyHumanWorkLeft, pick } from '../src/sched/scheduler.ts';
 import { buildIndex, loadIndex } from '../src/spec/index.ts';
 import type { HumanTask, Plan, Task } from '../src/types.ts';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { parse, stringify } from 'yaml';
 import { FIXTURE } from './fixture.ts';
+import { planOf, storyOf } from './plans.ts';
 
 const CHICAGO_NOON = zonedToEpoch(2026, 9, 23, 12, 0, 'America/Chicago'); // Oct 23 2026, 12:00 CDT
 
@@ -176,17 +177,15 @@ test('spec index: every requirement of the spec resolves to its definition', () 
 // ---- plan helpers ----
 function task(id: string, over: Partial<Task> = {}): Task {
   return {
-    id, repo: 'acme-app', stage: 'day1', area: `area-${id}`, title: `Task ${id} title`, reqs: ['PB-14'],
+    id, repo: 'acme-app', area: `area-${id}`, title: `Task ${id} title`, reqs: ['PB-14'],
     spec: ['§11 Requirements'], acceptance: [`unit: [PB-14] behaviour of ${id}`], blocked_by: [], estimate_passes: 1,
-    status: 'ready', claimed_by: null, attempts: [], ...over,
+    status: 'ready', claimed_by: null, attempts: [], ...over, story: over.story ?? storyOf(over.repo ?? 'acme-app'),
   };
 }
 function human(id: string, over: Partial<HumanTask> = {}): HumanTask {
   return { id, title: `Human task ${id}`, done_check: 'it is done', lead_time_days: 2, agent_can_help: 'no', blocked_by: [], status: 'todo', ...over };
 }
-function planOf(tasks: Task[], humans: HumanTask[] = []): Plan {
-  return { tasks: new Map(tasks.map((t) => [t.id, t])), human: new Map(humans.map((h) => [h.id, h])) };
-}
+
 const opts = { now: 0, passHours: 1, agents: [], mode: 'idle' as const };
 
 test('map: forward and backward pass, slack and critical path', () => {
@@ -217,24 +216,26 @@ test('validate: cycles and dangling blockers are reported', () => {
   assert.ok(msgs.some((m) => m.includes('HT-9')));
 });
 
-test('scheduler: blockers, held areas, stage gate', () => {
+test('scheduler: blockers and held areas; a later milestone is a priority, never a gate', () => {
   const plan = planOf([
     task('T-0001', { area: 'auth' }),
     task('T-0002', { area: 'auth' }),
     task('T-0003', { blocked_by: ['T-0001'] }),
-    task('T-0004', { stage: 'day2' }),
-  ]);
-  const rank = ['T-0004', 'T-0003', 'T-0001', 'T-0002'];
-  assert.equal(openStage(plan), 'day1');
+    task('T-0004', { estimate_passes: 3 }),
+  ], [], { 'T-0004': 'second' });
+  const rank = rankTasks(computeMap(plan, opts), plan);
+  assert.equal(rank.at(-1), 'T-0004', 'the later milestone ranks last, though it is the longest task');
   assert.equal(pick({ plan, rank, agent: 'claude', heldAreas: new Set(), maxAttempts: 3 })?.id, 'T-0001');
-  assert.equal(pick({ plan, rank, agent: 'codex', heldAreas: new Set(['auth']), maxAttempts: 3 }), undefined);
+  // Nothing earlier can start while auth is held: the later milestone's work runs rather than nothing.
+  assert.equal(pick({ plan, rank, agent: 'codex', heldAreas: new Set(['auth']), maxAttempts: 3 })?.id, 'T-0004');
 });
 
-test('scheduler: fix-first work left in a stage does not hold the next one shut, and stays pickable', () => {
-  const plan = planOf([task('T-0001', { status: 'done' }), task('T-0002', { priority: 'fix_first' }), task('T-0003', { stage: 'day2' })]);
-  assert.equal(openStage(plan), 'day2');
-  assert.equal(pick({ plan, rank: ['T-0002', 'T-0003'], agent: 'claude', heldAreas: new Set(), maxAttempts: 3 })?.id, 'T-0002');
-  assert.equal(pick({ plan, rank: ['T-0002', 'T-0003'], agent: 'claude', heldAreas: new Set(['area-T-0002']), maxAttempts: 3 })?.id, 'T-0003');
+test('scheduler: fix-first work comes before the earliest milestone, and stays pickable', () => {
+  const plan = planOf([task('T-0001', { status: 'done' }), task('T-0002', { priority: 'fix_first' }), task('T-0003')], [], { 'T-0002': 'second' });
+  const rank = rankTasks(computeMap(plan, opts), plan);
+  assert.deepEqual(rank.slice(0, 2), ['T-0002', 'T-0003']);
+  assert.equal(pick({ plan, rank, agent: 'claude', heldAreas: new Set(), maxAttempts: 3 })?.id, 'T-0002');
+  assert.equal(pick({ plan, rank, agent: 'claude', heldAreas: new Set(['area-T-0002']), maxAttempts: 3 })?.id, 'T-0003');
 });
 
 test('scheduler: a task failed twice by one agent goes to the other for its third attempt', () => {
@@ -370,21 +371,22 @@ test('config: a release hold must name a known repo and a human task', () => {
   assert.throws(withHold({ 'acme-website': 'approved' }), /must name a human task/);
 });
 
-test('scheduler: a stage opens past tasks that wait on a person, even through a diamond of tasks', () => {
+test('scheduler: work behind a person, even through a diamond of tasks, never holds back a later milestone', () => {
   const plan = planOf(
     [
-      task('T-0001', { stage: 'day0', blocked_by: ['HT-4'] }),
-      task('T-0002', { stage: 'day0', blocked_by: ['T-0001'] }),
-      task('T-0003', { stage: 'day0', blocked_by: ['T-0001'] }),
-      task('T-0004', { stage: 'day0', blocked_by: ['T-0002', 'T-0003'] }),
-      task('T-0005', { stage: 'day1' }),
+      task('T-0001', { blocked_by: ['HT-4'] }),
+      task('T-0002', { blocked_by: ['T-0001'] }),
+      task('T-0003', { blocked_by: ['T-0001'] }),
+      task('T-0004', { blocked_by: ['T-0002', 'T-0003'] }),
+      task('T-0005'),
     ],
     [human('HT-4')],
+    { 'T-0005': 'second' },
   );
-  assert.equal(openStage(plan), 'day1');
-  assert.equal(pick({ plan, rank: ['T-0001', 'T-0002', 'T-0003', 'T-0004', 'T-0005'], agent: 'claude', heldAreas: new Set(), maxAttempts: 3 })?.id, 'T-0005');
+  const rank = rankTasks(computeMap(plan, opts), plan);
+  assert.equal(pick({ plan, rank, agent: 'claude', heldAreas: new Set(), maxAttempts: 3 })?.id, 'T-0005');
   plan.tasks.get('T-0003')!.blocked_by = [];
-  assert.equal(openStage(plan), 'day0', 'a task with work it can do keeps its stage open');
+  assert.equal(pick({ plan, rank: rankTasks(computeMap(plan, opts), plan), agent: 'claude', heldAreas: new Set(), maxAttempts: 3 })?.id, 'T-0003', 'work it can do in the earlier milestone comes first');
 });
 
 test('builders get the loop\'s environment without what a parent Claude Code or Codex session would pass on', () => {
@@ -398,7 +400,7 @@ test('builders get the loop\'s environment without what a parent Claude Code or 
   assert.deepEqual(Object.keys(env).sort(), ['GIT_EDITOR', 'HELIX_FAKE_STATE', 'HOME', 'LANG', 'PATH', 'TMPDIR']);
 });
 
-test('validate: only design-role work may wait on a design-role task', () => {
+test('validate: any task may wait on a design-role task', () => {
   const design = { agent: 'codex' as const, role: 'design' as const };
   const plan = planOf([
     task('T-0001'),
@@ -406,9 +408,7 @@ test('validate: only design-role work may wait on a design-role task', () => {
     task('T-3100', design),
     task('T-3101', { ...design, blocked_by: ['T-3100', 'T-0001'] }),
   ]);
-  assert.deepEqual(validateGraph(plan).map((x) => [x.id, x.message]), [
-    ['T-0002', 'blocked by T-3100, a design-role task; only design-role tasks may wait on design work, since it can finish after later stages open'],
-  ]);
+  assert.deepEqual(validateGraph(plan), []);
 });
 
 test('restricted paths: only the design-guide area changes branding/, and only ci the workflows', () => {

@@ -5,3 +5,4 @@ export * from './inbox.ts';
 export * from './loop.ts';
 export * from './plan.ts';
 export * from './settings.ts';
+export * from './taskset.ts';

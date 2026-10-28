@@ -274,6 +274,8 @@ export function paths(root: string) {
     clarifications: join(h, 'spec', 'clarifications.md'), // answers sent into the spec, for the loop engineer to fold in
     plan: join(h, 'plan'),
     taskset: join(h, 'plan', 'taskset.yaml'),
+    milestones: join(h, 'plan', 'milestones.yaml'),
+    history: join(h, 'plan', 'history'),
     tasks: join(h, 'plan', 'tasks'),
     human: join(h, 'plan', 'human'),
     syntheticReqs: join(h, 'plan', 'synthetic-reqs.yaml'),

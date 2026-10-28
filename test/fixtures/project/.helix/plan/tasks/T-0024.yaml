@@ -1,0 +1,23 @@
+id: T-0024
+repo: acme-app
+story: unpublish-note
+area: publishing/unpublish-job
+title: Unpublishing runs on the job queue, with retries, and the request path is gone
+reqs:
+  - PB-2
+  - PLT-3
+spec:
+  - §11 Requirements
+  - §10 Background jobs
+acceptance:
+  - "integration: [PLT-3] a failed unpublish is retried by the queue and the page is gone within a minute"
+  - 'integration: [PB-2] unpublish returns via: "job", and no code removes a page inside the request any more'
+blocked_by:
+  - T-0014
+  - T-0016
+wires:
+  - T-0014
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []

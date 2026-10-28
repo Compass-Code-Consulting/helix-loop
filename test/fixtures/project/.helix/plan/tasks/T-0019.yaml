@@ -1,0 +1,15 @@
+id: T-0019
+repo: acme-app
+story: jobs-idempotent
+area: publishing/jobs
+title: "Publishing runs as a job that keeps one page however often it runs"
+reqs: [PLT-4, PB-14]
+spec: ["§10 Background jobs", "§11 Requirements"]
+acceptance:
+  - "integration: [PLT-4] the publish job run twice leaves one page"
+  - "integration: [PB-14] the page keeps its URL across runs"
+blocked_by: [T-0018, T-0012]
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []

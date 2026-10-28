@@ -1,0 +1,15 @@
+id: T-0022
+repo: acme-app
+story: open-shared-link
+area: sharing/open
+title: "A page's link opens it directly, with no sign-in"
+reqs: [NAV-2, PB-14]
+spec: ["§19", "§11 Requirements"]
+acceptance:
+  - "e2e: [NAV-2] a private window opens the page from its link"
+  - "e2e: [PB-14] the link still works after the note is edited"
+blocked_by: [T-0012]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

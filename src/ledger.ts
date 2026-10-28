@@ -56,7 +56,9 @@ export type LedgerEvent =
   // `tag` and `approval` are set when it waits for the owner to approve a change under the review paths.
   | { kind: 'release_held'; at: string; repo: string; reason: string; tasks: string[]; detail: string; tag?: string; approval?: string }
   // Release tags origin lacked because their push had failed, pushed again (`pushed`: whether it worked).
-  | { kind: 'release_retry'; at: string; repo: string; tags: string[]; pushed: boolean };
+  | { kind: 'release_retry'; at: string; repo: string; tags: string[]; pushed: boolean }
+  // A milestone's last task merged: its lanes (`repos`) were tagged, and Home asks the owner to review its demo.
+  | { kind: 'milestone'; at: string; key: string; title: string; demo: string; repos: string[] };
 
 export function record(file: string, event: LedgerEvent): void {
   mkdirSync(dirname(file), { recursive: true });

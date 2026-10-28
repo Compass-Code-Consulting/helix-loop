@@ -68,7 +68,7 @@ agents:
 
 ```yaml
 release:
-  every_merged_tasks: 150          # a release tag per repo every N merged tasks, and when a stage closes
+  every_merged_tasks: 150          # a release tag per repo every N merged tasks, and when a milestone that touched it is reached
   review_paths: [".github/**", "infra/**"]   # a release changing these waits for `helix-loop release approve`
   hold_until: { acme-website: HT-25 }        # a repo's releases wait for a human task
 ```

@@ -408,7 +408,7 @@
   // ---- Releases ----
   function releases(d) {
     return h('div', { class: 'page stack lg', style: { maxWidth: '980px' } },
-      head('Releases', `Each lane is tagged every ${F.plural(d.releaseEvery, 'merged task')}, or when a stage closes with unreleased work. A release that changes ${d.reviewPaths.join(' or ')} waits for you, at every pilot level.`),
+      head('Releases', `Each lane is tagged every ${F.plural(d.releaseEvery, 'merged task')}, and when a milestone that touched it is reached. A release that changes ${d.reviewPaths.join(' or ')} waits for you, at every pilot level.`),
       d.releases.map((r) => h('div', { class: 'glass pad stack' },
         h('div', { class: 'row' }, h('b', { style: { fontWeight: 500, color: HX.laneColor(r.repo) } }, r.repo), h('span', { class: 'grow' }), h('span', { class: 'muted' }, `${F.plural(r.unreleased, 'task')} unreleased`)),
         r.holds.map((x) => h('div', { class: 'small t-warn' }, x)),
@@ -431,13 +431,18 @@
     const path = h('input', { class: 'input mono', placeholder: '/path/to/plan-folder or taskset.zip', value: X.drafts.importPath ?? '' });
     path.oninput = () => (X.drafts.importPath = path.value);
     const jobs = [...S.jobs.values()].filter((j) => /TaskSet/.test(j.title)).slice(0, 2);
+    const msPath = h('input', { class: 'input mono', placeholder: '/path/to/the milestones proposal folder', value: X.drafts.msPath ?? '' });
+    msPath.oninput = () => (X.drafts.msPath = msPath.value);
+    const msJobs = [...S.jobs.values()].filter((j) => /Milestones/.test(j.title)).slice(0, 2);
+    const ms = t.milestones;
     const okTag = (ok, warn, text) => HX.tag(text, ok ? 'tag-ok' : warn ? 'tag-warn' : 'tag-crit');
     return h('div', { class: 'page stack lg', style: { maxWidth: '1240px' } },
-      head('Spec and TaskSet', 'A loop starts from a Helix Spec, the technical and design specification, which a harness breaks down into a Helix TaskSet: every task in Lane › Epic › Task order, with its dependencies, ready for the loop.'),
+      head('Spec and TaskSet', 'A loop starts from a Helix Spec, the technical and design specification, which a harness breaks down into a Helix TaskSet: the scope as Lane › Epic › Feature › Story › Task, with each task’s dependencies. Helix Milestones then order the delivery as demoable outcomes, and the loop builds in that order.'),
       h('div', { class: 'glass step3' },
         h('div', null, h('div', { class: 'row' }, h('span', { class: 'mono small muted' }, '01'), h('b', { style: { fontSize: '16px', fontWeight: 500 } }, 'Helix Spec'), okTag(t.plans.spec, false, t.plans.spec ? 'in spec/' : 'missing')), h('div', null, t.plans.clarifications ? 'Clarifications wait to be folded in' : 'No clarification waiting'), h('div', { class: 'small muted' }, 'spec/ · the loop engineer applies changes with you'), h('div', { class: 'row' }, h('span', { class: 'small muted' }, 'Re-harden it with /helix harden'))),
-        h('div', null, h('div', { class: 'row' }, h('span', { class: 'mono small muted' }, '02'), h('b', { style: { fontSize: '16px', fontWeight: 500 } }, 'Helix TaskSet'), okTag(!t.problems, false, t.problems ? `${t.problems} problems` : 'valid')), h('div', null, `${t.lanes} lanes · ${t.epics} epics · ${F.n(t.tasks)} tasks · ${t.human} human tasks`), h('div', { class: 'small muted' }, `plan/ · ${t.file ? 'plan/taskset.yaml' : 'epics derived'}`), h('div', { class: 'row' }, h('a', { class: 'btn btn-secondary sm', href: '#map' }, 'Open on map'), HX.btn('Export', HX.act(async () => { await HX.post('/api/export', { what: 'render' }); HX.toast('Rendering the plan documents…'); }), 'btn-ghost sm'))),
-        h('div', null, h('div', { class: 'row' }, h('span', { class: 'mono small muted' }, '03'), h('b', { style: { fontSize: '16px', fontWeight: 500 } }, 'Helix Loop'), okTag(t.running, true, t.running ? 'running' : 'stopped')), t.codeFinish != null ? [h('div', null, `${F.n(t.merged)} of ${F.n(t.tasks)} merged`), h('div', { class: 'small' }, `Code complete ${F.day(t.codeFinish)} · project complete ${F.day(t.finish)}`)] : h('div', null, `${F.n(t.merged)} of ${F.n(t.tasks)} merged · finish ${F.day(t.finish)}`), h('div', { class: 'small muted' }, 'Builds from the TaskSet; changes come back as new revisions'), h('div', { class: 'row' }, h('a', { class: 'btn btn-secondary sm', href: '#settings/loop' }, 'Loop controls')))),
+        h('div', null, h('div', { class: 'row' }, h('span', { class: 'mono small muted' }, '02'), h('b', { style: { fontSize: '16px', fontWeight: 500 } }, 'Helix TaskSet'), okTag(!!t.file, false, t.file ? `revision ${t.revision}` : 'not version 2')), h('div', null, `${F.n(t.tasks)} tasks in ${F.plural(t.stories, 'story', 'stories')}`), h('div', { class: 'small muted' }, `${F.plural(t.lanes, 'lane')} · ${F.plural(t.epics, 'epic')} · ${F.plural(t.features, 'feature')} · plan/taskset.yaml`), h('div', { class: 'row' }, h('a', { class: 'btn btn-secondary sm', href: '#map' }, 'Open on map'), HX.btn('Export', HX.act(async () => { await HX.post('/api/export', { what: 'render' }); HX.toast('Rendering the plan documents…'); }), 'btn-ghost sm'))),
+        h('div', null, h('div', { class: 'row' }, h('span', { class: 'mono small muted' }, '03'), h('b', { style: { fontSize: '16px', fontWeight: 500 } }, 'Helix Milestones'), okTag(ms.count > 0, false, ms.count ? `${ms.reached} of ${ms.count} reached` : 'missing')), ms.next ? h('div', null, `Next: ${ms.next.title}`) : h('div', null, ms.count ? 'Every milestone reached' : 'Plan them with /helix milestones'), h('div', { class: 'small muted' }, ms.next?.at ? `projected ${F.day(ms.next.at)}${ms.placeholders ? ` · ${F.plural(ms.placeholders, 'placeholder')}` : ''}` : 'plan/milestones.yaml'), h('div', { class: 'row' }, h('a', { class: 'btn btn-secondary sm', href: '#map' }, 'See them on the map'))),
+        h('div', null, h('div', { class: 'row' }, h('span', { class: 'mono small muted' }, '04'), h('b', { style: { fontSize: '16px', fontWeight: 500 } }, 'Helix Loop'), okTag(t.running, true, t.running ? 'running' : 'stopped')), t.codeFinish != null ? [h('div', null, `${F.n(t.merged)} of ${F.n(t.tasks)} merged`), h('div', { class: 'small' }, `Code complete ${F.day(t.codeFinish)} · project complete ${F.day(t.finish)}`)] : h('div', null, `${F.n(t.merged)} of ${F.n(t.tasks)} merged · finish ${F.day(t.finish)}`), h('div', { class: 'small muted' }, 'Builds from the TaskSet; changes come back as new revisions'), h('div', { class: 'row' }, h('a', { class: 'btn btn-secondary sm', href: '#settings/loop' }, 'Loop controls')))),
       h('div', { class: 'cards2', style: { alignItems: 'start' } },
         h('div', { class: 'glass pad stack', style: { boxShadow: 'inset 0 0 0 1px var(--color-accent-700), var(--shadow-sm)' } },
           h('div', { class: 'row' }, h('span', { class: 'helixnote', style: { padding: '0', background: 'none', boxShadow: 'none' } }, h('span', { class: 'ring', style: { width: '30px', height: '30px' } })), h('div', { class: 'grow' }, h('b', { style: { fontSize: '17px', fontWeight: 500 } }, 'The Helix skill'), h('div', { class: 'soft' }, 'Gives any agent harness the guidelines to write a Helix Spec and break it down into a Helix TaskSet this loop can run.')), HX.tag(`v${k.version} · ${Math.round(k.bytes / 1024)} KB`, 'tag-mono')),
@@ -449,21 +454,19 @@
             HX.btn('Read SKILL.md', HX.act(async () => { const text = await HX.api('/api/skill/file', { name: 'SKILL.md' }); await HX.dialog('SKILL.md', h('div', { class: 'codebox', style: { maxHeight: '60vh' } }, text), [{ label: 'Close', value: 'close' }]); }), 'btn-ghost')),
           h('div', { class: 'cards2', style: { gap: '18px' } },
             h('div', { class: 'stack', style: { gap: '6px' } }, h('h6', { class: 'cap' }, 'What it asks the agent to do'),
-              [['/helix spec', 'Interview you, then write the technical and design spec with numbered requirements and acceptance criteria'], ['/helix harden', 'Find the gaps and ambiguities a builder would ask about, before any task exists'], ['/helix taskset', 'Break it down into lanes, epics and atomic tasks, each one pass and one gate, plus the human tasks only you can do'], ['/helix validate', 'Check the TaskSet against the schema before you import it']].map(([c, t2]) => h('div', null, h('div', { class: 'mono t-acc' }, c), h('div', { class: 'small soft' }, t2)))),
+              [['/helix spec', 'Interview you, then write the technical and design spec: epics as outcomes, features as capabilities, user stories as needs, with numbered requirements'], ['/helix harden', 'Find the gaps and ambiguities a builder would ask about, before any task exists'], ['/helix taskset', 'Break it down into Lane › Epic › Feature › Story › Task, each task one pass and one gate, plus the human tasks only you can do'], ['/helix milestones', 'Order the delivery as demoable milestones, a walking skeleton first, with placeholders where a dependency comes later'], ['/helix validate', 'Check the TaskSet and its milestones before you import them']].map(([c, t2]) => h('div', null, h('div', { class: 'mono t-acc' }, c), h('div', { class: 'small soft' }, t2)))),
             h('div', { class: 'stack', style: { gap: '2px' } }, h('h6', { class: 'cap' }, 'Inside the zip'), h('div', { class: 'mono small soft', style: { whiteSpace: 'pre' } }, treeOf(k.files))))),
         h('div', { class: 'stack lg' },
           h('div', { class: 'glass pad stack' },
             h('div', { class: 'row' }, h('b', { style: { fontSize: '15px', fontWeight: 500 } }, 'This loop’s TaskSet'), okTag(!t.problems, false, t.problems ? `${t.problems} problems` : '✓ valid'), h('span', { class: 'grow' }), h('span', { class: 'mono small muted' }, 'plan/')),
-            h('div', { class: 'stat5' }, [[t.lanes, 'lanes'], [t.epics, 'epics'], [t.tasks, 'tasks'], [t.human, 'human tasks'], [t.deps, 'dependencies']].map(([v, l]) => h('div', null, h('div', { class: 'v' }, F.n(v)), h('div', { class: 'small muted' }, l)))),
+            h('div', { class: 'stat5' }, [[t.lanes, 'lanes'], [t.epics, 'epics'], [t.features, 'features'], [t.stories, 'stories'], [t.tasks, 'tasks']].map(([v, l]) => h('div', null, h('div', { class: 'v' }, F.n(v)), h('div', { class: 'small muted' }, l)))),
+            h('div', { class: 'small muted' }, `${F.plural(t.human, 'human task')} · ${F.plural(t.deps, 'dependency', 'dependencies')} · ${F.plural(ms.count, 'milestone')}${t.revision ? ` · revision ${t.revision}, earlier ones in plan/history/` : ''}`),
             h('div', { class: 'stack', style: { gap: '3px' } }, t.checks.map((c) => h('div', { class: 'row top' }, h('span', { class: c.ok ? 't-ok' : c.warn ? 't-warn' : 't-crit' }, c.ok ? '✓' : '!'), h('span', { class: 'soft' }, c.text)))),
-            t.file ? null : h('div', { class: 'row' }, HX.btn('Write .helix/plan/taskset.yaml', HX.act(async () => {
-              if (!(await HX.confirm('Write the TaskSet', [h('p', null, 'Writes .helix/plan/taskset.yaml with one epic per lane and feature, and sets each task’s epic, in the real plan. Rename and merge epics afterwards by hand.'), h('p', { class: 'mono small' }, 'helix-loop taskset init')], 'Write it'))) return;
-              await HX.post('/api/taskset/init');
-            })), h('span', { class: 'small muted' }, 'helix-loop taskset init'))),
+            ),
           h('div', { class: 'outline pad stack' },
             h('div', { class: 'row' }, h('b', { class: 'grow', style: { fontSize: '15px', fontWeight: 500 } }, 'Import a TaskSet'), h('span', { class: 'small muted' }, 'A plan folder or a zip')),
             path,
-            h('div', { class: 'small muted' }, 'It is validated, then diffed against the running plan: tasks and epics added, dependencies changed, tasks removed (only tasks not yet started). Merged and running tasks are kept as they are.'),
+            h('div', { class: 'small muted' }, 'It is validated, then diffed against the running plan: tasks and stories added, dependencies changed, tasks removed (only tasks not yet started). Merged and running tasks are kept as they are. Applied, it is the TaskSet’s next revision.'),
             h('div', { class: 'row' },
               HX.btn('Check it', HX.act(async () => { await HX.post('/api/taskset/import', { path: path.value }); }), 'btn-secondary'),
               HX.btn('Try in dry run', HX.act(async () => { await HX.post('/api/taskset/import', { path: path.value, dry: true }); HX.toast('Written into a fresh dry run; start it from Loop controls with Dry run picked.'); })),
@@ -471,7 +474,18 @@
                 if (!(await HX.confirm('Apply the TaskSet', h('p', null, 'Writes it into the real plan as one commit. Merged and running tasks are kept as they are.'), 'Apply', true))) return;
                 await HX.post('/api/taskset/import', { path: path.value, apply: true });
               }), 'btn-primary')),
-            jobs.map(jobCard)))));
+            jobs.map(jobCard)),
+          h('div', { class: 'outline pad stack' },
+            h('div', { class: 'row' }, h('b', { class: 'grow', style: { fontSize: '15px', fontWeight: 500 } }, 'Apply Helix Milestones'), h('span', { class: 'small muted' }, 'The folder /helix milestones wrote')),
+            msPath,
+            h('div', { class: 'small muted' }, 'Checked first: every task in one milestone, and no task waiting on a later one. Applied, the TaskSet as it stands is kept in plan/history/ and the milestones, placeholders and wiring tasks become its next revision, as one commit.'),
+            h('div', { class: 'row' },
+              HX.btn('Check it', HX.act(async () => { await HX.post('/api/milestones/check', { path: msPath.value }); }), 'btn-secondary'),
+              HX.btn('Apply to the loop', HX.act(async () => {
+                if (!(await HX.confirm('Apply the milestones', h('p', null, 'Keeps the TaskSet as it stands in plan/history/ and writes the next revision with these milestones, as one commit. A running loop takes it on its next round.'), 'Apply', true))) return;
+                await HX.post('/api/milestones/apply', { path: msPath.value });
+              }), 'btn-primary')),
+            msJobs.map(jobCard)))));
   }
   function treeOf(files) {
     const dirs = new Map();
