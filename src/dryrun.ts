@@ -22,8 +22,8 @@ export function seedControlPlane(root: string, from: string): void {
   cpSync(src.specSections, p.specSections, { recursive: true });
   cpSync(src.specIndex, p.specIndex);
   cpSync(src.prompts, p.prompts, { recursive: true });
-  if (existsSync(src.taskset)) cpSync(src.taskset, p.taskset);
-  if (existsSync(src.milestones)) cpSync(src.milestones, p.milestones);
+  // The requirement lists too: without them the dry run's plan cites requirements it can't find.
+  for (const f of ['taskset', 'milestones', 'syntheticReqs', 'deferredReqs'] as const) if (existsSync(src[f])) cpSync(src[f], p[f]);
 }
 
 // One throwaway repository per product repo, each with a skeleton commit on main.

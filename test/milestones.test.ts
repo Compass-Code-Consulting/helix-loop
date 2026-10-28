@@ -48,7 +48,7 @@ test('applying milestones records those already reached, which stay reached when
   assert.deepEqual(buildView(root, snapshot(root), loadConfig(root), { dismissed: new Set() }).groups.filter((g) => g.kind === 'milestone'), []);
   // A fix filed into its story later is follow-up work: the milestone stays reached, dated when it was.
   const story = loadPlan(p.tasks, p.human).tasks.get('T-0001')!.story;
-  writeFileSync(join(p.tasks, 'T-0090.yaml'), stringify(task('T-0090', { story, fix_first: true })));
+  writeFileSync(join(p.tasks, 'T-0090.yaml'), stringify(task('T-0090', { story, priority: 'fix_first' })));
   const plan = loadPlan(p.tasks, p.human);
   assert.equal(isReached(plan, 'walking-skeleton'), false, 'by its tasks alone it would not be');
   const board = buildBoard({ plan, events: readFileSync(p.ledger, 'utf8').trim().split('\n').map((l) => JSON.parse(l)), agents: [], running: [], config: loadConfig(root), now: Date.now() });
@@ -85,6 +85,8 @@ test('milestones apply --dry-run writes the revision into a fresh dry run and le
   assert.equal(loadPlan(p.tasks, p.human).taskset!.revision, 1);
   const dry = paths(p.dryRun);
   assert.equal(loadPlan(dry.tasks, dry.human).taskset!.revision, 2);
+  // The dry run has the requirement lists too, so its plan validates as the real one does.
+  for (const f of ['syntheticReqs', 'deferredReqs'] as const) assert.equal(existsSync(p[f]), existsSync(dry[f]), f);
   assert.deepEqual(validateMilestones(loadPlan(dry.tasks, dry.human)), []);
 });
 
