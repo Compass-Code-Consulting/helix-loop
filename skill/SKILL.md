@@ -83,7 +83,7 @@ It plans the delivery order as Helix Milestones and applies them as the TaskSet'
 
 1. Read the TaskSet and its dependencies: `helix-loop taskset --json`.
 2. Propose milestones with [guides/milestones.md](guides/milestones.md): a walking skeleton, then the thinnest end-to-end path a user values, then breadth, the riskiest work early in each; a semi-working UI as soon as its core backend exists.
-3. Run `helix-loop milestones check <folder>`, and resolve each dependency that points forward: pull it forward, or build the waiting task against a placeholder, rewriting its description and acceptance, and write the wiring task.
+3. Run `helix-loop milestones check <folder>`, and resolve each dependency that points forward: pull it forward, or build the waiting task against a placeholder, rewriting its title, notes and acceptance, and write the wiring task.
 4. Show the owner the milestone list, with each demo and each placeholder, and have them confirm it.
 5. Apply it: `helix-loop milestones apply <folder>`.
 

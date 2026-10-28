@@ -41,6 +41,8 @@ It names features, stories and tasks; a task belongs to the milestone that names
 - **Nothing waits on a later milestone.** Where the order wants a task before something it needs, the dependency is pulled forward, or the task is built against a **placeholder** (`placeholder_for`), a stand-in its acceptance describes, and a **wiring task** (`wires`) in a later milestone replaces it with the real thing.
 - **Reached** when every task in it is done: the loop tags a release of each lane it touched and asks you on Home to review its demo.
   It doesn't pause.
+  Once reached, it stays reached: a fix filed into it later is follow-up work, not a new reaching.
+  Milestones whose work is all done when they are applied count as reached already, with no release and nothing to review.
 - **Projected**: the app and `helix-loop milestones` date each one, at the slots the loop has now.
 
 ### Revisions

@@ -38,6 +38,56 @@ function task(id: string, over: Partial<Task> = {}): Task {
 }
 const milestone = (key: string, over: Partial<MilestoneDef> = {}): MilestoneDef => ({ key, title: `Milestone ${key}`, demo: `What ${key} shows works.`, features: [], stories: [], tasks: [], ...over });
 
+test('applying milestones records those already reached, which stay reached when a fix is filed into them later', async () => {
+  const root = project({ revision1: true });
+  const p = paths(root);
+  assert.equal((await cli(root, 'milestones', 'apply', proposal())).code, 0);
+  const recorded = (readFileSync(p.ledger, 'utf8').trim().split('\n').map((l) => JSON.parse(l)) as LedgerEvent[]).filter((e) => e.kind === 'milestone');
+  assert.deepEqual(recorded.map((e) => [e.key, e.already, e.repos]), [['walking-skeleton', true, []]]);
+  // Reached before it existed: nothing to review on Home.
+  assert.deepEqual(buildView(root, snapshot(root), loadConfig(root), { dismissed: new Set() }).groups.filter((g) => g.kind === 'milestone'), []);
+  // A fix filed into its story later is follow-up work: the milestone stays reached, dated when it was.
+  const story = loadPlan(p.tasks, p.human).tasks.get('T-0001')!.story;
+  writeFileSync(join(p.tasks, 'T-0090.yaml'), stringify(task('T-0090', { story, fix_first: true })));
+  const plan = loadPlan(p.tasks, p.human);
+  assert.equal(isReached(plan, 'walking-skeleton'), false, 'by its tasks alone it would not be');
+  const board = buildBoard({ plan, events: readFileSync(p.ledger, 'utf8').trim().split('\n').map((l) => JSON.parse(l)), agents: [], running: [], config: loadConfig(root), now: Date.now() });
+  const skeleton = board.milestones.find((m) => m.key === 'walking-skeleton')!;
+  assert.deepEqual([skeleton.reached, skeleton.done, skeleton.tasks.length, skeleton.at], [true, 7, 8, Date.parse(recorded[0]!.at)]);
+});
+
+test('notes in a proposal replace the task notes, saying what a placeholder stands in for; a proposal without notes keeps them', async () => {
+  const root = project({ revision1: true });
+  const p = paths(root);
+  const dir = proposal();
+  const file = join(dir, 'tasks', 'T-0014.yaml');
+  writeFileSync(file, stringify({ ...parse(readFileSync(file, 'utf8')), notes: 'Stand in for the job queue: unpublish in the request.' }));
+  writeFileSync(join(p.tasks, 'T-0015.yaml'), stringify({ ...parse(readFileSync(join(p.tasks, 'T-0015.yaml'), 'utf8')), notes: 'Kept by the owner.' }));
+  const t15 = join(dir, 'tasks', 'T-0015.yaml');
+  const { notes: _drop, ...without } = parse(readFileSync(join(p.tasks, 'T-0015.yaml'), 'utf8'));
+  writeFileSync(t15, stringify({ ...without, title: 'An Unpublish button on the note, with a confirmation' }));
+  assert.equal((await cli(root, 'milestones', 'apply', dir)).code, 0);
+  const plan = loadPlan(p.tasks, p.human);
+  assert.equal(plan.tasks.get('T-0014')!.notes, 'Stand in for the job queue: unpublish in the request.');
+  assert.equal(plan.tasks.get('T-0015')!.notes, 'Kept by the owner.');
+});
+
+test('milestones apply --dry-run writes the revision into a fresh dry run and leaves the plan alone; options may lead the command', async () => {
+  const root = project({ revision1: true });
+  const p = paths(root);
+  const head = () => execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root }).toString().trim();
+  const was = head();
+  const out: string[] = [];
+  const code = await main(['--root', root, 'milestones', 'apply', proposal(), '--dry-run'], { out: (s = '') => void out.push(s), err: (s) => void out.push(s) });
+  assert.equal(code, 0, out.join('\n'));
+  assert.match(out[0]!, /^In the dry run \(.+\), not the plan: see it with `helix-loop milestones --root .+` or the app's Dry run\.$/);
+  assert.equal(head(), was);
+  assert.equal(loadPlan(p.tasks, p.human).taskset!.revision, 1);
+  const dry = paths(p.dryRun);
+  assert.equal(loadPlan(dry.tasks, dry.human).taskset!.revision, 2);
+  assert.deepEqual(validateMilestones(loadPlan(dry.tasks, dry.human)), []);
+});
+
 // A copy of the fixture project, as a git checkout, at revision 1 (the TaskSet before milestones) when asked.
 function project(o: { revision1?: boolean } = {}): string {
   const root = mkdtempSync(join(tmpdir(), 'helix-ms-'));

@@ -305,7 +305,7 @@ Checks a proposal folder (milestones.yaml, with the tasks/ it adds or changes an
 Every task must be in exactly one milestone, by its id, its story or its feature, most specific first.
 No task may wait on a task in a later milestone: each such dependency is listed with the two ways to resolve it.
 Pull it forward: name the dependency (and what it waits on in later milestones) in the same milestone or an earlier one.
-Or build against a placeholder: the waiting task names the dependency in placeholder_for instead of blocked_by, its description and acceptance say what the placeholder does, and a wiring task (wires: [it], blocked_by: it and the dependency) goes in the dependency's milestone or later.
+Or build against a placeholder: the waiting task names the dependency in placeholder_for instead of blocked_by, its title, notes and acceptance say what the placeholder does, and a wiring task (wires: [it], blocked_by: it and the dependency) goes in the dependency's milestone or later.
 Exits 0 when the milestones would apply, 1 when they wouldn't.
 
 | Argument | What it is |
@@ -344,10 +344,13 @@ A running loop takes the new revision on its next round.
 | Option | What it does |
 | --- | --- |
 | `--why <text>` | Why, for the history (default: the milestones and placeholders it adds) |
+| `--dry-run` | Apply it in a fresh dry run instead, to look at it in the app or run it with the fake agents first |
 
 Examples:
 
 ```sh
+# Try the proposal in the dry run first
+helix-loop milestones apply ./milestones --dry-run
 # Apply the proposal the Helix skill wrote
 helix-loop milestones apply ./milestones
 ```

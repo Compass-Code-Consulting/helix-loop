@@ -281,7 +281,7 @@ const milestonesCheck = define({
 Every task must be in exactly one milestone, by its id, its story or its feature, most specific first.
 No task may wait on a task in a later milestone: each such dependency is listed with the two ways to resolve it.
 Pull it forward: name the dependency (and what it waits on in later milestones) in the same milestone or an earlier one.
-Or build against a placeholder: the waiting task names the dependency in placeholder_for instead of blocked_by, its description and acceptance say what the placeholder does, and a wiring task (wires: [it], blocked_by: it and the dependency) goes in the dependency's milestone or later.
+Or build against a placeholder: the waiting task names the dependency in placeholder_for instead of blocked_by, its title, notes and acceptance say what the placeholder does, and a wiring task (wires: [it], blocked_by: it and the dependency) goes in the dependency's milestone or later.
 Exits 0 when the milestones would apply, 1 when they wouldn't.`,
   args: [{ name: 'folder', description: 'A Milestones proposal folder; the plan\'s own milestones when left out', optional: true }],
   examples: [
@@ -324,10 +324,17 @@ const milestonesApply = define({
 Then the TaskSet as it stands (taskset.yaml, tasks/, human/) is kept in .helix/plan/history/r<N>/, never edited again, and revision N+1 is written in place: the milestones, the tasks the proposal changes (placeholders) and adds (wiring tasks), and an entry in .helix/plan/history/index.yaml, as one commit.
 A running loop takes the new revision on its next round.`,
   args: [{ name: 'folder', description: 'The proposal: milestones.yaml, and the tasks/ (and taskset.yaml) it brings' }],
-  options: { why: { type: 'string', value: 'text', description: 'Why, for the history (default: the milestones and placeholders it adds)' } },
-  examples: [['helix-loop milestones apply ./milestones', 'Apply the proposal the Helix skill wrote']],
+  options: {
+    why: { type: 'string', value: 'text', description: 'Why, for the history (default: the milestones and placeholders it adds)' },
+    'dry-run': { type: 'boolean', description: 'Apply it in a fresh dry run instead, to look at it in the app or run it with the fake agents first' },
+  },
+  examples: [
+    ['helix-loop milestones apply ./milestones --dry-run', 'Try the proposal in the dry run first'],
+    ['helix-loop milestones apply ./milestones', 'Apply the proposal the Helix skill wrote'],
+  ],
   async run({ root, args, opts, out }) {
-    const r = await ops.applyMilestones(root, args[0]!, { why: str(opts, 'why'), actor: withCli(root) });
+    const r = await ops.applyMilestones(root, args[0]!, { why: str(opts, 'why'), actor: withCli(root), dry: opts['dry-run'] === true });
+    if (r.dryRun) out(`In the dry run (${shown(r.dryRun)}), not the plan: see it with \`helix-loop milestones --root ${shown(r.dryRun)}\` or the app's Dry run.`);
     out(`TaskSet revision ${r.revision}${r.snapshot ? `; revision ${r.revision - 1} is kept in .helix/plan/${r.snapshot}` : ''}.`);
     if (r.added.length || r.changed.length) out(`${plural(r.added.length, 'task')} added, ${plural(r.changed.length, 'task')} changed${r.placeholders ? `: ${plural(r.placeholders, 'placeholder')}, ${plural(r.wiring, 'wiring task')}` : ''}.`);
     if (!r.committed) out('(Not a git checkout: nothing committed.)');

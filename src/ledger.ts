@@ -58,7 +58,9 @@ export type LedgerEvent =
   // Release tags origin lacked because their push had failed, pushed again (`pushed`: whether it worked).
   | { kind: 'release_retry'; at: string; repo: string; tags: string[]; pushed: boolean }
   // A milestone's last task merged: its lanes (`repos`) were tagged, and Home asks the owner to review its demo.
-  | { kind: 'milestone'; at: string; key: string; title: string; demo: string; repos: string[] };
+  // `already`: it was reached before its milestones were applied, so it is recorded with no release and nothing on
+  // Home. Either way a milestone reached stays reached: work filed into it later is follow-up, not a new reaching.
+  | { kind: 'milestone'; at: string; key: string; title: string; demo: string; repos: string[]; already?: boolean };
 
 export function record(file: string, event: LedgerEvent): void {
   mkdirSync(dirname(file), { recursive: true });

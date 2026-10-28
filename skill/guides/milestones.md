@@ -43,7 +43,7 @@ Do this when the dependency is small, risky, or needed for the demo to be real.
 The waiting task is built first, against a stand-in, and a follow-up task wires the real thing in later:
 
 - The waiting task names the dependency in `placeholder_for: [T-…]` and drops it from `blocked_by`.
-- Rewrite its description and acceptance to say exactly what the placeholder does and how the missing dependency is handled: an empty state, a stub returning fixed data behind the real interface, or a clear "not available yet" error.
+- Rewrite its title, notes and acceptance to say exactly what the placeholder does and how the missing dependency is handled: an empty state, a stub returning fixed data behind the real interface, or a clear "not available yet" error.
   The acceptance proves the placeholder, never the real dependency.
 - Write one **wiring task** with `wires: [the waiting task]`, `blocked_by` the waiting task and every task in its `placeholder_for`, in the dependency's milestone or later (name it by id in that milestone's `tasks`).
   Its acceptance proves the real path end to end, and that the placeholder is gone.

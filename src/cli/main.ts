@@ -32,12 +32,23 @@ function closest(name: string): string | undefined {
 }
 
 export async function main(argv: string[], io = { out: (s = '') => console.log(s), err: (s: string) => console.error(s) }): Promise<number> {
+  // Global options may come before the command too ("helix-loop --root ~/acme doctor"): they move after it.
+  const lead: string[] = [];
+  let i = 0;
+  while (i < argv.length && argv[i]!.startsWith('-')) {
+    const name = argv[i]!.replace(/^--?/, '').split('=')[0]!;
+    const o = Object.entries(GLOBAL_OPTIONS).find(([n, x]) => n === name || x.short === name)?.[1];
+    if (!o) break;
+    lead.push(argv[i]!);
+    if (o.type === 'string' && !argv[i]!.includes('=') && i + 1 < argv.length) lead.push(argv[++i]!);
+    i++;
+  }
   const words: string[] = [];
-  for (const a of argv) {
+  for (const a of argv.slice(i)) {
     if (a.startsWith('-')) break;
     words.push(a);
   }
-  const flags = argv.slice(words.length);
+  const flags = [...argv.slice(i + words.length), ...lead];
   if (!words.length || words[0] === 'help') {
     const target = words[0] === 'help' ? findCommand(words.slice(1)) : undefined;
     if (flags.includes('--version') || flags.includes('-v')) return io.out(VERSION), 0;

@@ -2,7 +2,7 @@ import type { Config } from '../config.ts';
 import type { LedgerEvent } from '../ledger.ts';
 import { computeMap, rankTasks } from '../map/graph.ts';
 import { meanPassHours } from '../ledger.ts';
-import { membership } from '../plan/milestones.ts';
+import { membership, recordedReached } from '../plan/milestones.ts';
 import { countedAttempts } from '../sched/scheduler.ts';
 import type { AgentName, Level, MapAgent, Plan, RepoName, Task, Timeline } from '../types.ts';
 import { expectedHumanDone, project, type Projection } from './projection.ts';
@@ -246,11 +246,14 @@ export function buildBoard(input: BoardInput): Board & { projection: Projection;
   });
 
   const byId = new Map(tasks.map((t) => [t.id, t]));
+  const recorded = recordedReached(events);
   const milestones: BoardMilestone[] = (plan.milestones ?? []).map((m) => {
     const ids = member.tasks.get(m.key) ?? [];
     const done = ids.filter((id) => byId.get(id)?.status === 'done').length;
-    const reached = ids.length > 0 && done === ids.length;
-    const at = reached ? Math.max(...ids.map((id) => byId.get(id)!.end ?? 0)) : projection.milestones.get(m.key);
+    const allDone = ids.length > 0 && done === ids.length;
+    const reachedAt = recorded.get(m.key);
+    const reached = allDone || reachedAt !== undefined;
+    const at = allDone ? Math.max(...ids.map((id) => byId.get(id)!.end ?? 0)) : reachedAt ? Date.parse(reachedAt) : projection.milestones.get(m.key);
     return { key: m.key, title: m.title, demo: m.demo, tasks: ids, done, reached, ...(at ? { at } : {}) };
   });
 

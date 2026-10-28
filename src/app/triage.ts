@@ -228,10 +228,10 @@ export function triage(input: TriageInput): Group[] {
     });
   }
 
-  // Milestones the loop reached, each once, until the owner has reviewed its demo. A milestone reached again (work
-  // added to it after it was reached) asks again.
+  // Milestones the loop reached, each once, until the owner has reviewed its demo; not those already reached when
+  // their milestones were applied.
   const reachedAt = new Map<string, Extract<LedgerEvent, { kind: 'milestone' }>>();
-  for (const e of input.events) if (e.kind === 'milestone') reachedAt.set(e.key, e);
+  for (const e of input.events) if (e.kind === 'milestone' && !e.already) reachedAt.set(e.key, e);
   for (const e of reachedAt.values()) {
     const id = `milestone:${e.key}:${e.at}`;
     if (input.dismissed.has(id)) continue;

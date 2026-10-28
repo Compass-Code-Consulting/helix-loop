@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
+import type { LedgerEvent } from '../ledger.ts';
 import type { MilestoneDef, Plan, Task, TaskSetDef } from '../types.ts';
 
 // Helix Milestones (plan/milestones.yaml): the order the TaskSet is delivered in, as named, demoable outcomes. A
@@ -87,6 +88,12 @@ export function membership(plan: Plan): Membership {
 export function milestoneRank(plan: Plan, m = membership(plan)): Map<string, number> {
   const last = plan.milestones?.length ?? 0;
   return new Map([...plan.tasks.keys()].map((id) => [id, m.index.get(m.of.get(id) ?? '') ?? last]));
+}
+
+// The milestones the ledger says were reached, with when: once reached, a milestone stays reached, so a fix filed
+// into one of its stories later doesn't take it back.
+export function recordedReached(events: LedgerEvent[]): Map<string, string> {
+  return new Map(events.flatMap((e) => (e.kind === 'milestone' ? [[e.key, e.at] as [string, string]] : [])));
 }
 
 // Reached: every task in it is done. A milestone with no tasks is never reached.

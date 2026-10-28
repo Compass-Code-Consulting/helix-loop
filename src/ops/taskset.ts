@@ -10,8 +10,8 @@ import { buildBoard } from '../app/board.ts';
 import { boardInput } from '../app/views.ts';
 import { loadConfig, paths } from '../config.ts';
 import { prepareDryRun } from '../dryrun.ts';
-import { readLedger } from '../ledger.ts';
-import { forwardDeps, membership, milestonesPath, readMilestones, type ForwardDep, type MilestonesFile } from '../plan/milestones.ts';
+import { readLedger, record } from '../ledger.ts';
+import { forwardDeps, isReached, membership, milestonesPath, recordedReached, readMilestones, type ForwardDep, type MilestonesFile } from '../plan/milestones.ts';
 import { historyDir, readHistory, reviseMilestonesText, reviseTaskSetText, snapshot, writeHistory, type Revision } from '../plan/revisions.ts';
 import { atomicWrite, loadPlan, loadRaw, writeTask } from '../plan/store.ts';
 import { diffTaskSet, readTaskSet, tasksetPath, type ImportDiff, type TaskSetFile } from '../plan/taskset.ts';
@@ -102,12 +102,26 @@ async function writeRevision(root: string, w: RevisionWrite): Promise<{ revision
   if (w.milestones) atomicWrite(live, reviseMilestonesText(w.milestones, was ?? next));
   else rmSync(live, { force: true }); // a new TaskSet's order is planned afresh; the old one is in the snapshot
   if (w.milestones || existsSync(join(root, '.git'))) files.push(live);
-  const tasks = loadPlan(p.tasks, p.human).tasks.size;
+  const after = loadPlan(p.tasks, p.human);
+  const tasks = after.tasks.size;
+  recordAlreadyReached(p.ledger, after);
   history.push({ revision: next, date: new Date().toISOString(), by: w.actor.by, why: w.why, tasks, ...(w.counts.placeholders ? { placeholders: w.counts.placeholders } : {}), ...(w.counts.wiring ? { wiring: w.counts.wiring } : {}) });
   writeHistory(p.plan, history.sort((a, b) => a.revision - b.revision));
   const tracked = await trackedOrPresent(root, files);
   const r = await afterEdit(root, tracked, `Plan: TaskSet revision ${next}: ${w.why.charAt(0).toLowerCase()}${w.why.slice(1)} (${signed(w.actor)})`);
   return { revision: next, ...(kept ? { snapshot: kept } : {}), committed: r.committed };
+}
+
+// Milestones whose work is all merged when they are applied were reached before they existed: the ledger records
+// them as reached already, with no release and nothing on Home, so a fix filed into one later doesn't take it back.
+function recordAlreadyReached(ledger: string, plan: Plan): void {
+  const recorded = recordedReached(readLedger(ledger));
+  const member = membership(plan);
+  const at = new Date().toISOString();
+  for (const m of plan.milestones ?? []) {
+    if (recorded.has(m.key) || !isReached(plan, m.key, member)) continue;
+    record(ledger, { kind: 'milestone', at, key: m.key, title: m.title, demo: m.demo, repos: [], already: true });
+  }
 }
 
 // Git refuses a pathspec that matches nothing: a removed file only counts when git knows it.
@@ -196,8 +210,9 @@ export async function importTaskSet(root: string, from: string, mode: { apply?: 
 
 // ---- a Milestones proposal: a folder over the plan ----
 
-// The fields a builder pass and the loop own; a proposal never changes them.
-const RUNTIME: (keyof Task)[] = ['status', 'claimed_by', 'attempts', 'summary', 'notes'];
+// The fields a builder pass and the loop own; a proposal never changes them. Notes are the planner's as much as the
+// owner's: a placeholder task's notes say what its builder stands in, so a proposal's notes replace the task's.
+const RUNTIME: (keyof Task)[] = ['status', 'claimed_by', 'attempts', 'summary'];
 const definition = (t: Task) => JSON.stringify(Object.fromEntries(Object.entries(t).filter(([k, v]) => !RUNTIME.includes(k as keyof Task) && v !== undefined).sort(([a], [b]) => a.localeCompare(b))));
 
 export interface Proposal {
@@ -240,7 +255,7 @@ export function readProposal(root: string, folder: string): Proposal {
     const doc = value as Task;
     const was = current.tasks.get(id);
     const next: Task = was
-      ? { ...doc, status: was.status, claimed_by: was.claimed_by, attempts: was.attempts, ...(was.summary ? { summary: was.summary } : {}), ...(was.notes ? { notes: was.notes } : {}) }
+      ? { ...doc, status: was.status, claimed_by: was.claimed_by, attempts: was.attempts, ...(was.summary ? { summary: was.summary } : {}), ...(doc.notes === undefined && was.notes ? { notes: was.notes } : {}) }
       : { ...doc, status: 'ready', claimed_by: null, attempts: [], blocked_by: doc.blocked_by ?? [] };
     if (!was) delete next.summary;
     if (was && definition(was) === definition(next)) continue;
@@ -256,7 +271,8 @@ export function readProposal(root: string, folder: string): Proposal {
   const humanChanged: HumanTask[] = [];
   for (const { id, value } of existsSync(join(base, 'human')) ? loadRaw(join(base, 'human')) : []) {
     const was = current.human.get(id);
-    const next = { ...(value as HumanTask), ...(was ? { status: was.status, ...(was.notes ? { notes: was.notes } : {}) } : {}) };
+    const doc = value as HumanTask;
+    const next = { ...doc, ...(was ? { status: was.status, ...(doc.notes === undefined && was.notes ? { notes: was.notes } : {}) } : {}) };
     if (was && JSON.stringify(was) === JSON.stringify(next)) continue;
     problems.push(...validateDocument(p.schema, 'human', id, next));
     human.set(id, next);
@@ -311,11 +327,17 @@ export interface MilestonesApplied {
   placeholders: number;
   wiring: number;
   committed: boolean;
+  dryRun?: string; // applied in a fresh dry run there instead
 }
 
 // Applies a proposal: checked whole first (nothing is written while anything is wrong), then written as the TaskSet's
 // next revision with the milestones and the tasks the proposal brings. The loop takes it on its next round.
-export async function applyMilestones(root: string, folder: string, o: { why?: string; actor: Actor }): Promise<MilestonesApplied> {
+export async function applyMilestones(root: string, folder: string, o: { why?: string; actor: Actor; dry?: boolean }): Promise<MilestonesApplied> {
+  // A dry run gets the revision on its copy of the plan, to look at in the app or run with the fake agents first.
+  if (o.dry) {
+    const target = prepareDryRun(root).root;
+    return { ...(await applyMilestones(target, folder, { ...o, dry: false })), dryRun: target };
+  }
   const p = paths(root);
   const proposal = readProposal(root, folder);
   const { plan } = proposal;

@@ -27,7 +27,7 @@ import { Semaphore } from './semaphore.ts';
 import type { Notifier } from './notify.ts';
 import { atomicWrite, loadPlan, writeTask } from './plan/store.ts';
 import { clipNote, clipSummary, firstLine } from './summary.ts';
-import { membership, reachedBy } from './plan/milestones.ts';
+import { membership, reachedBy, recordedReached } from './plan/milestones.ts';
 import { errorsOnly, validateGraph, validateHierarchy, validateMilestones, validateReleaseHolds, validateRepos, validateSchemas, validateState, validateStructure } from './plan/validate.ts';
 import { BUILDER_NICE, run } from './proc.ts';
 import { loadTemplate, PromptOverBudget, renderPrompt, type CarriedWork } from './prompt.ts';
@@ -1153,6 +1153,8 @@ async function milestoneReached(ctx: PassContext, task: Task) {
   const m = reachedBy(ctx.plan, task.id);
   if (!m) return undefined;
   const { paths: p, clock, log, notify } = ctx.deps;
+  // Reached before: this was follow-up work filed into it, which neither releases nor asks for a review again.
+  if (recordedReached(readLedger(p.ledger)).has(m.key)) return undefined;
   const members = membership(ctx.plan).tasks.get(m.key) ?? [];
   const repos = [...new Set(members.map((id) => ctx.plan.tasks.get(id)!.repo))].filter((r) => ctx.deps.config.repos[r]);
   record(p.ledger, { kind: 'milestone', at: iso(clock.now()), key: m.key, title: m.title, demo: m.demo, repos });
