@@ -60,7 +60,26 @@ export type LedgerEvent =
   // A milestone's last task merged: its lanes (`repos`) were tagged, and Home asks the owner to review its demo.
   // `already`: it was reached before its milestones were applied, so it is recorded with no release and nothing on
   // Home. Either way a milestone reached stays reached: work filed into it later is follow-up, not a new reaching.
-  | { kind: 'milestone'; at: string; key: string; title: string; demo: string; repos: string[]; already?: boolean };
+  | { kind: 'milestone'; at: string; key: string; title: string; demo: string; repos: string[]; already?: boolean }
+  // A whole-suite run on main, for a repo with scoped gates (fullrun.ts): every N merges, or before a release.
+  // A failed one names its failing tests, whether they passed when run again (`flaky`), the merge they first fail
+  // at (`culprit`) and the fix-first task filed for it (`fix`).
+  | {
+      kind: 'full_run';
+      at: string;
+      repo: string;
+      commit: string;
+      reason: string;
+      ok: boolean;
+      ms: number;
+      log: string;
+      steps?: { step: string; ms: number }[];
+      failing?: string;
+      tests?: string[];
+      flaky?: boolean;
+      culprit?: { commit: string; task: string };
+      fix?: string;
+    };
 
 export function record(file: string, event: LedgerEvent): void {
   mkdirSync(dirname(file), { recursive: true });

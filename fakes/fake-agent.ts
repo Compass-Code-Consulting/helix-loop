@@ -291,6 +291,11 @@ switch (verb) {
     implement();
     writeFileSync(join(cwd, 'FLAKY'), 'the fake gate fails the shared test while this file exists\n');
     finishOk(message('implement, and meet the shared flaky test'), cost);
+  case 'remove':
+    // Deletes the file it names (remove:FLAKY), as a fix takes out what broke main.
+    implement();
+    rmSync(join(cwd, param!), { force: true });
+    finishOk(message(`implement, and remove ${param}`), cost);
   case 'clash':
     // Passes the gate alone, but the fake gate fails while two tasks' clash files sit side by side: the
     // second of two such tasks to merge fails only after its rebase onto the first.

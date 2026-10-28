@@ -62,6 +62,21 @@ The revision it replaces is kept whole in `.helix/plan/history/r<N>/`, never edi
   Neither runs again until it is handed back.
 - When the same test fails passes of two different tasks, the loop files a **fix first** task for it, ranked ahead of everything else.
 
+## Scoped gates
+
+A gate that runs every test on every pass grows with the product: each task adds tests, so each pass costs more than the last, and the more tests a pass must clear, the likelier one fails for reasons the change had nothing to do with.
+A repository with `scoped` set ([configuration](configuration.md#repos)) tests each change instead, and checks the whole on `main`:
+
+- **Each pass's gate tests what its change can affect.**
+  The loop tells the repository's gate where the change started, in `HELIX_GATE_BASE` (its merge base with `main`, after a rebase the new `main`), and the gate picks the tests: those that import the changed code, those that exercise it, and the task's own.
+  Which tests those are is the repository's to know; without the variable, its gate runs everything.
+  A fix-first task runs everything anyway: it is often filed for a test its change may not reach.
+- **The whole suite runs on `main`,** every `full_run_every` merges, in one of the gates' slots, and before each release the loop tags, in the repository's merge queue so `main` can't move under it: a release carries only what the whole suite passed on.
+- **A failure there goes back to its cause.**
+  Its failing tests run again at the same commit: if they pass, the test is flaky.
+  If they fail again, they run at the merges since the last run that passed, halving the range each time, which finds the merge that broke them and so its task.
+  Either way the loop files a fix-first task, once per failing test, and tells you; releases wait until a run passes, and the fix's merge starts one.
+
 ## Two finish dates
 
 - **Project complete:** when everything is done: the last builder task merged and the last human task done, each human task taking its lead time after the human tasks it waits on.
@@ -124,3 +139,4 @@ Settings › Helix shows what each level would have spent at the last 24 hours' 
 ## Releases
 
 The loop tags a release of a repository every so many merged tasks and when a milestone that touched it is reached, holds it until a named human task is done when the config says so, and holds any release that changes a reviewed path (CI workflows, infrastructure) until you've read its diff and approved it.
+With [scoped gates](#scoped-gates), it tags only a commit the whole suite passed on, and holds the release while `main` fails it.

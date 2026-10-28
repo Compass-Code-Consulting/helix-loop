@@ -28,6 +28,18 @@ export interface ProjectInfo {
   timezone: string;
 }
 
+export interface RepoConfig {
+  gate: string; // the repo's full check: every test, unless the loop names where the change started (scoped)
+  prepare?: string; // its install step, run in a fresh worktree before the agent and before each gate
+  path?: string;
+  // Scoped gates (fullrun.ts): each pass's gate is given HELIX_GATE_BASE, the commit its change started from,
+  // and runs only the tests the change can affect. The whole suite runs on main instead: every
+  // `full_run_every` merges, and before each release the loop tags. `tests` runs given test files (appended
+  // as arguments): with it, a failure on main is rerun to tell a flaky test from a break, and traced to the
+  // merge that caused it.
+  scoped?: { full_run_every: number; tests?: string };
+}
+
 export interface Config {
   root: string; // the project: the folder that holds .helix/
   project?: Partial<ProjectInfo>;
@@ -38,7 +50,7 @@ export interface Config {
   agents: Record<AgentName, AgentConfig>;
   // Each repo the loop builds: its checkout is the project's own code, at <project>/<repo> unless `path` says
   // where (relative to the project). The loop merges into that checkout's main; its passes work in worktrees.
-  repos: Record<RepoName, { gate: string; prepare?: string; path?: string }>;
+  repos: Record<RepoName, RepoConfig>;
   limits: {
     pass_timeout_minutes: number;
     gate_timeout_minutes: number;
@@ -244,6 +256,9 @@ export function loadConfig(root: string, file = configPath(root)): Config {
     const at = resolve(root, c.path ?? r);
     if (at === resolve(root)) throw new Error(`config: repos.${r}.path can't be the project folder itself; keep the code in a folder of its own, such as ${r}/`);
     if (at === resolve(root, HELIX_DIR) || at.startsWith(resolve(root, HELIX_DIR) + sep)) throw new Error(`config: repos.${r}.path is inside ${HELIX_DIR}/, where the code would be hidden; put it beside it, such as ${r}/`);
+    // Without whole-suite runs on main, a scoped gate would leave every test outside each change unchecked.
+    const every = c.scoped?.full_run_every;
+    if (c.scoped && !(Number.isInteger(every) && every! > 0)) throw new Error(`config: repos.${r}.scoped.full_run_every must be a whole number of merges, 1 or more, not ${every}`);
   }
   // A misspelt repo here would hold nothing, and that repo would release unreviewed.
   for (const [r, step] of Object.entries(raw.release?.hold_until ?? {})) {
@@ -267,7 +282,7 @@ export function repoDir(config: Pick<Config, 'root' | 'repos'>, repo: RepoName):
   return resolve(config.root, config.repos[repo]?.path ?? repo);
 }
 
-export function repoConfig(config: Config, repo: RepoName): { gate: string; prepare?: string; path?: string } {
+export function repoConfig(config: Config, repo: RepoName): RepoConfig {
   const r = config.repos[repo];
   if (!r) throw new Error(`config: no repo ${repo} under repos`);
   return r;
@@ -304,6 +319,8 @@ export function paths(root: string) {
     ledger: join(h, 'runs', 'runs.jsonl'),
     metrics: join(h, 'runs', 'metrics'), // the metrics page's versions (metrics/archive.ts)
     approvals: join(h, 'runs', 'approvals'),
+    gateCache: join(h, 'runs', 'cache'), // <repo>/: what a scoped gate keeps between runs, such as which tests cover which code
+    fullRuns: join(h, 'worktrees', 'full-runs'), // the worktrees of the whole-suite runs on main (fullrun.ts)
     agentsState: join(h, 'runs', 'agents.json'),
     logs: join(h, 'runs', 'logs'),
     stopFile: join(h, 'runs', 'STOP'),

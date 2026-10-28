@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import type { Clock } from './clock.ts';
 import { suspensionWatch } from './clock.ts';
@@ -47,6 +47,9 @@ export interface GateInput {
   env?: NodeJS.ProcessEnv;
   envPrefix?: string; // the project's prefix for the gate's id variable (config env_prefix)
   signal?: AbortSignal; // kills the prepare step and the gate command: the pass was stopped from the loop app
+  // Scoped gates (fullrun.ts): the repo's gate is told the commit the change started from, its merge base with
+  // main, and given a folder that outlasts the pass, so it can test only what the change can affect.
+  scoped?: { cache: string };
 }
 
 // Finishes a dirty tree by committing it, with the agent's final message as the message (L7).
@@ -105,7 +108,7 @@ const WRAPPER = /ELIFECYCLE|Command failed with exit code|^\s*[>$] /; // a packa
 // A gate runner starting a step, as repos' gate scripts print it: "> gate 70-unit: …", "Checking 40-unit.ts",
 // "Checking: scripts/checks/40-unit.ts". stepName gives the step's name.
 const STEP = /^\s*(?:> gate (\S+):|Checking:? (\S+)\.[cm]?[jt]s$)/;
-const ANSI = /\x1b\[[0-9;]*[A-Za-z]/g; // terminal colours
+export const ANSI = /\x1b\[[0-9;]*[A-Za-z]/g; // terminal colours
 
 // A gate runner that runs steps at the same time reports each one when it ends, with its own time:
 // "< gate 15-lint: passed in 31.2s", "< gate 70-unit: failed in 12s (exit 1)"; and the first failed one last:
@@ -199,8 +202,89 @@ export function pageAtFailure(worktree: string): string | undefined {
   return `${relative(worktree, first.file)}:\n${text.length > PAGE_LIMIT ? `${text.slice(0, PAGE_LIMIT)}\n[…]` : text}`;
 }
 
+// A variable the loop sets for a repo's gate, under the HELIX_ name and the project's own prefix.
+export const gateVar = (prefix: string | undefined, name: string, value: string) => ({ [`HELIX_${name}`]: value, [`${prefix ?? 'HELIX'}_${name}`]: value });
+
 // The gate's id, which a repo's scripts use to keep parallel gates' databases and ports apart.
-const gateId = (prefix = 'HELIX', id: string) => ({ HELIX_GATE_ID: id, [`${prefix}_GATE_ID`]: id });
+export const gateId = (prefix: string | undefined, id: string) => gateVar(prefix, 'GATE_ID', id);
+
+// The repo's own check in a worktree, as in CI: everything git doesn't track goes (build outputs, caches,
+// installs), the prepare step installs from the lockfile, then `command` runs. A host suspension during it says
+// nothing about the code: it runs again, once. Each step is timed by the runner's own report when it gives one
+// ("< gate 15-lint: passed in 31.2s"), and otherwise from its announcement to the next one's. The pass's gate
+// and the whole-suite runs on main (fullrun.ts) both run through it.
+export interface RepoCheckInput {
+  worktree: string;
+  command: string;
+  prepare?: string;
+  timeoutMs: number;
+  suspensionMs: number;
+  clock: Clock;
+  logFile: string;
+  env: NodeJS.ProcessEnv; // the gate's id and the loop's other variables included
+  signal?: AbortSignal;
+}
+export type RepoCheckResult =
+  | { ok: true; steps: GateStep[] }
+  | { ok: false; outcome: 'gate_failed' | 'suspended'; detail: string; failing?: string; failedStep: string; steps: GateStep[]; output: string };
+
+export async function runRepoCheck(input: RepoCheckInput): Promise<RepoCheckResult> {
+  const { worktree, clock } = input;
+  const steps: GateStep[] = [];
+  interface Seen {
+    marks: { step: string; at: number }[];
+    ends: { step: string; ok: boolean; ms: number }[];
+    failedAt?: string;
+  }
+  const run = (command: string, seen?: Seen) =>
+    sh(command, {
+      cwd: worktree,
+      timeoutMs: input.timeoutMs,
+      logFile: input.logFile,
+      signal: input.signal,
+      env: { ...process.env, ...input.env, CI: '1' },
+      onLine: seen && ((line) => {
+        const end = stepEnd(line);
+        if (end) return void seen.ends.push(end);
+        const step = stepName(line);
+        if (step) seen.marks.push({ step, at: clock.monotonic() });
+        seen.failedAt ??= GATE_FAILED_AT.exec(line.replace(ANSI, ''))?.[1];
+      }),
+    });
+  for (let tries = 0; tries < 2; tries++) {
+    steps.length = 0;
+    const slept = suspensionWatch(clock, input.suspensionMs);
+    await git(worktree, 'clean', '-ffdxq');
+    const prepStarted = clock.monotonic();
+    const prep = input.prepare ? await run(input.prepare) : undefined;
+    if (prep) steps.push({ step: 'prepare', ms: Math.round(clock.monotonic() - prepStarted) });
+    const unprepared = prep !== undefined && (prep.code !== 0 || prep.timedOut);
+    const seen: Seen = { marks: [], ends: [] };
+    const res = unprepared ? prep : await run(input.command, seen);
+    const ended = clock.monotonic();
+    const marks = seen.marks;
+    if (seen.ends.length) seen.ends.forEach((e) => steps.push({ step: e.step, ms: e.ms }));
+    else marks.forEach((m, i) => steps.push({ step: m.step, ms: Math.round((marks[i + 1]?.at ?? ended) - m.at) }));
+    if (slept()) {
+      if (tries === 0) continue;
+      return { ok: false, outcome: 'suspended', detail: 'the host was suspended during the gate, twice', failedStep: 'suspended', steps, output: '' };
+    }
+    if (res.code === 0 && !res.timedOut) return { ok: true, steps };
+    // The next attempt reads this: what failed first, then the end of the output, without terminal colours.
+    const command = unprepared ? input.prepare! : input.command;
+    const output = res.output.replace(ANSI, '');
+    const tail = output.trim().split('\n').slice(-80).join('\n');
+    const failed = res.timedOut
+      ? `it timed out after ${Math.round(input.timeoutMs / 60_000)} minutes`
+      : (firstFailure(output) ?? `${command} exited with code ${res.code}`);
+    const failing = unprepared ? `its prepare step, ${failed}` : failed;
+    const failedStep = unprepared ? 'prepare' : (seen.failedAt ?? seen.ends.find((e) => !e.ok)?.step ?? marks.at(-1)?.step ?? 'gate');
+    const page = unprepared ? undefined : pageAtFailure(worktree);
+    const detail = `the gate failed: ${failing}\n\n${tail}${page ? `\n\nThe page when the first browser test failed (${page})` : ''}`;
+    return { ok: false, outcome: 'gate_failed', detail, failing, failedStep, steps, output };
+  }
+  return { ok: false, outcome: 'gate_failed', detail: 'unreachable', failedStep: 'gate', steps, output: '' };
+}
 
 export async function runGate(input: GateInput): Promise<GateOutcome> {
   const { worktree, task, clock } = input;
@@ -275,62 +359,23 @@ export async function runGate(input: GateInput): Promise<GateOutcome> {
     };
   }
 
-  // The repo's full check, on what a fresh checkout of the commit holds, as in CI: everything git doesn't
-  // track goes (build outputs, caches, installs, whatever the pass left), then the prepare step installs
-  // from the lockfile. A host suspension during it says nothing about the code: run it again.
-  // Each step is timed by the runner's own report when it gives one ("< gate 15-lint: passed in 31.2s"), and
-  // otherwise from its announcement to the next one's.
-  interface Seen {
-    marks: { step: string; at: number }[];
-    ends: { step: string; ok: boolean; ms: number }[];
-    failedAt?: string;
-  }
-  const run = (command: string, seen?: Seen) =>
-    sh(command, {
-      cwd: worktree,
-      timeoutMs: input.gateTimeoutMs,
-      logFile: input.logFile,
-      signal: input.signal,
-      env: { ...process.env, ...input.env, CI: '1', ...gateId(input.envPrefix, `${task.id}-${relative(join(worktree, '..'), worktree)}`) },
-      onLine: seen && ((line) => {
-        const end = stepEnd(line);
-        if (end) return void seen.ends.push(end);
-        const step = stepName(line);
-        if (step) seen.marks.push({ step, at: clock.monotonic() });
-        seen.failedAt ??= GATE_FAILED_AT.exec(line.replace(ANSI, ''))?.[1];
-      }),
-    });
-  for (let tries = 0; tries < 2; tries++) {
-    steps.length = 0;
-    const slept = suspensionWatch(clock, input.suspensionMs);
-    await git(worktree, 'clean', '-ffdxq');
-    const prepStarted = clock.monotonic();
-    const prep = input.prepare ? await run(input.prepare) : undefined;
-    if (prep) steps.push({ step: 'prepare', ms: Math.round(clock.monotonic() - prepStarted) });
-    const unprepared = prep !== undefined && (prep.code !== 0 || prep.timedOut);
-    const seen: Seen = { marks: [], ends: [] };
-    const res = unprepared ? prep : await run(input.gateCommand, seen);
-    const ended = clock.monotonic();
-    const marks = seen.marks;
-    if (seen.ends.length) seen.ends.forEach((e) => steps.push({ step: e.step, ms: e.ms }));
-    else marks.forEach((m, i) => steps.push({ step: m.step, ms: Math.round((marks[i + 1]?.at ?? ended) - m.at) }));
-    if (slept()) {
-      if (tries === 0) continue;
-      return { ok: false, outcome: 'suspended', detail: 'the host was suspended during the gate, twice', gateMs: elapsed(), failedStep: 'suspended', steps };
-    }
-    if (res.code === 0 && !res.timedOut) return { ok: true, commit: await git(worktree, 'rev-parse', 'HEAD'), gateMs: elapsed(), steps };
-    // The next attempt reads this: what failed first, then the end of the output, without terminal colours.
-    const command = unprepared ? input.prepare! : input.gateCommand;
-    const output = res.output.replace(ANSI, '');
-    const tail = output.trim().split('\n').slice(-80).join('\n');
-    const failed = res.timedOut
-      ? `it timed out after ${Math.round(input.gateTimeoutMs / 60_000)} minutes`
-      : (firstFailure(output) ?? `${command} exited with code ${res.code}`);
-    const failing = unprepared ? `its prepare step, ${failed}` : failed;
-    const failedStep = unprepared ? 'prepare' : (seen.failedAt ?? seen.ends.find((e) => !e.ok)?.step ?? marks.at(-1)?.step ?? 'gate');
-    const page = unprepared ? undefined : pageAtFailure(worktree);
-    const detail = `the gate failed: ${failing}\n\n${tail}${page ? `\n\nThe page when the first browser test failed (${page})` : ''}`;
-    return { ok: false, outcome: 'gate_failed', detail, gateMs: elapsed(), failing, failedStep, steps };
-  }
-  return { ok: false, outcome: 'gate_failed', detail: 'unreachable', gateMs: elapsed(), failedStep: 'gate', steps };
+  // The repo's full check, on what a fresh checkout of the commit holds. With scoped gates, it is told where the
+  // change started (re-gates included: after a rebase that is the new main) and may test only what it can affect.
+  const scoped = input.scoped
+    ? { ...gateVar(input.envPrefix, 'GATE_BASE', await git(worktree, 'merge-base', 'HEAD', 'main')), ...gateVar(input.envPrefix, 'GATE_CACHE', input.scoped.cache) }
+    : {};
+  if (input.scoped) mkdirSync(input.scoped.cache, { recursive: true });
+  const r = await runRepoCheck({
+    worktree,
+    command: input.gateCommand,
+    prepare: input.prepare,
+    timeoutMs: input.gateTimeoutMs,
+    suspensionMs: input.suspensionMs,
+    clock,
+    logFile: input.logFile,
+    env: { ...input.env, ...gateId(input.envPrefix, `${task.id}-${relative(join(worktree, '..'), worktree)}`), ...scoped },
+    signal: input.signal,
+  });
+  if (r.ok) return { ok: true, commit: await git(worktree, 'rev-parse', 'HEAD'), gateMs: elapsed(), steps: r.steps };
+  return { ok: false, outcome: r.outcome, detail: r.detail, failing: r.failing, failedStep: r.failedStep, steps: r.steps, gateMs: elapsed() };
 }

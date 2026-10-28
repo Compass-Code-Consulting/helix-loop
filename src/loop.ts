@@ -17,6 +17,7 @@ import { buildMetrics } from './metrics/model.ts';
 import { readVersions, VERSION_EVERY, writeVersion } from './metrics/archive.ts';
 import { normaliseFailure } from './metrics/model.ts';
 import { failingTest, filedFor, fixTaskFor, nextFixId, RECURRING_WINDOW_MS, reopenedFix, type FailureSeen } from './flaky.ts';
+import { filedForFullRun, FullRunStopped, fullRunFixTask, lastGreen, latestFullRun, mergesOf, mergesSinceFullRun, runFullCheck, type FullRunEvent } from './fullrun.ts';
 import { taskHistory } from './metrics/render.ts';
 import { carryInto, checkoutInUse, compareWithOrigin, MergeQueue, mergeTask } from './merge.ts';
 import { releaseRepo, releaseSettings, retryTagPushes, unreleased } from './release.ts';
@@ -162,6 +163,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
       },
       refreshMap: () => {},
       gates: new Semaphore(config.limits.concurrent_gates ?? 2),
+      fullRuns: new Map(),
       failures: recentFailures(readLedger(p.ledger), clock.now()),
       passEnded: () => {},
       stops: new Map(),
@@ -389,6 +391,7 @@ interface PassContext {
   stop: (why: string) => void;
   refreshMap: (finished?: string) => void;
   gates: Semaphore; // the gates (and re-gates) running at once
+  fullRuns: Map<string, Promise<FullRunEvent | undefined>>; // repo → its whole-suite run on main in flight (fullrun.ts)
   failures: Map<string, FailureSeen[]>; // failing test → the passes it failed in the last day (flaky.ts)
   passEnded: () => void; // counts the pass, and writes a new version of the metrics page every N passes
   harness?: string; // the control plane's commit, recorded with every pass
@@ -789,7 +792,7 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
       checkStop();
       if (pr.code !== 0) log(`${task.id}: prepare step failed (exit ${pr.code}); the agent will see the same state`);
     }
-    passId = ctx.runner?.register(worktree);
+    passId = ctx.runner?.register(worktree, { wholeSuite: task.priority === 'fix_first' });
 
     let prompt: string;
     try {
@@ -891,6 +894,9 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
         clock,
         logFile,
         signal: stop.controller.signal,
+        // A fix-first task runs the whole suite: it is often filed for a test its change may not reach (a break main's
+        // whole-suite run found, a flaky test), and the gate must run that test to show it fixed.
+        scoped: repoConfig(config, task.repo).scoped && task.priority !== 'fix_first' ? { cache: join(p.gateCache, task.repo) } : undefined,
       };
       const asked = clock.monotonic();
       const g = await ctx.gates.run(() => {
@@ -946,6 +952,7 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
           if (m.pushed === true && ctx.diverged.delete(task.repo)) log(`${task.repo}: main and origin/main agree again; its tasks run again`);
           record(p.ledger, { kind: 'merge', at: iso(clock.now()), task: task.id, repo: task.repo, commit: m.commit, agent, regated: m.regated });
           await ctx.queue.enqueue(task.repo, () => checkpointRelease(ctx, task.repo));
+          fullRunIfDue(ctx, task.repo, task);
         } else if (m.outcome === 'diverged') {
           // Not the task's fault, so the attempt does not count: the task goes back to the queue, its gated
           // work stays on its branch for the next attempt, and the repo takes no new tasks until main and
@@ -1133,10 +1140,136 @@ async function noteFailure(ctx: PassContext, task: Task, seen: FailureSeen): Pro
   await commitPlan(ctx, `plan: ${fix.id} filed, fix first, for a test failing ${which}`, false);
 }
 
+// A whole-suite run on main for a repo with scoped gates (fullrun.ts), in one of the concurrent gates' slots. A repo
+// has one at a time: asking while one is in flight gets that one. Undefined when the repo isn't scoped, or the loop
+// stopped it.
+function fullRun(ctx: PassContext, repo: string, reason: string): Promise<FullRunEvent | undefined> {
+  const inFlight = ctx.fullRuns.get(repo);
+  if (inFlight) return inFlight;
+  const run = ctx.gates
+    .run(() => checkMain(ctx, repo, reason))
+    .catch((e: unknown) => {
+      if (!(e instanceof FullRunStopped)) ctx.deps.log(`🧪 ${repo}: the whole-suite run could not run: ${(e as Error).stack ?? e}`);
+      return undefined;
+    })
+    .finally(() => ctx.fullRuns.delete(repo));
+  ctx.fullRuns.set(repo, run);
+  return run;
+}
+
+// After a merge into a repo with scoped gates: a whole-suite run in the background once `full_run_every` merges
+// have gone in since the last, or at once when the merge fixed the last run's failure. A release it held is then
+// tagged, if the run passes.
+function fullRunIfDue(ctx: PassContext, repo: string, merged: Task): void {
+  const scoped = repoConfig(ctx.deps.config, repo).scoped;
+  if (!scoped || ctx.fullRuns.has(repo)) return;
+  const events = readLedger(ctx.deps.paths.ledger);
+  const latest = latestFullRun(events, repo);
+  const fixed = latest !== undefined && !latest.ok && latest.fix === merged.id;
+  if (!fixed && mergesSinceFullRun(events, repo) < scoped.full_run_every) return;
+  void fullRun(ctx, repo, fixed ? `${merged.id} fixed the last run's failure` : `${scoped.full_run_every} merges since the last run`).then((run) => {
+    const held = readLedger(ctx.deps.paths.ledger).findLast((e) => (e.kind === 'release' || e.kind === 'release_held') && e.repo === repo);
+    if (run?.ok && held?.kind === 'release_held' && held.detail.startsWith(HELD_FOR_FULL_RUN)) {
+      void ctx.queue.enqueue(repo, () => tagRelease(ctx, repo, unreleased(ctx.deps.paths.ledger, repo), held.reason));
+    }
+  });
+}
+
+// Runs the whole suite on main, records it, and when it fails files one fix-first task per failing test (not again
+// while one is open) and tells the owner.
+async function checkMain(ctx: PassContext, repo: string, reason: string): Promise<FullRunEvent | undefined> {
+  const { config, paths: p, clock, log, notify } = ctx.deps;
+  const rc = repoConfig(config, repo);
+  if (!rc.scoped) return undefined;
+  const checkout = repoDir(config, repo);
+  const events = readLedger(p.ledger);
+  // The merges since the last run that passed, by git, so a merge recorded while that run went on still counts; or
+  // the last few, when none has passed (or its commit is no longer on main).
+  const green = lastGreen(events, repo);
+  const after =
+    green && (await gitOk(checkout, 'merge-base', '--is-ancestor', green, 'main'))
+      ? new Set((await git(checkout, 'rev-list', '--first-parent', `${green}..main`)).split('\n').filter(Boolean))
+      : undefined;
+  const merges = mergesOf(events, repo, { after, last: rc.scoped.full_run_every * 2 });
+  const day = iso(clock.now()).slice(0, 10);
+  mkdirSync(join(p.logs, day), { recursive: true });
+  const logRel = join('runs', 'logs', day, `full-${repo}-${iso(clock.now()).slice(11, 19).replace(/:/g, '')}.log`);
+  const logFile = join(p.runs, '..', logRel);
+  log(`🧪 ${repo}: whole-suite run on main (${reason})`);
+  const r = await runFullCheck({
+    repo,
+    checkout,
+    dir: p.fullRuns,
+    gate: rc.gate,
+    prepare: rc.prepare,
+    tests: rc.scoped.tests,
+    envPrefix: config.env_prefix,
+    cache: join(p.gateCache, repo),
+    merges,
+    knownGood: after !== undefined,
+    timeoutMs: config.limits.gate_timeout_minutes * 60_000,
+    suspensionMs: config.limits.suspension_threshold_seconds * 1000,
+    clock,
+    logFile,
+    log,
+    signal: ctx.abort,
+  });
+  const gz = await compress(logFile).catch(() => logFile);
+  const event: FullRunEvent = { kind: 'full_run', at: iso(clock.now()), repo, commit: r.commit, reason, ok: r.ok, ms: r.ms, log: gz === logFile ? logRel : `${logRel}.gz`, steps: r.steps };
+  const minutes = `${Math.round(r.ms / 60_000)} min`;
+  if (r.ok) {
+    const was = latestFullRun(events, repo);
+    record(p.ledger, event);
+    log(`🧪 ${repo}: the whole suite passed at ${r.commit.slice(0, 12)} (${minutes})`);
+    if (was && !was.ok) notify('Main passes again', `${repo}'s whole suite passes at ${r.commit.slice(0, 12)}.`);
+    return event;
+  }
+  const open = [...ctx.plan.tasks.values()].filter((t) => t.status !== 'done');
+  const culprit = r.culprit?.task ? ctx.plan.tasks.get(r.culprit.task) : undefined;
+  const fallback = culprit ?? [...merges].reverse().map((m) => ctx.plan.tasks.get(m.task)).find(Boolean) ?? [...ctx.plan.tasks.values()].findLast((t) => t.repo === repo);
+  const knownReq = (id: string) => Boolean(ctx.index.reqs[id]) || [...ctx.plan.tasks.values()].some((t) => t.reqs.includes(id));
+  const candidate = fallback
+    ? fullRunFixTask({ id: nextFixId(ctx.plan, (id) => existsSync(join(p.tasks, `${id}.yaml`))), run: { ...r, reason }, culprit, fallback, knownReq, tests: rc.scoped.tests, log: event.log })
+    : undefined;
+  const already = candidate && open.find((t) => filedForFullRun(t) === filedForFullRun(candidate));
+  if (candidate && !already) {
+    writeTask(p.tasks, candidate);
+    ctx.plan.tasks.set(candidate.id, candidate);
+    await commitPlan(ctx, `plan: ${candidate.id} filed, fix first, for main's whole-suite run`, false);
+  }
+  const fix = already ?? candidate;
+  record(p.ledger, { ...event, failing: r.failing, tests: r.tests.map((t) => t.file), flaky: r.flaky, culprit: r.culprit, fix: fix?.id });
+  const cause = r.flaky ? 'a flaky test' : r.culprit?.task ? `broken by ${r.culprit.task}` : r.culprit ? `broken at ${r.culprit.commit.slice(0, 12)}` : 'its cause not found';
+  const filed = !fix ? '' : already ? `; ${already.id} is already open for it` : `; filed ${fix.id}, fix first`;
+  log(`🧪 ${repo}: the whole suite failed at ${r.commit.slice(0, 12)} (${minutes}): ${r.failing ?? r.failedStep}, ${cause}${filed}`);
+  notify("Main's whole-suite run failed", `${repo}: ${r.failing ?? r.failedStep} (${cause})${fix && !already ? `. Filed ${fix.id}.` : ''}`);
+  return { ...event, ok: false, failing: r.failing, fix: fix?.id };
+}
+
+const HELD_FOR_FULL_RUN = "until main's whole-suite run passes";
+
 // The loop's side of a release; release.ts decides and records it. Logs what happened, tells the owner
 // what needs a person, and holds a repo found diverged. A release that fails is reported; it never undoes a merge.
 async function tagRelease(ctx: PassContext, repo: string, ids: string[], reason: string): Promise<void> {
   const { config, paths: p, clock, log, notify } = ctx.deps;
+  // With scoped gates a release carries only what the whole suite passed on. This runs in the repo's merge queue,
+  // so main can't move while the run goes on, and the tag goes on the commit it checked.
+  if (repoConfig(config, repo).scoped) {
+    const main = await head(repoDir(config, repo), 'main');
+    const passed = (run?: FullRunEvent) => run?.ok === true && run.commit === main;
+    let run = latestFullRun(readLedger(p.ledger), repo);
+    if (!passed(run)) {
+      await ctx.fullRuns.get(repo);
+      run = latestFullRun(readLedger(p.ledger), repo);
+      if (!passed(run)) run = await fullRun(ctx, repo, `before the release: ${reason}`);
+    }
+    if (!passed(run)) {
+      const detail = `${HELD_FOR_FULL_RUN}${run?.failing ? `: it failed on ${run.failing}` : ''}`;
+      record(p.ledger, { kind: 'release_held', at: iso(clock.now()), repo, reason, tasks: ids, detail });
+      log(`🏷 ${repo}: release held ${detail}`);
+      return;
+    }
+  }
   try {
     const r = await releaseRepo({
       ...releaseSettings(config, p, repo),

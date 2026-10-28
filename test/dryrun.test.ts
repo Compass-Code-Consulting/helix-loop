@@ -331,6 +331,46 @@ scenario('a test that fails passes of two different tasks gets a fix-first task,
   assert.equal(s.notes.filter((n) => n.title === 'The loop filed a fix').length, 1, 'filed once');
 });
 
+scenario('scoped gates: a pass tests from where its change started; main runs the whole suite every N merges, and a break only it sees goes back to the merge that caused it', async () => {
+  // The fake gate fails on FLAKY only when it runs everything (no base): a break outside what each change reaches.
+  const s = setup([{}, {}, {}], { 'T-0002': ['flaky'], 'T-0004': ['remove:FLAKY'] }, (c) => {
+    c.agents.codex.enabled = false;
+    const r = c.repos['acme-app']!;
+    r.gate = `printf '%s\\n' "\${HELIX_GATE_BASE:-everything}" >> "${join(c.root, 'gate-bases.txt')}"; echo '> gate 10-check: the fake gate'; if [ -f FLAKY ] && [ -z "$HELIX_GATE_BASE" ]; then echo ' FAIL  |unit| test/flaky.test.ts > [PB-14] the shared dry-run test'; exit 1; fi`;
+    r.scoped = { full_run_every: 2, tests: "sh -c 'test ! -f FLAKY' --" };
+  });
+  mkdirSync(join(s.root, 'acme-app', 'test'));
+  writeFileSync(join(s.root, 'acme-app', 'test', 'flaky.test.ts'), '// [PB-14] the shared dry-run test, which the fake gate stands in for\n');
+  s.git('acme-app', 'add', '-A');
+  s.git('acme-app', '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', 'the shared test');
+
+  assert.equal(await s.run(), EXIT.allDone);
+  const bases = readFileSync(join(s.root, 'gate-bases.txt'), 'utf8').trim().split('\n');
+  const scoped = s.passes().filter((p) => p.task !== 'T-0004').length;
+  assert.equal(bases.filter((b) => /^[0-9a-f]{40}$/.test(b)).length, scoped, `each feature pass's gate was told its base: ${bases.join(', ')}`);
+
+  const runs = s.ledger().filter((e): e is Extract<LedgerEvent, { kind: 'full_run' }> => e.kind === 'full_run');
+  const failed = runs.find((r) => !r.ok);
+  assert.ok(failed, JSON.stringify(runs));
+  assert.equal(failed.culprit?.task, 'T-0002');
+  assert.equal(failed.fix, 'T-0004');
+  assert.deepEqual(failed.tests, ['test/flaky.test.ts']);
+  assert.equal(failed.flaky, false);
+  const fix = s.task('T-0004');
+  assert.equal(fix.priority, 'fix_first');
+  assert.equal(fix.status, 'done');
+  assert.match(fix.title, /^The unit test "\[PB-14\] the shared dry-run test" passes on main again, after T-0002 broke it$/);
+  assert.equal(s.passes('T-0004').length, 1);
+  assert.ok(runs.indexOf(failed) < runs.findLastIndex((r) => r.ok), 'a run after the fix passes');
+  assert.ok(s.notes.some((n) => n.title === "Main's whole-suite run failed"));
+  assert.ok(s.notes.some((n) => n.title === 'Main passes again'));
+  // The milestone's release went out only on a commit the whole suite passed.
+  const [tag] = s.tags('acme-app');
+  assert.ok(tag, 'released');
+  const tagged = s.git('acme-app', 'rev-parse', `${tag}^{commit}`);
+  assert.ok(runs.some((r) => r.ok && r.commit === tagged), `${tag} at ${tagged} passed a whole-suite run`);
+});
+
 scenario('two passes per agent run at once, while the gates take turns', async () => {
   const s = setup([{}, {}, {}, {}, {}, {}], {}, (c) => {
     c.agents.claude.slots = 2;

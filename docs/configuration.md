@@ -27,6 +27,18 @@ repos:
 - **gate:** the repository's full check: typecheck, lint, every test. A pass merges into `main` only when it passes, and only the work it saw is merged.
 - **prepare:** run in a fresh worktree before the agent starts, outside its sandbox, so installs are ready.
 - **path:** where the checkout is, relative to the project: `<name>` by default. Never the project folder itself, and never inside `.helix/`.
+- **scoped:** turns on [scoped gates](concepts.md#scoped-gates) for the repository.
+  - Each pass's gate is told where its change started, in `HELIX_GATE_BASE` (and `<PREFIX>_GATE_BASE`), and may run only the tests the change can affect.
+  - The whole suite runs on `main` instead, every `full_run_every` merges and before each release the loop tags.
+  - `tests` is the repository's command for running given test files, which the loop appends: with it, a failure on `main` is run again to tell a flaky test from a break, and traced to the merge that caused it.
+
+```yaml
+repos:
+  acme-app:
+    gate: pnpm run gate
+    prepare: "pnpm install --frozen-lockfile --prefer-offline"
+    scoped: { full_run_every: 25, tests: "pnpm run gate --tests" }
+```
 
 ## agents
 
