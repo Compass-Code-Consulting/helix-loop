@@ -93,7 +93,7 @@ function setup(
   };
   add(tasks);
   humans.forEach(human);
-  seedRepos(p.repos, Object.keys(loadConfig(FIXTURE).repos));
+  seedRepos(root, Object.keys(loadConfig(FIXTURE).repos));
   const scenarioFile = join(root, 'scenario.json');
   writeFileSync(scenarioFile, JSON.stringify(scenario));
   process.env.HELIX_FAKE_SCENARIO = scenarioFile;
@@ -111,7 +111,7 @@ function setup(
   const ledger = () => readLedger(p.ledger);
   const notes: { title: string; message: string }[] = [];
   const maps: MapModel[] = [];
-  const git = (repo: string, ...args: string[]) => execFileSync('git', args, { cwd: join(p.repos, repo) }).toString().trim();
+  const git = (repo: string, ...args: string[]) => execFileSync('git', args, { cwd: join(root, repo) }).toString().trim();
   return {
     root,
     run: ({ maxPasses, signal } = {}) =>
@@ -137,7 +137,7 @@ function setup(
     ledger,
     modes: () => ledger().flatMap((e) => (e.kind === 'mode' ? [e.mode] : [])),
     passes: (id) => ledger().filter((e): e is Extract<LedgerEvent, { kind: 'pass' }> => e.kind === 'pass' && (!id || e.task === id)),
-    main: (repo = 'acme-app') => execFileSync('git', ['log', '--format=%s', 'main'], { cwd: join(p.repos, repo) }).toString().trim().split('\n'),
+    main: (repo = 'acme-app') => execFileSync('git', ['log', '--format=%s', 'main'], { cwd: join(root, repo) }).toString().trim().split('\n'),
     notes,
     maps,
     add,
@@ -391,7 +391,7 @@ scenario('a rebase that conflicts only in a lockfile regenerates it, and both ta
   assert.equal(await s.run(), EXIT.allDone);
   assert.deepEqual([...s.task('T-0001').attempts, ...s.task('T-0002').attempts].map((a) => a.outcome), ['merged', 'merged']);
   assert.ok(lastLog.some((l) => /the rebase conflicted only in deps\.lock; manifests merged key by key, lockfiles regenerated/.test(l)), 'the second merge regenerated the lockfile');
-  const lock = execFileSync('git', ['show', 'main:deps.lock'], { cwd: join(paths(s.root).repos, 'acme-app') }).toString();
+  const lock = execFileSync('git', ['show', 'main:deps.lock'], { cwd: join(s.root, 'acme-app') }).toString();
   assert.equal(lock, 'T-0001\nT-0002\n');
 });
 
@@ -400,7 +400,7 @@ scenario('two tasks adding dependencies to one manifest both merge: the manifest
   assert.equal(await s.run(), EXIT.allDone);
   assert.deepEqual([...s.task('T-0001').attempts, ...s.task('T-0002').attempts].map((a) => a.outcome), ['merged', 'merged']);
   assert.ok(lastLog.some((l) => /the rebase conflicted only in manifest\.json, manifest\.lock/.test(l)), lastLog.join('\n'));
-  const show = (f: string) => execFileSync('git', ['show', `main:${f}`], { cwd: join(paths(s.root).repos, 'acme-app') }).toString();
+  const show = (f: string) => execFileSync('git', ['show', `main:${f}`], { cwd: join(s.root, 'acme-app') }).toString();
   assert.deepEqual(JSON.parse(show('manifest.json')), { name: 'fake', dependencies: { 't-0001': '1.0.0', 't-0002': '1.0.0' } });
   assert.equal(show('manifest.lock'), 't-0001\nt-0002\n');
 });
@@ -709,7 +709,7 @@ scenario('release tags: every N merges in a repo, and in each lane a milestone t
   assert.ok(releases.some((r) => r.repo === 'acme-docs' && r.reason === 'Milestone reached: The first milestone' && r.tasks.includes('T-0004')), JSON.stringify(releases));
   // The second milestone touched acme-app alone.
   assert.ok(!releases.some((r) => r.repo === 'acme-docs' && r.reason === 'Milestone reached: Milestone second'), JSON.stringify(releases));
-  const tags = execFileSync('git', ['tag', '--list', 'v*'], { cwd: join(paths(s.root).repos, 'acme-app') }).toString().trim().split('\n');
+  const tags = execFileSync('git', ['tag', '--list', 'v*'], { cwd: join(s.root, 'acme-app') }).toString().trim().split('\n');
   assert.ok(tags.length >= 2 && tags.every((t) => /^v\d{4}\.\d{2}\.\d{2}\.\d+$/.test(t)), tags.join(','));
   assert.equal(s.task('T-0006').attempts[0]!.outcome, 'forbidden_paths');
   assert.equal(s.task('T-0005').attempts[0]!.outcome, 'merged');
@@ -737,10 +737,42 @@ scenario('an agent with nothing to take while the other is out says so', async (
   assert.equal(s.task('T-0001').attempts.at(-1)!.agent, 'codex');
 });
 
-scenario('an agent that writes into the primary checkout stops the loop', async () => {
+scenario('a file written into the checkout during a pass is reported, and the loop carries on', async () => {
   const s = setup([{}, {}, {}], { 'T-0001': ['tamper'] });
-  assert.equal(await s.run(), EXIT.stopped);
-  assert.ok(s.ledger().some((e) => e.kind === 'warning' && e.detail.includes('primary checkout')));
+  assert.equal(await s.run(), EXIT.allDone);
+  assert.ok(s.ledger().some((e) => e.kind === 'warning' && e.task === 'T-0001' && /checkout changed during the pass, outside its worktree[^]*TAMPERED\.txt/.test(e.detail)), 'recorded');
+  assert.ok(s.notes.some((n) => /^acme-app's checkout changed during T-0001's pass: TAMPERED\.txt\. If that wasn't you, look at it\.$/.test(n.message)), JSON.stringify(s.notes));
+});
+
+scenario('a checkout with uncommitted edits holds its repo\'s merges and tasks, keeping the work, until it is clean', async () => {
+  const s = setup([{}, {}], { 'T-0001': ['edit-checkout', 'implement'] });
+  // One pass: someone edits shared.txt in the checkout meanwhile, so its merge waits.
+  assert.equal(await s.run({ maxPasses: 1 }), EXIT.stopped);
+  const held = s.task('T-0001');
+  assert.equal(held.status, 'ready');
+  assert.equal(held.attempts.at(-1)!.outcome, 'transient');
+  assert.match(held.attempts.at(-1)!.note!, /^acme-app's checkout has uncommitted changes in shared\.txt\. Nothing was merged; the gated work is kept on branch \S+, and merges once the checkout is back on main with nothing uncommitted\.$/);
+  assert.ok(held.attempts.at(-1)!.kept, 'the work is kept');
+  assert.ok(s.notes.some((n) => n.title === "acme-app's checkout is in use"), JSON.stringify(s.notes));
+  assert.equal(s.git('acme-app', 'show', 'main:shared.txt'), 'original', 'nothing merged under the edit');
+  // The edit is committed elsewhere or undone: the next run merges from the kept work.
+  s.git('acme-app', 'checkout', '--', 'shared.txt');
+  assert.equal(await s.run(), EXIT.allDone);
+  assert.deepEqual(s.task('T-0001').attempts.map((a) => a.outcome), ['transient', 'merged']);
+});
+
+scenario('a checkout on another branch holds the repo, and the loop waits for it instead of exiting', async () => {
+  const s = setup([{}], { 'T-0001': ['implement'] });
+  s.git('acme-app', 'checkout', '-q', '-b', 'my-experiment');
+  const stop = new AbortController();
+  const run = s.run({ signal: stop.signal });
+  // The merge holds; the loop waits a minute at a time, then the person goes back to main.
+  for (let i = 0; i < 400 && !s.notes.some((n) => n.title === "acme-app's checkout is in use"); i++) await new Promise((r) => setTimeout(r, 25));
+  assert.match(s.notes.find((n) => n.title === "acme-app's checkout is in use")!.message, /^acme-app's checkout is on my-experiment, not main\. Its merges and new tasks wait/);
+  s.git('acme-app', 'checkout', '-q', 'main');
+  assert.equal(await run, EXIT.allDone);
+  assert.equal(s.task('T-0001').status, 'done');
+  stop.abort();
 });
 
 const releasesOf = (s: Setup, repo: string) => s.ledger().filter((e): e is Extract<LedgerEvent, { kind: 'release' }> => e.kind === 'release' && e.repo === repo);

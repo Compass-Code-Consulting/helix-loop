@@ -16,7 +16,8 @@ project:
 
 ## repos
 
-The repositories the loop builds, one lane each, cloned in `.helix/repos/<name>`.
+The repositories the loop builds, one lane each.
+Each is a checkout in the project, `<project>/<name>/` unless `path` says otherwise ([project layout](project-layout.md#the-code)).
 
 ```yaml
 repos:
@@ -25,6 +26,7 @@ repos:
 
 - **gate:** the repository's full check: typecheck, lint, every test. A pass merges into `main` only when it passes, and only the work it saw is merged.
 - **prepare:** run in a fresh worktree before the agent starts, outside its sandbox, so installs are ready.
+- **path:** where the checkout is, relative to the project: `<name>` by default. Never the project folder itself, and never inside `.helix/`.
 
 ## agents
 

@@ -9,7 +9,7 @@ project:
 
 # The repositories the loop builds, each a lane. gate: the repo's full check, which a pass must pass before it
 # merges into main. prepare: run in a fresh worktree before the agent starts (outside its sandbox), so
-# installs are ready. Each repo is cloned into .helix/repos/<name>.
+# installs are ready. Each repo's checkout is <project>/<name>/, or where its path: says (relative to the project).
 repos:
 {{REPOS}}
 

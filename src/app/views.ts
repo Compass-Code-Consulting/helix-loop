@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { loadQuota } from '../agents/quota.ts';
-import { paths, type Config } from '../config.ts';
+import { loadConfig, paths, repoDir, type Config } from '../config.ts';
 import type { LedgerEvent } from '../ledger.ts';
 import { pendingApprovals, describeBase } from '../release.ts';
 import type { AgentName, Plan } from '../types.ts';
@@ -127,7 +127,7 @@ export async function taskCommits(root: string, events: LedgerEvent[], task: str
   if (i < 0) return undefined;
   const m = merges[i]!;
   const prev = merges.slice(0, i).findLast((x) => x.repo === m.repo);
-  const dir = join(paths(root).repos, m.repo);
+  const dir = repoDir(loadConfig(root), m.repo);
   if (!existsSync(dir)) return { repo: m.repo, commits: [] };
   const range = prev ? `${prev.commit}..${m.commit}` : `${m.commit}~1..${m.commit}`;
   const out = await exec('git', ['log', '--numstat', '--format=@@%H%x09%P%x09%s', '-n', '30', range], { cwd: dir, maxBuffer: 8_000_000 }).then((r) => r.stdout, () => '');

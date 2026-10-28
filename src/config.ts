@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { AGENTS, type AgentName, type RepoName } from './types.ts';
@@ -36,7 +36,9 @@ export interface Config {
   env_prefix?: string;
   git_author?: { name: string; email: string }; // who the loop's own commits and tags are by
   agents: Record<AgentName, AgentConfig>;
-  repos: Record<RepoName, { gate: string; prepare?: string }>;
+  // Each repo the loop builds: its checkout is the project's own code, at <project>/<repo> unless `path` says
+  // where (relative to the project). The loop merges into that checkout's main; its passes work in worktrees.
+  repos: Record<RepoName, { gate: string; prepare?: string; path?: string }>;
   limits: {
     pass_timeout_minutes: number;
     gate_timeout_minutes: number;
@@ -237,6 +239,11 @@ export function loadConfig(root: string, file = configPath(root)): Config {
   if (!raw.repos || !Object.keys(raw.repos).length) throw new Error('config: repos must name at least one repo to build');
   for (const [r, c] of Object.entries(raw.repos)) {
     if (!c?.gate) throw new Error(`config: repos.${r}.gate is missing`);
+    // The project's own folder holds the plan, which the loop commits as it goes: a repo there would have the
+    // loop's plan commits and its merges racing on one main. Inside .helix/ the code would be hidden.
+    const at = resolve(root, c.path ?? r);
+    if (at === resolve(root)) throw new Error(`config: repos.${r}.path can't be the project folder itself; keep the code in a folder of its own, such as ${r}/`);
+    if (at === resolve(root, HELIX_DIR) || at.startsWith(resolve(root, HELIX_DIR) + sep)) throw new Error(`config: repos.${r}.path is inside ${HELIX_DIR}/, where the code would be hidden; put it beside it, such as ${r}/`);
   }
   // A misspelt repo here would hold nothing, and that repo would release unreviewed.
   for (const [r, step] of Object.entries(raw.release?.hold_until ?? {})) {
@@ -255,7 +262,12 @@ export function loadConfig(root: string, file = configPath(root)): Config {
 }
 
 // A repo's gate and prepare steps; a task naming a repo the config doesn't is refused by validation first.
-export function repoConfig(config: Config, repo: RepoName): { gate: string; prepare?: string } {
+// A repo's checkout: the project's code, where people read and run it, and where the loop merges each pass.
+export function repoDir(config: Pick<Config, 'root' | 'repos'>, repo: RepoName): string {
+  return resolve(config.root, config.repos[repo]?.path ?? repo);
+}
+
+export function repoConfig(config: Config, repo: RepoName): { gate: string; prepare?: string; path?: string } {
   const r = config.repos[repo];
   if (!r) throw new Error(`config: no repo ${repo} under repos`);
   return r;
@@ -307,7 +319,6 @@ export function paths(root: string) {
     changes: join(h, 'runs', 'changes.jsonl'), // each plan change the app applied, for undo (app/changes.ts)
     threads: join(h, 'runs', 'threads'), // comments and Helix's threads (app/threads.ts)
     dryRun: join(h, 'runs', 'dry-run'), // the dry run's own project (dryrun.ts)
-    repos: join(h, 'repos'),
     worktrees: join(h, 'worktrees'),
   };
 }

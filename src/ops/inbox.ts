@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { loadConfig, paths } from '../config.ts';
+import { loadConfig, paths, repoDir } from '../config.ts';
 import { git } from '../git.ts';
 import { readLedger } from '../ledger.ts';
 import { loadPlan } from '../plan/store.ts';
@@ -95,7 +95,7 @@ export async function addSecret(root: string, s: { name: string; value: string; 
   const hide = (t: string) => t.split(value).join('***').trim();
   if (s.where === 'github') {
     const repo = repoArg(loadConfig(root), s.repo);
-    const remote = await git(join(paths(root).repos, repo), 'remote', 'get-url', 'origin').catch(() => '');
+    const remote = await git(repoDir(loadConfig(root), repo), 'remote', 'get-url', 'origin').catch(() => '');
     const slug = /github\.com[:/](.+?)(\.git)?$/.exec(remote)?.[1];
     if (!slug) throw new OpError(409, `${repo} has no GitHub remote`);
     const env = (s.env ?? '').trim();

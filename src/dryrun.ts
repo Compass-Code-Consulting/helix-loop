@@ -27,9 +27,9 @@ export function seedControlPlane(root: string, from: string): void {
 }
 
 // One throwaway repository per product repo, each with a skeleton commit on main.
-export function seedRepos(reposDir: string, repos: string[]): void {
+export function seedRepos(root: string, repos: string[]): void {
   for (const repo of repos) {
-    const dir = join(reposDir, repo);
+    const dir = join(root, repo);
     mkdirSync(dir, { recursive: true });
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: dir });
     writeFileSync(join(dir, 'shared.txt'), 'original\n');
@@ -47,6 +47,7 @@ export function fakeConfig(base: Config, root: string): Config {
   config.agents.claude.command = join(FAKES, 'claude');
   config.agents.codex.command = join(FAKES, 'codex');
   for (const r of Object.values(config.repos)) {
+    delete r.path; // the dry run's throwaway repos sit in its own folder, never where the real code is
     r.gate =
       "echo '> gate 10-check: the fake gate'; if [ -f FLAKY ]; then echo ' FAIL  |unit| test/flaky.test.ts > [PB-14] the shared dry-run test'; exit 1; fi; if [ -f GATE_FAIL ]; then printf 'building\\n\\033[31m✖ adds numbers (2ms)\\033[39m\\n'; exit 1; fi; if [ -f NEEDS_BUILT ] && [ ! -f built/ok ]; then echo '✖ built/ok is missing'; exit 1; fi; " +
       "if [ $(ls CLASH_* 2>/dev/null | wc -l) -gt 1 ]; then echo '✖ two clashing changes'; exit 1; fi";
@@ -100,7 +101,7 @@ export function prepareDryRun(controlPlane: string): DryRun {
   }
   cpSync(src.human, p.human, { recursive: true });
   const config = fakeConfig(loadConfig(controlPlane), root);
-  seedRepos(p.repos, Object.keys(config.repos));
+  seedRepos(root, Object.keys(config.repos));
   writeFileSync(configPath(root), stringify({ ...config, root: undefined }));
   mkdirSync(p.runs, { recursive: true });
   const scenarioFile = join(root, 'scenario.json');

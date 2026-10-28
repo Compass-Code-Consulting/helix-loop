@@ -5,7 +5,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { extname, join, normalize, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { ownerOf } from './prompts.ts';
-import { asset, BIN, configPath, logFile, FEEDBACK_KINDS, HELIX_DIR, loadConfig, MONITOR_LEVELS, monitorOf, PACKAGE_ROOT, paths, projectInfo, type FeedbackKind } from '../config.ts';
+import { asset, BIN, configPath, logFile, FEEDBACK_KINDS, HELIX_DIR, loadConfig, MONITOR_LEVELS, monitorOf, PACKAGE_ROOT, paths, projectInfo, repoDir, type FeedbackKind } from '../config.ts';
 import { git } from '../git.ts';
 import { renderDependencyMap } from '../map/render.ts';
 import { renderMetrics } from '../metrics/render.ts';
@@ -933,13 +933,13 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
 
   async function commitDiff(root: string, repo: string, sha: string): Promise<string> {
     if (!/^[0-9a-f]{7,40}$/.test(sha)) throw new HttpError(400, 'not a commit');
-    return (await exec('git', ['show', '--stat', '--patch', '--format=fuller', sha], { cwd: join(paths(root).repos, ops.repoArg(loadConfig(root), repo)), maxBuffer: 20_000_000 })).stdout.slice(0, 1_500_000);
+    return (await exec('git', ['show', '--stat', '--patch', '--format=fuller', sha], { cwd: repoDir(loadConfig(root), ops.repoArg(loadConfig(root), repo)), maxBuffer: 20_000_000 })).stdout.slice(0, 1_500_000);
   }
 
   async function releaseFiles(root: string, repo: string, tag: string) {
     const a = pendingApprovals(paths(root).approvals, ops.repoArg(loadConfig(root), repo)).find((x) => x.approval.tag === tag)?.approval;
     if (!a) throw new HttpError(404, `${repo} ${tag} is not waiting for approval`);
-    const dir = join(paths(root).repos, repo);
+    const dir = repoDir(loadConfig(root), repo);
     const stat = (await exec('git', ['diff', '--numstat', a.since, a.commit], { cwd: dir, maxBuffer: 20_000_000 })).stdout.trim();
     const reviewed = new Set(a.paths);
     const files = stat.split('\n').filter(Boolean).map((l) => {
@@ -955,7 +955,7 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
     const a = pendingApprovals(paths(root).approvals, ops.repoArg(loadConfig(root), repo)).find((x) => x.approval.tag === tag)?.approval;
     if (!a) throw new HttpError(404, `${repo} ${tag} is not waiting for approval`);
     if (!file || file.includes('..')) throw new HttpError(400, 'not a file');
-    return (await exec('git', ['diff', a.since, a.commit, '--', file], { cwd: join(paths(root).repos, repo), maxBuffer: 20_000_000 })).stdout.slice(0, 1_000_000);
+    return (await exec('git', ['diff', a.since, a.commit, '--', file], { cwd: repoDir(loadConfig(root), repo), maxBuffer: 20_000_000 })).stdout.slice(0, 1_000_000);
   }
 
   await new Promise<void>((resolve, reject) => {

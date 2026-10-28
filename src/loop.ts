@@ -8,7 +8,7 @@ import { hashToken, LiveBoard, newToken } from './live.ts';
 import { describePace, loadQuota, loopMode, mapAgents, markAvailable, markLimited, overBudget, paceSlots, rollDay, saveQuota, helixSpentUsd, type Pace, type QuotaState } from './agents/quota.ts';
 import type { Clock } from './clock.ts';
 import { suspensionWatch } from './clock.ts';
-import { asset, gitAuthor, HELIX_DIR, productEnv, projectInfo, repoConfig, weeklyTargets, type Config, type Paths } from './config.ts';
+import { asset, gitAuthor, HELIX_DIR, repoDir, productEnv, projectInfo, repoConfig, weeklyTargets, type Config, type Paths } from './config.ts';
 import { commitLeftovers, runGate, type GateStep } from './gate.ts';
 import { addWorktree, branchFor, commitsAhead, ensureUnionMerge, git, gitOk, head, removeWorktree } from './git.ts';
 import { compress, meanPassHours, readLedger, record, type LedgerEvent, type PassPhases } from './ledger.ts';
@@ -18,7 +18,7 @@ import { readVersions, VERSION_EVERY, writeVersion } from './metrics/archive.ts'
 import { normaliseFailure } from './metrics/model.ts';
 import { failingTest, filedFor, fixTaskFor, nextFixId, RECURRING_WINDOW_MS, reopenedFix, type FailureSeen } from './flaky.ts';
 import { taskHistory } from './metrics/render.ts';
-import { carryInto, compareWithOrigin, MergeQueue, mergeTask } from './merge.ts';
+import { carryInto, checkoutInUse, compareWithOrigin, MergeQueue, mergeTask } from './merge.ts';
 import { releaseRepo, releaseSettings, retryTagPushes, unreleased } from './release.ts';
 import { E2ERunner, type E2EUse } from './e2e-runner.ts';
 import { statSync } from 'node:fs';
@@ -136,7 +136,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
     }
     rmSync(p.worktrees, { recursive: true, force: true });
     for (const repo of Object.keys(config.repos)) {
-      if (existsSync(join(p.repos, repo, '.git'))) await gitOk(join(p.repos, repo), 'worktree', 'prune');
+      if (existsSync(join(repoDir(config, repo), '.git'))) await gitOk(repoDir(config, repo), 'worktree', 'prune');
     }
     record(p.ledger, { kind: 'loop', at: iso(clock.now()), event: 'start', slots: Object.fromEntries(AGENTS.map((a) => [a, config.agents[a].enabled ? config.agents[a].slots : 0])) });
 
@@ -152,6 +152,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
       abort: abort.signal,
       runner,
       diverged: new Map(),
+      busy: new Map(),
       editedInPass: new Set(),
       live,
       signIns: new Map(),
@@ -186,7 +187,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
     };
     if (passCount > 0 && !readVersions(p.metrics).length) writeMetrics();
     for (const repo of Object.keys(config.repos)) {
-      if (existsSync(join(p.repos, repo)) && (await ensureUnionMerge(join(p.repos, repo), config.union_merge_paths ?? []))) log(`${repo}: union merge set for ${(config.union_merge_paths ?? []).join(', ')}`);
+      if (existsSync(repoDir(config, repo)) && (await ensureUnionMerge(repoDir(config, repo), config.union_merge_paths ?? []))) log(`${repo}: union merge set for ${(config.union_merge_paths ?? []).join(', ')}`);
     }
     if (config.push) await syncAtStart(ctx);
 
@@ -244,7 +245,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
       // Fill free slots, best-ranked task first.
       if (!stopping && !paused) {
         const model = mapModel(ctx, running, lastMode ?? 'idle');
-        const rank = rankTasks(model, plan).filter((id) => !ctx.diverged.has(plan.tasks.get(id)!.repo));
+        const rank = rankTasks(model, plan).filter((id) => !ctx.diverged.has(plan.tasks.get(id)!.repo) && !ctx.busy.has(plan.tasks.get(id)!.repo));
         for (const a of enabled) {
           while (available[a] && running.filter((r) => r.agent === a).length < pace[a].slots) {
             if (deps.maxPasses !== undefined && passes >= deps.maxPasses) break;
@@ -301,6 +302,15 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
           await clock.sleep(60_000, abort.signal);
           continue;
         }
+        if (ctx.busy.size && !stopping) {
+          // Someone is working in a repo's checkout: its tasks wait for it, not for the loop to be restarted.
+          log(`waiting for ${[...ctx.busy.keys()].join(', ')}: ${[...ctx.busy.values()].join('; ')}; checking again in a minute`);
+          const woke = new AbortController();
+          const signal = AbortSignal.any([abort.signal, woke.signal]);
+          await Promise.race([clock.sleep(60_000, signal), waitForControl(p, paused, signal)]);
+          woke.abort();
+          continue;
+        }
         if (!anyWork) {
           refreshMap();
           notify('The loop', 'Every task is done.');
@@ -348,6 +358,7 @@ export async function runLoop(deps: LoopDeps): Promise<number> {
       // aborted signal, and racing them would spin without ever yielding to the passes' exit events.
       if (!abort.signal.aborted) {
         if (resumes.length && !stopping) waits.push(clock.sleep(Math.min(...resumes) - clock.now(), waitSignal));
+        if (ctx.busy.size && !stopping) waits.push(clock.sleep(60_000, waitSignal)); // to see a checkout freed
         waits.push(waitForControl(p, paused, waitSignal));
       }
       await Promise.race(waits);
@@ -371,6 +382,7 @@ interface PassContext {
   abort: AbortSignal;
   runner: E2ERunner | undefined;
   diverged: Map<string, string>; // repo → how its main and origin/main differ; it takes no tasks meanwhile
+  busy: Map<string, string>; // repo → why its checkout is in use (off main, uncommitted edits); no merges or tasks meanwhile
   editedInPass: Set<string>; // tasks changed on disk during their pass, already reported
   live: LiveBoard; // runs/live.json, for the loop app
   signIns: Map<AgentName, SignIn & { checkedAt: number }>; // each agent's last sign-in check (onSubscription)
@@ -443,7 +455,7 @@ function holdDiverged(ctx: PassContext, repo: string, detail: string): void {
 async function syncAtStart(ctx: PassContext): Promise<void> {
   const { config, paths: p, clock, log } = ctx.deps;
   for (const repo of Object.keys(config.repos)) {
-    const dir = join(p.repos, repo);
+    const dir = repoDir(config, repo);
     if (!existsSync(join(dir, '.git'))) continue;
     const origin = await compareWithOrigin(dir).catch(() => undefined);
     if (origin?.relation === 'diverged') {
@@ -456,13 +468,25 @@ async function syncAtStart(ctx: PassContext): Promise<void> {
   }
 }
 
+// A repo whose checkout is in use, on another branch or with uncommitted edits, takes no merges or new tasks:
+// the loop never moves files under someone's edit. The owner hears about it once, and the hold lifts by itself.
+function holdBusy(ctx: PassContext, repo: string, detail: string): void {
+  if (!ctx.busy.has(repo)) ctx.deps.notify(`${repo}'s checkout is in use`, `${detail}. Its merges and new tasks wait until it is back on main with nothing uncommitted.`);
+  ctx.busy.set(repo, detail);
+}
+
 // Before each round of picks, each held repo with no pass in flight is fetched again, and once main and
-// origin/main agree its tasks run again. A fetch that fails keeps the hold.
+// origin/main agree its tasks run again. A fetch that fails keeps the hold. A checkout in use is looked at again.
 async function recheckDiverged(ctx: PassContext, running: Running[]): Promise<void> {
   const { paths: p, log } = ctx.deps;
+  for (const repo of [...ctx.busy.keys()]) {
+    if (await ctx.queue.enqueue(repo, () => checkoutInUse(repoDir(ctx.deps.config, repo)))) continue;
+    ctx.busy.delete(repo);
+    log(`${repo}: its checkout is on main with nothing uncommitted again; its tasks run again`);
+  }
   for (const repo of [...ctx.diverged.keys()]) {
     if (running.some((r) => r.task.repo === repo)) continue; // that pass's merge checks again
-    const origin = await ctx.queue.enqueue(repo, () => compareWithOrigin(join(p.repos, repo))).catch(() => undefined);
+    const origin = await ctx.queue.enqueue(repo, () => compareWithOrigin(repoDir(ctx.deps.config, repo))).catch(() => undefined);
     if (!origin || origin.relation === 'diverged' || origin.relation === 'unknown') continue;
     ctx.diverged.delete(repo);
     log(`${repo}: main and origin/main agree again; its tasks run again`);
@@ -693,7 +717,7 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
   const model = config.agents[agent].models[role].model;
   const label = `${agent} (${model})`;
   const attempt = task.attempts.length + 1;
-  const repoDir = join(p.repos, task.repo);
+  const checkout = repoDir(config, task.repo);
   const worktree = join(p.worktrees, task.repo, `${task.id}-${agent}`);
   const branch = branchFor(task.id, agent, attempt);
   const day = iso(clock.now()).slice(0, 10);
@@ -742,10 +766,11 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
   let mainMoved: number | undefined;
   let e2e: E2EUse | undefined;
   const controlBefore = await controlPlaneChanges(config.root);
+  const checkoutBefore = await checkoutStatus(checkout);
   try {
-    if (!existsSync(join(repoDir, '.git'))) throw new Error(`repository ${task.repo} is not cloned at ${repoDir}`);
-    base = await head(repoDir, 'main');
-    await addWorktree(repoDir, worktree, branch);
+    if (!existsSync(join(checkout, '.git'))) throw new Error(`repository ${task.repo} is not cloned at ${checkout}`);
+    base = await head(checkout, 'main');
+    await addWorktree(checkout, worktree, branch);
     // The latest work an earlier attempt kept goes in first, so the prepare step installs what it needs.
     const keptBy = task.attempts.findLast((a) => a.kept);
     if (keptBy?.kept) {
@@ -891,7 +916,7 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
         const m = await ctx.queue.enqueue(task.repo, () => {
           merging = clock.monotonic();
           return mergeTask({
-            repo: repoDir,
+            repo: checkout,
             worktree,
             branch,
             gatedOn: base!,
@@ -914,7 +939,7 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
           outcome = 'merged';
           commit = m.commit;
           note = m.pushNote ?? '';
-          subject = await git(repoDir, 'log', '-1', '--format=%s', m.commit).catch(() => '');
+          subject = await git(checkout, 'log', '-1', '--format=%s', m.commit).catch(() => '');
           if (m.fromOrigin) log(`${task.repo}: main caught up with origin/main (${m.fromOrigin.slice(0, 12)}) before ${task.id} merged`);
           if (m.resolved.length) log(`${task.id}: the rebase conflicted only in ${m.resolved.join(', ')}; manifests merged key by key, lockfiles regenerated`);
           // A push that went through proves main and origin/main agree.
@@ -927,9 +952,17 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
           // origin/main agree.
           outcome = 'transient';
           failedStep = m.failedStep;
-          note = `${m.detail}. Nothing was merged; the gated work is kept on branch ${branch}. Reconcile main with origin/main in repos/${task.repo}.`;
+          note = `${m.detail}. Nothing was merged; the gated work is kept on branch ${branch}. Reconcile main with origin/main in ${relative(config.root, checkout) || '.'}.`;
           record(p.ledger, { kind: 'warning', at: iso(clock.now()), task: task.id, detail: `${task.repo}: ${note}` });
           holdDiverged(ctx, task.repo, m.detail);
+        } else if (m.outcome === 'busy') {
+          // Someone is working in the checkout: not the task's fault either. Its gated work is kept, and the
+          // next attempt starts from it once the checkout is free.
+          outcome = 'transient';
+          failedStep = m.failedStep;
+          note = `${m.detail}. Nothing was merged; the gated work is kept on branch ${branch}, and merges once the checkout is back on main with nothing uncommitted.`;
+          record(p.ledger, { kind: 'warning', at: iso(clock.now()), task: task.id, detail: `${task.repo}: ${note}` });
+          holdBusy(ctx, task.repo, m.detail);
         } else {
           outcome = m.outcome;
           note = m.detail;
@@ -958,14 +991,14 @@ async function runPass(ctx: PassContext, task: Task, agent: AgentName): Promise<
     ctx.stops.delete(task.id);
     ctx.live.end(task.id); // its MCP token stops working here
     if (passId) e2e = ctx.runner?.unregister(passId);
-    await checkTampering(ctx, task, repoDir, controlBefore);
-    await removeWorktree(repoDir, worktree).catch(() => undefined);
+    await checkTampering(ctx, task, checkout, controlBefore, checkoutBefore);
+    await removeWorktree(checkout, worktree).catch(() => undefined);
     if (outcome === 'merged') {
-      await gitOk(repoDir, 'branch', '-d', branch);
-      for (const a of task.attempts) if (a.kept) await gitOk(repoDir, 'branch', '-D', a.kept);
-    } else if (!keepBranch) await gitOk(repoDir, 'branch', '-D', branch);
+      await gitOk(checkout, 'branch', '-d', branch);
+      for (const a of task.attempts) if (a.kept) await gitOk(checkout, 'branch', '-D', a.kept);
+    } else if (!keepBranch) await gitOk(checkout, 'branch', '-D', branch);
   }
-  if (mainMoved === undefined && base) mainMoved = Number(await git(repoDir, 'rev-list', '--count', `${base}..main`).catch(() => '0'));
+  if (mainMoved === undefined && base) mainMoved = Number(await git(checkout, 'rev-list', '--count', `${base}..main`).catch(() => '0'));
 
   const gz = await compress(logFile).catch(() => logFile);
   const logPath = gz === logFile ? logRel : `${logRel}.gz`;
@@ -1243,8 +1276,6 @@ function reloadPlan(ctx: PassContext): void {
   if (n) log(`plan reload: ${n} new task${n === 1 ? '' : 's'}`);
 }
 
-// Defence in depth behind the sandboxes: after every pass, the product repo's primary checkout must be
-// clean and on main, and the control plane's protected files must not have changed during the pass.
 // The project's own files a builder has no business touching: the config, the build prompt, the spec, Helix's
 // prompts and rules, and the agent instructions at the top. The plan isn't here: the loop itself writes it.
 const PROTECTED = ['config.yaml', 'prompts', 'spec', 'helix'].map((f) => `${HELIX_DIR}/${f}`).concat('CLAUDE.md', 'AGENTS.md');
@@ -1254,27 +1285,27 @@ export async function controlPlaneChanges(root: string): Promise<string> {
   return git(root, 'status', '--porcelain', '--', ...PROTECTED).catch(() => '');
 }
 
-async function checkTampering(ctx: PassContext, task: Task, repoDir: string, controlBefore: string): Promise<void> {
+// Defence in depth behind the sandboxes. The repo's checkout is where people work too, so a change there during
+// a pass may be theirs: it is reported, never fatal, and the merge holds while tracked files are changed
+// (merge.ts checkoutInUse). The project's protected files are reported the same way.
+const checkoutStatus = (checkout: string) =>
+  existsSync(join(checkout, '.git')) ? git(checkout, '--no-optional-locks', 'status', '--porcelain').catch(() => '') : Promise.resolve('');
+
+async function checkTampering(ctx: PassContext, task: Task, checkout: string, controlBefore: string, checkoutBefore: string): Promise<void> {
   const { config, paths: p, clock, notify } = ctx.deps;
-  const problems: string[] = [];
-  if (existsSync(join(repoDir, '.git'))) {
-    // Read-only: a plain status refreshes the checkout's index under its lock, and the other agent's merge,
-    // a fast-forward of this same checkout, fails if it finds that lock taken.
-    const status = await git(repoDir, '--no-optional-locks', 'status', '--porcelain').catch(() => '');
-    const branch = await git(repoDir, 'rev-parse', '--abbrev-ref', 'HEAD').catch(() => '');
-    if (status) problems.push(`${task.repo}'s primary checkout has uncommitted changes:\n${status}`);
-    if (branch && branch !== 'main') problems.push(`${task.repo}'s primary checkout is on ${branch}, not main`);
+  // Read-only: a plain status refreshes the checkout's index under its lock, and the other agent's merge,
+  // a fast-forward of this same checkout, fails if it finds that lock taken.
+  const before = new Set(checkoutBefore.split('\n').filter(Boolean));
+  const appeared = (await checkoutStatus(checkout)).split('\n').filter((l) => l && !before.has(l));
+  if (appeared.length) {
+    record(p.ledger, { kind: 'warning', at: iso(clock.now()), task: task.id, detail: `${task.repo}'s checkout changed during the pass, outside its worktree (a builder, or someone editing):\n${appeared.join('\n')}` });
+    notify('The loop', `${task.repo}'s checkout changed during ${task.id}'s pass: ${appeared[0]!.replace(/^\s*\S+\s+/, '')}${appeared.length > 1 ? ` and ${appeared.length - 1} more` : ''}. If that wasn't you, look at it.`);
   }
   const controlAfter = await controlPlaneChanges(config.root);
   if (controlAfter !== controlBefore) {
     // Could be the loop engineer editing while the loop runs; recorded and reported, not fatal.
     record(p.ledger, { kind: 'warning', at: iso(clock.now()), task: task.id, detail: `control-plane protected files changed during the pass:\n${controlAfter}` });
-    notify('The loop', `Protected control-plane files changed during ${task.id}; check runs/runs.jsonl.`);
-  }
-  if (problems.length) {
-    record(p.ledger, { kind: 'warning', at: iso(clock.now()), task: task.id, detail: `tampering: ${problems.join('; ')}` });
-    notify('The loop stopped', `${task.id}: ${problems[0]!.split('\n')[0]}`);
-    ctx.stop(`after ${task.id}: ${problems.join('; ')}`);
+    notify('The loop', `Protected control-plane files changed during ${task.id}; check .helix/runs/runs.jsonl.`);
   }
 }
 

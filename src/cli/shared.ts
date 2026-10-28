@@ -1,4 +1,5 @@
-import { relative } from 'node:path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { describePace, loadQuota, mapAgents, paceSlots } from '../agents/quota.ts';
 import { loadConfig, paths } from '../config.ts';
 import { meanPassHours, readLedger } from '../ledger.ts';
@@ -39,3 +40,15 @@ export const shown = (file: string) => {
   const rel = relative(process.cwd(), file);
   return rel && !rel.startsWith('..') ? rel : file;
 };
+
+// The repos' checkouts sit in the project folder, each a repository of its own: the project's git ignores them,
+// so its commits hold the plan and never the code. Appends what .gitignore lacks; returns what it added.
+export function ignoreRepos(root: string, repos: string[]): string[] {
+  const file = join(root, '.gitignore');
+  const had = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  const lines = new Set(had.split('\n').map((l) => l.trim()));
+  const add = repos.map((r) => `/${r}/`).filter((l) => !lines.has(l) && !lines.has(l.slice(1)));
+  if (!add.length) return [];
+  writeFileSync(file, `${had}${had && !had.endsWith('\n') ? '\n' : ''}${had.includes('# The repos Helix Loop builds') ? '' : '# The repos Helix Loop builds: repositories of their own.\n'}${add.join('\n')}\n`);
+  return add;
+}

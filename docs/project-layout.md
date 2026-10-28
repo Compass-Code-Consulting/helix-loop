@@ -1,10 +1,12 @@
 # Project layout
 
-A project keeps everything Helix Loop needs in one hidden folder, `.helix/`, at its root.
-Commands find it the way git finds a repository: the nearest folder up from where you are.
+A project keeps everything Helix Loop needs in one hidden folder, `.helix/`, at its root, and the code it builds beside it, where you read and run it.
+Commands find `.helix/` the way git finds a repository: the nearest folder up from where you are.
 
 ```
 my-product/
+  app/                   a repository the loop builds: its own git repository, one lane (not committed here)
+  website/               another, if the product has more than one
   .helix/
     config.yaml          the project's configuration (configuration.md)
     spec/
@@ -31,15 +33,22 @@ my-product/
       prompts/*.local.md your edits to Helix's prompts
     app.yaml             this machine's app settings: folds, filters, the last visit to Home (not committed)
     runs/                the loop's ledger, logs, metrics and state (not committed)
-    repos/               the product repositories the loop builds (not committed: each has its own remote)
     worktrees/           one git worktree per running pass (not committed)
-    .gitignore           keeps the last four out of git
+    .gitignore           keeps the last three out of git
 ```
 
 ## What to commit
 
 Commit `config.yaml`, `spec/`, `plan/` (its `history/` too), `prompts/` and `helix/` with the project: they are its source, and the loop commits its own plan updates (a task merged, a task waiting on you) into the same repository.
-`.helix/.gitignore` keeps the rest out.
+`.helix/.gitignore` keeps the rest out, and the project's own `.gitignore` names each repository's folder: each is a repository of its own, with its own remote.
+
+## The code
+
+Each repository the loop builds is a folder in the project: `<project>/<repo>/` by default, or where its `path` in the config says.
+It is a normal checkout on `main`: open it in your editor, run it, read its history.
+The loop's passes never work in it; each works in its own worktree under `.helix/worktrees/`, and only a merge that passed the gate moves its `main` forward.
+While the checkout is on another branch or has uncommitted changes, the loop holds that repository's merges and new tasks, keeping the work they did, and tells you once; it carries on by itself when the checkout is back on `main` with nothing uncommitted.
+The project's own folder can't be a repository the loop builds: the loop commits its plan there as it goes, and those commits would race its merges on one `main`.
 
 ## Where the tool's own files are
 

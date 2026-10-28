@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { gitAuthor, type Config, type Paths } from './config.ts';
+import { gitAuthor, repoDir, type Config, type Paths } from './config.ts';
 import { git, gitNet, gitNetOk, hasRemote, head } from './git.ts';
 import { readLedger, record } from './ledger.ts';
 import { compareWithOrigin } from './merge.ts';
@@ -46,7 +46,7 @@ export interface ReleaseSettings {
 export function releaseSettings(config: Config, p: Paths, repo: string): ReleaseSettings {
   return {
     repo,
-    dir: join(p.repos, repo),
+    dir: repoDir(config, repo),
     approvals: p.approvals,
     ledger: p.ledger,
     push: config.push,

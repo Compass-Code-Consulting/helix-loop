@@ -41,7 +41,7 @@ helix-loop init [options]
 ```
 
 Asks for the product's name, who steers it, its time zone, the repositories to build and their gate commands, and the agents to use, then writes .helix/: config.yaml, the build prompt, and folders for the spec and the TaskSet.
-Each repository is cloned into .helix/repos/<name>, or started empty for the loop to build from scratch.
+Each repository is cloned into a folder of its own beside .helix/ (<name>/), or started empty for the loop to build from scratch; the project's .gitignore names each.
 It offers to install the Helix skill too.
 Everything it asks has an option, for scripts; --yes takes the defaults.
 
@@ -130,13 +130,14 @@ helix-loop skill pack [file]
 
 ### helix-loop migrate
 
-Move a control plane from before .helix/ (spec/, plan/, harness/config.yaml, runs/) into .helix/
+Move a project to the current layout: an old control plane into .helix/, and repos out of .helix/repos/
 
 ```
 helix-loop migrate [options]
 ```
 
-For a project that ran Helix Loop from inside it, before the tool stood alone: moves the spec, the TaskSet, the build prompt, the config and Helix's files into .helix/ with git mv, and the loop's runs, repos and worktrees after them (repairing the worktrees' links).
+For a project that ran Helix Loop from inside it, before the tool stood alone: moves the spec, the TaskSet, the build prompt, the config and Helix's files into .helix/ with git mv, and the loop's runs and worktrees after them; the repos' checkouts go beside .helix/, each in <name>/, with their worktrees re-linked.
+For a project whose repos are in .helix/repos/, from when the code was kept there, it moves just those.
 The loop must be stopped.
 Without --apply it only says what it would do.
 

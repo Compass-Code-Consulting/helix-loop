@@ -15,7 +15,7 @@ helix-loop doctor         # checks Node, git and the agents
 
 ## 2. Start a project
 
-In your product's folder (a git repository of its own, holding the plan; the product's code lives in the repositories the loop builds):
+In your product's folder (a git repository of its own, holding the plan; the product's code is in the repositories the loop builds, each a folder beside `.helix/`):
 
 ```sh
 helix-loop init
@@ -29,8 +29,8 @@ It asks for:
 - a spec to start from, if you have one;
 - whether to install the Helix skill, globally or for this project.
 
-Everything lands in `.helix/` ([project layout](project-layout.md)).
-Commit it: the config, the spec, the TaskSet and its milestones are the project's source; the loop's runs, the cloned repositories and the passes' worktrees are ignored.
+The plan lands in `.helix/`, and each repository in a folder of its own beside it ([project layout](project-layout.md)).
+Commit `.helix/`: the config, the spec, the TaskSet and its milestones are the project's source; the loop's runs and the passes' worktrees are ignored, and so are the repositories' folders, each a repository of its own.
 
 ## 3. Write the spec
 

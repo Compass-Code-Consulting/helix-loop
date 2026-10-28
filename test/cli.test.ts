@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { stringify } from 'yaml';
-import { asset, configPath, loadConfig, paths } from '../src/config.ts';
+import { asset, configPath, loadConfig, paths, repoDir } from '../src/config.ts';
 import { seedControlPlane } from '../src/dryrun.ts';
 import type { LiveFile } from '../src/live.ts';
 import { loadPlan } from '../src/plan/store.ts';
@@ -333,4 +333,61 @@ test('ask says plainly when Helix has no agent it can run here, and runs no agen
   assert.equal(r.code, 1);
   assert.match(r.err, /^Helix isn't set up: it runs on Claude Code, and `.*no-such-claude` doesn't run here\./);
   assert.ok(!existsSync(paths(root).threads), 'no conversation was started');
+});
+
+// ---- migrate: the repos' checkouts belong in the project, not in .helix/ ----
+
+const sh = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, stdio: 'pipe' }).toString().trim();
+function gitRepo(dir: string): void {
+  mkdirSync(dir, { recursive: true });
+  sh(dir, 'init', '-q', '-b', 'main');
+  writeFileSync(join(dir, 'README.md'), 'code\n');
+  sh(dir, 'add', '-A');
+  sh(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'start');
+}
+async function cliIn(root: string, ...argv: string[]): Promise<{ code: number; out: string }> {
+  const out: string[] = [];
+  const code = await main([...argv, '--root', root], { out: (s = '') => void out.push(s), err: (s) => void out.push(s) });
+  return { code, out: out.join('\n') };
+}
+
+test('migrate moves the repos out of .helix/ into the project, ignores them, and re-links their worktrees', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'helix-migrate-'));
+  seedControlPlane(root, FIXTURE);
+  writeFileSync(configPath(root), stringify({ ...loadConfig(FIXTURE), root: undefined }));
+  writeFileSync(join(root, '.gitignore'), '.DS_Store\n');
+  sh(root, 'init', '-q', '-b', 'main');
+  // The old layout: each checkout in .helix/repos/, one with a pass's worktree in .helix/worktrees/<repo>/.
+  for (const r of ['acme-app', 'acme-website']) gitRepo(join(paths(root).home, 'repos', r));
+  const tree = join(paths(root).worktrees, 'acme-app', 'T-0001-claude');
+  sh(join(paths(root).home, 'repos', 'acme-app'), 'worktree', 'add', '-q', '-b', 'task/T-0001', tree);
+
+  const dry = await cliIn(root, 'migrate');
+  assert.equal(dry.code, 0, dry.out);
+  assert.match(dry.out, /^Moving the repos' checkouts out of \.helix\/ into the project \(a dry run: --apply does it\):\n {2}mv {6}\.helix\/repos\/acme-app {2}→ {2}acme-app\/\n {2}mv {6}\.helix\/repos\/acme-website {2}→ {2}acme-website\/$/);
+  assert.ok(existsSync(join(paths(root).home, 'repos', 'acme-app')), 'a dry run moves nothing');
+
+  assert.equal((await cliIn(root, 'migrate', '--apply')).code, 0);
+  assert.ok(!existsSync(join(paths(root).home, 'repos')));
+  assert.equal(sh(join(root, 'acme-app'), 'log', '-1', '--format=%s'), 'start');
+  assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), '.DS_Store\n# The repos Helix Loop builds: repositories of their own.\n/acme-app/\n/acme-website/\n');
+  // The worktree follows its repo: git sees it from both sides.
+  assert.match(sh(join(root, 'acme-app'), 'worktree', 'list'), new RegExp(`${tree.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} +\\w+ \\[task/T-0001\\]`));
+  assert.equal(sh(tree, 'rev-parse', '--abbrev-ref', 'HEAD'), 'task/T-0001');
+  assert.match((await cliIn(root, 'migrate')).out, /has a \.helix\/ already: nothing to migrate/);
+});
+
+test('a repo\'s checkout is <project>/<repo> unless its path says where, never the project folder or inside .helix/', () => {
+  const root = mkdtempSync(join(tmpdir(), 'helix-paths-'));
+  seedControlPlane(root, FIXTURE);
+  const base = loadConfig(FIXTURE);
+  const write = (path?: string) => writeFileSync(configPath(root), stringify({ ...base, root: undefined, repos: { ...base.repos, 'acme-app': { ...base.repos['acme-app'], ...(path === undefined ? {} : { path }) } } }));
+  write();
+  assert.equal(repoDir(loadConfig(root), 'acme-app'), join(root, 'acme-app'));
+  write('code/app');
+  assert.equal(repoDir(loadConfig(root), 'acme-app'), join(root, 'code', 'app'));
+  write('.');
+  assert.throws(() => loadConfig(root), /repos\.acme-app\.path can't be the project folder itself/);
+  write('.helix/repos/acme-app');
+  assert.throws(() => loadConfig(root), /repos\.acme-app\.path is inside \.helix\//);
 });

@@ -22,8 +22,8 @@ interface MergeTiming {
 export type MergeResult =
   | ({ ok: true; commit: string; regated: boolean; pushed: boolean | 'skipped'; pushNote?: string; fromOrigin?: string; resolved: string[] } & MergeTiming)
   // carry: the work passed its own gate and only met a main that had moved on. failedStep: rebase, gitleaks,
-  // origin, or the re-gate's own failed step as regate:<step>.
-  | ({ ok: false; outcome: 'conflict' | 'gate_failed' | 'diverged'; detail: string; regated: boolean; failing?: string; carry?: boolean; failedStep: string } & MergeTiming);
+  // origin, checkout, or the re-gate's own failed step as regate:<step>. busy: the repo's checkout is in use.
+  | ({ ok: false; outcome: 'conflict' | 'gate_failed' | 'diverged' | 'busy'; detail: string; regated: boolean; failing?: string; carry?: boolean; failedStep: string } & MergeTiming);
 
 export class MergeQueue {
   private tails = new Map<string, Promise<unknown>>();
@@ -70,8 +70,21 @@ export async function compareWithOrigin(repo: string): Promise<OriginState> {
   return { relation: 'diverged', local, remote, detail };
 }
 
+// The repo's checkout is where people work on the code too: the loop merges into it only while it is on main
+// with no uncommitted change to a tracked file, so it never moves files under someone's edit or merges into
+// their branch. Untracked files are left alone; a merge that would overwrite one is refused by git (below).
+export async function checkoutInUse(repo: string): Promise<string | undefined> {
+  const branch = await git(repo, 'rev-parse', '--abbrev-ref', 'HEAD').catch(() => '');
+  if (branch !== 'main') return `${basename(repo)}'s checkout is on ${branch === 'HEAD' ? 'a detached HEAD' : branch || 'no branch'}, not main`;
+  const changed = (await git(repo, '--no-optional-locks', 'status', '--porcelain', '--untracked-files=no').catch(() => '')).split('\n').filter(Boolean).map((l) => l.replace(/^\s*\S+\s+/, ''));
+  if (changed.length) return `${basename(repo)}'s checkout has uncommitted changes in ${changed.slice(0, 3).join(', ')}${changed.length > 3 ? ` and ${changed.length - 3} more` : ''}`;
+  return undefined;
+}
+
 export async function mergeTask(input: MergeInput): Promise<MergeResult> {
   const { repo, worktree, branch } = input;
+  const inUse = await checkoutInUse(repo);
+  if (inUse) return { ok: false, outcome: 'busy', detail: inUse, regated: false, failedStep: 'checkout', mainMoved: 0 };
   // Someone may have pushed to origin/main since the loop last did. Take their commits first, so this
   // merge's push is a fast-forward; a main that has diverged from origin/main waits for a person.
   let fromOrigin: string | undefined;
@@ -134,7 +147,13 @@ export async function mergeTask(input: MergeInput): Promise<MergeResult> {
       failing: `gitleaks flagged ${found[0]}${found.length > 1 ? `, and ${found.length - 1} more` : ''}`,
     };
   }
-  await git(repo, 'merge', '--ff-only', '--quiet', branch);
+  try {
+    await git(repo, 'merge', '--ff-only', '--quiet', branch);
+  } catch (e) {
+    const why = String((e as { stderr?: string }).stderr ?? (e as Error).message);
+    if (!/would be overwritten|untracked working tree files/.test(why)) throw e;
+    return { ok: false, outcome: 'busy', detail: `${basename(repo)}'s checkout has files the merge would overwrite: ${why.trim().split('\n').slice(0, 4).join(' ')}`, regated, failedStep: 'checkout', mainMoved, regateMs };
+  }
   const commit = await head(repo, 'main');
 
   if (!input.push || !(await hasRemote(repo))) return { ok: true, commit, regated, pushed: 'skipped', fromOrigin, resolved, mainMoved, regateMs };

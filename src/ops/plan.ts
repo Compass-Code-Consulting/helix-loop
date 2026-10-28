@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { join, normalize } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { loadConfig, logFile, paths } from '../config.ts';
+import { loadConfig, logFile, paths, repoDir } from '../config.ts';
 import { git } from '../git.ts';
 import type { LedgerEvent } from '../ledger.ts';
 import { loadPlan } from '../plan/store.ts';
@@ -243,7 +243,7 @@ export function trailItems(board: Board, itemId: string): { id: string; level: s
 }
 
 export async function remoteUrl(root: string, repo: string): Promise<string | undefined> {
-  const u = await git(join(paths(root).repos, repo), 'remote', 'get-url', 'origin').catch(() => '');
+  const u = await git(repoDir(loadConfig(root), repo), 'remote', 'get-url', 'origin').catch(() => '');
   const slug = /github\.com[:/](.+?)(\.git)?$/.exec(u)?.[1];
   return slug ? `https://github.com/${slug}` : undefined;
 }

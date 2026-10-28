@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir, userInfo } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
-import { asset, configPath, findProject, HELIX_DIR, loadConfig, PACKAGE_ROOT, paths } from '../../config.ts';
+import { asset, configPath, findProject, HELIX_DIR, loadConfig, PACKAGE_ROOT, paths, repoDir } from '../../config.ts';
 import { installSkill, packSkill, skillInfo } from '../../skill.ts';
 import { writeIndex } from '../../spec/index.ts';
 import { Asker } from '../ask.ts';
@@ -10,7 +10,7 @@ import { define, str, UsageError, type Context } from '../command.ts';
 import { referenceMarkdown } from '../help.ts';
 import { COMMANDS } from '../registry.ts';
 import { migrateLegacy } from '../migrate.ts';
-import { shown } from '../shared.ts';
+import { ignoreRepos, shown } from '../shared.ts';
 
 // Starting a project, installing the Helix skill, checking a machine, and the docs generator.
 
@@ -133,7 +133,7 @@ const init = define({
   group: 'Start a project',
   summary: 'Start a Helix Loop project in this folder: the .helix/ folder, its config and its repos',
   description: `Asks for the product's name, who steers it, its time zone, the repositories to build and their gate commands, and the agents to use, then writes .helix/: config.yaml, the build prompt, and folders for the spec and the TaskSet.
-Each repository is cloned into .helix/repos/<name>, or started empty for the loop to build from scratch.
+Each repository is cloned into a folder of its own beside .helix/ (<name>/), or started empty for the loop to build from scratch; the project's .gitignore names each.
 It offers to install the Helix skill too.
 Everything it asks has an option, for scripts; --yes takes the defaults.`,
   project: false,
@@ -192,7 +192,7 @@ Everything it asks has an option, for scripts; --yes takes the defaults.`,
 
       // .helix/: the config from the template, the build prompt, and the folders the loop reads.
       const p = paths(root);
-      for (const d of [p.specSections, p.tasks, p.human, p.prompts, p.helix, p.runs, p.repos]) mkdirSync(d, { recursive: true });
+      for (const d of [p.specSections, p.tasks, p.human, p.prompts, p.helix, p.runs]) mkdirSync(d, { recursive: true });
       const repoLines = repos.map((r) => `  ${r.name}: { gate: ${JSON.stringify(r.gate)}, prepare: "test ! -f pnpm-lock.yaml || pnpm install --frozen-lockfile --prefer-offline" }`).join('\n');
       writeFileSync(
         configPath(root),
@@ -206,10 +206,11 @@ Everything it asks has an option, for scripts; --yes takes the defaults.`,
       );
       cpSync(asset('templates', 'prompts', 'build.md'), join(p.prompts, 'build.md'));
       cpSync(asset('templates', 'gitignore'), join(p.home, '.gitignore'));
-      loadConfig(root); // the config written must load, or init has a bug
+      const config = loadConfig(root); // the config written must load, or init has a bug
+      ignoreRepos(root, repos.map((r) => r.name));
       out('');
       for (const r of repos) {
-        const dir = join(p.repos, r.name);
+        const dir = repoDir(config, r.name);
         if (r.from) {
           out(`Cloning ${r.name} from ${r.from}…`);
           execFileSync('git', ['clone', '-q', r.from, dir], { stdio: 'inherit' });
@@ -236,7 +237,7 @@ Everything it asks has an option, for scripts; --yes takes the defaults.`,
       out(`  ${spec ? 1 : 2}. Plan it: /helix taskset writes the TaskSet; \`helix-loop taskset import <folder> --apply\` brings it in.`);
       out(`  ${spec ? 2 : 3}. Check everything: \`helix-loop doctor\`, then \`helix-loop validate\`.`);
       out(`  ${spec ? 3 : 4}. Watch it work: \`helix-loop app --open\`, then \`helix-loop run\`.`);
-      out('Commit .helix/ with the project: the config, spec and TaskSet are its source; runs, repos and worktrees are ignored.');
+      out(`Commit .helix/ with the project: the config, spec and TaskSet are its source; the loop's runs and worktrees are ignored, and so are the repos' folders (${repos.map((r) => `${r.name}/`).join(', ')}), which are repositories of their own.`);
     } finally {
       ask?.close();
     }
@@ -281,7 +282,7 @@ const doctor = define({
     for (const a of ['claude', 'codex'] as const) if (config.agents[a].enabled && !which(config.agents[a].command)) line(false, `${a} is enabled but \`${config.agents[a].command}\` isn't on the PATH`, `Install it, or set agents.${a}.enabled: false.`);
     const p = paths(root);
     for (const r of Object.keys(config.repos)) {
-      const dir = join(p.repos, r);
+      const dir = repoDir(config, r);
       const head = existsSync(join(dir, '.git')) ? spawnSync('git', ['rev-parse', '--verify', '-q', 'main'], { cwd: dir, encoding: 'utf8' }).stdout.trim() : '';
       line(!!head, `repo ${r}${head ? ` (main at ${head.slice(0, 7)})` : ''}`, existsSync(dir) ? `${dir} has no main branch.` : `Clone it: git clone <url> ${relative(process.cwd(), dir)}`);
     }
@@ -295,8 +296,9 @@ const doctor = define({
 const migrate = define({
   name: 'migrate',
   group: 'Start a project',
-  summary: 'Move a control plane from before .helix/ (spec/, plan/, harness/config.yaml, runs/) into .helix/',
-  description: `For a project that ran Helix Loop from inside it, before the tool stood alone: moves the spec, the TaskSet, the build prompt, the config and Helix's files into .helix/ with git mv, and the loop's runs, repos and worktrees after them (repairing the worktrees' links).
+  summary: 'Move a project to the current layout: an old control plane into .helix/, and repos out of .helix/repos/',
+  description: `For a project that ran Helix Loop from inside it, before the tool stood alone: moves the spec, the TaskSet, the build prompt, the config and Helix's files into .helix/ with git mv, and the loop's runs and worktrees after them; the repos' checkouts go beside .helix/, each in <name>/, with their worktrees re-linked.
+For a project whose repos are in .helix/repos/, from when the code was kept there, it moves just those.
 The loop must be stopped.
 Without --apply it only says what it would do.`,
   options: {

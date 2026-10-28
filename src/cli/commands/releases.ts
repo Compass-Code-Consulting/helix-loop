@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { loadConfig, paths } from '../../config.ts';
+import { loadConfig, paths, repoDir } from '../../config.ts';
 import { loadPlan } from '../../plan/store.ts';
 import { approveRelease, describeBase, pendingApprovals, releaseRepo, releaseSettings, unreleased } from '../../release.ts';
 import { define, UsageError } from '../command.ts';
@@ -81,7 +81,7 @@ const approve = define({
     const [repo, tag] = args as [string, string];
     const config = repoOf(root, repo);
     const p = paths(root);
-    const r = await approveRelease({ repo, dir: join(p.repos, repo), tag, approvals: p.approvals, ledger: p.ledger, push: config.push, now: Date.now() });
+    const r = await approveRelease({ repo, dir: repoDir(config, repo), tag, approvals: p.approvals, ledger: p.ledger, push: config.push, now: Date.now() });
     const at = r.approval.commit.slice(0, 12);
     if (r.pushed === false) {
       out(`${repo} ${tag} is approved and tagged at ${at}, but the push failed. It is pushed again before the repo's next release, or now with: helix-loop release run ${repo}`);

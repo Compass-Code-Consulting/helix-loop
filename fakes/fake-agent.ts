@@ -12,7 +12,7 @@
 //   CODEX_HOME           where the codex fake writes its rollout file
 //
 // A "*" list applies to every task without one of its own. Actions: work:<s> (<s> real seconds of reported
-//          work, for a watched dry run) · issue:<kind>+<action> (reports an issue first) · implement · commit · shared · dep · jsondep · fail · flaky · clash · resolve · unclash · runsuite · untracked · buildstep · ciwrite · infrawrite · tamper · nothing · blocked · forbidden · secret · background
+//          work, for a watched dry run) · issue:<kind>+<action> (reports an issue first) · implement · commit · shared · dep · jsondep · fail · flaky · clash · resolve · unclash · runsuite · untracked · buildstep · ciwrite · infrawrite · tamper · edit-checkout · nothing · blocked · forbidden · secret · background
 //          · error · transient · suspend · slow:<s> · linger:<s> · stall:<s> · limit:<min> · limit-unknown · cost:<usd>
 //          (linger:<s> is slow:<s> that, like the real CLIs, takes 2 seconds to exit after SIGTERM; stall:<s>
 //          implements first, then works <s> seconds more, so a pass killed meanwhile leaves its work behind)
@@ -350,6 +350,13 @@ switch (verb) {
     const common = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd }).toString().trim();
     writeFileSync(join(common, '..', 'TAMPERED.txt'), 'written from a task worktree\n');
     finishOk(message('tamper with the primary checkout'), cost);
+  }
+  case 'edit-checkout': {
+    // Someone edits a tracked file in the repo's checkout while this pass runs, as a person working on the code.
+    implement();
+    const common = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd }).toString().trim();
+    writeFileSync(join(common, '..', 'shared.txt'), 'edited by someone in the checkout\n');
+    finishOk(message('implement while someone edits the checkout'), cost);
   }
   case 'upstream': {
     // Someone else pushes to origin/main while this pass runs.
