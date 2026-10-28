@@ -128,6 +128,7 @@
       tools: h('div', { class: 'bar1' }),
       legend: h('div', { class: 'legend', role: 'group', 'aria-label': 'Show or hide' }),
       gantt: h('div', { class: 'gantt' }),
+      resize: resizer(),
       panel: h('aside', { class: `panel${opt('panel', true) === false ? ' closed' : ''}`, 'aria-label': 'Detail' }),
     };
     B.gantt.addEventListener('scroll', () => {
@@ -135,7 +136,7 @@
       drawRows();
     });
     pinch();
-    fill(M.el, h('section', { class: 'map' }, B.tools, B.legend, B.gantt), B.panel);
+    fill(M.el, h('section', { class: 'map' }, B.tools, B.legend, h('div', { class: 'gframe' }, B.gantt, B.resize)), B.panel);
     renderLegend();
     renderTools();
     renderPanel();
@@ -333,7 +334,48 @@
     code: "The last builder task's merge, if every human task were done when it is needed",
     project: "The last builder task's merge, with human tasks taking their lead times",
   };
-  const colW = () => Math.max(200, Math.min(640, Number(opt('col', 330)) || 330));
+  const colW = () => M.dragCol ?? Math.max(200, Math.min(640, Number(opt('col', 330)) || 330));
+
+  // The task column's edge, dragged to resize it. It sits over the chart, not in it: the column stays put as the chart
+  // scrolls sideways (and the chart opens scrolled to now), so a handle in the chart would scroll out of reach.
+  function resizer() {
+    const el = h('div', { class: 'g-resize', tabindex: '0', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': 'Task column width', 'aria-valuemin': 200, 'aria-valuemax': 640 });
+    const set = (w) => {
+      HX.setUi('map.col', w);
+      drawGrid();
+    };
+    el.onpointerdown = (e) => {
+      e.preventDefault();
+      const x0 = e.clientX;
+      const w0 = colW();
+      // The width while dragging, which a redraw from a live update keeps too.
+      const move = (ev) => {
+        M.dragCol = Math.max(200, Math.min(640, Math.round(w0 + ev.clientX - x0)));
+        for (const n of B.gantt.querySelectorAll('.g-lab, .g-head .lab')) n.style.width = `${M.dragCol}px`;
+        // The gridlines and the dependency lines move with the bars.
+        for (const n of [M.lines, M.deps]) if (n) n.style.left = `${M.dragCol}px`;
+        el.style.left = `${M.dragCol - 4}px`;
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        document.body.style.cursor = '';
+        const w = M.dragCol;
+        M.dragCol = undefined;
+        if (w != null) set(w);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      document.body.style.cursor = 'col-resize';
+    };
+    el.onkeydown = (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      set(Math.max(200, Math.min(640, colW() + (e.key === 'ArrowRight' ? 16 : -16))));
+    };
+    el.ondblclick = () => set(330);
+    return el;
+  }
 
   // The grid's fixed parts: the header with its ticks, the gridlines, and a body the rows are drawn into.
   function drawGrid() {
@@ -346,40 +388,8 @@
     for (let t = M.axis.start; t < M.axis.end; t += step) ticks.push(t);
     const label = (t) => step < DAY ? (new Date(t).getHours() === 0 ? new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : new Date(t).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })) : new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     const wrapBox = h('input', { type: 'checkbox', checked: wrap, onchange: (e) => { HX.setUi('map.wrap', e.target.checked); drawGrid(); } });
-    const resize = h('div', { class: 'g-resize', tabindex: '0', role: 'separator', 'aria-label': 'Task column width', 'aria-valuenow': cw, style: { left: `${cw - 4}px` } });
-    resize.onpointerdown = (e) => {
-      e.preventDefault();
-      const x0 = e.clientX;
-      const w0 = colW();
-      const move = (ev) => {
-        const w = Math.max(200, Math.min(640, Math.round(w0 + ev.clientX - x0)));
-        M.el.style.setProperty('--col', `${w}px`);
-        for (const n of B.gantt.querySelectorAll('.g-lab, .g-head .lab')) n.style.width = `${w}px`;
-        resize.style.left = `${w - 4}px`;
-        M.pendingCol = w;
-      };
-      const up = () => {
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-        document.body.style.cursor = '';
-        if (M.pendingCol) HX.setUi('map.col', M.pendingCol);
-        drawGrid();
-      };
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
-      document.body.style.cursor = 'col-resize';
-    };
-    resize.onkeydown = (e) => {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        HX.setUi('map.col', Math.max(200, Math.min(640, colW() + (e.key === 'ArrowRight' ? 16 : -16))));
-        drawGrid();
-        resize.focus?.();
-      }
-    };
-    resize.ondblclick = () => {
-      HX.setUi('map.col', 330);
-      drawGrid();
-    };
+    B.resize.style.left = `${cw - 4}px`;
+    B.resize.setAttribute('aria-valuenow', cw);
     const now = M.board.now;
     // The finish lines, each with a chip in the header beside its line. A chip that would run into the "now" chip or
     // the other one either way is left out; its line and the legend still say where it is.
@@ -427,8 +437,7 @@
           chips.map((c) => h('span', { class: c.cls, title: c.title, style: { left: `${c.at + 1}px` } }, c.text)),
           shown('now') ? h('span', { class: 'nowchip', style: { left: `${x(now)}px` } }, new Date(now).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })) : null,
           ms.length ? h('div', { class: 'msstrip' }, msLabels) : null)),
-      h('div', { style: { position: 'relative' } }, M.lines, M.body, M.deps = svgEl('svg', { class: 'g-deps', 'aria-hidden': 'true' })),
-      resize);
+      h('div', { style: { position: 'relative' } }, M.lines, M.body, M.deps = svgEl('svg', { class: 'g-deps', 'aria-hidden': 'true' })));
     M.deps.style.left = `${cw}px`;
     // The rows' height first: without it the chart is momentarily header-high, and the scroll put back would be cut to
     // the top (a selection opened from a link, or the place the owner was reading when a live update redrew).
