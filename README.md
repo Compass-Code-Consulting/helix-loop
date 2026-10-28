@@ -9,6 +9,14 @@ Then you order the delivery as milestones, outcomes you can demo, from a walking
 Helix Loop runs the agents in parallel on those tasks, earliest milestone first, each in its own git worktree, merges only the work that passes each repository's full check, and paces the agents so their subscriptions last the week.
 You steer from the app or the command line: the human tasks only you can do, the failures that need a decision, the fixes Helix proposes.
 
+![The Map: the TaskSet nested Lane › Epic › Feature › Story against time, with the milestones, today and the code-complete line, and a feature's progress and milestones beside it](docs/assets/screenshots/map.png)
+
+The Map shows the TaskSet against time: what is done, building, ready or waiting on you, each milestone, and when the code and the project are projected to be complete.
+
+![Settings › Loop controls: the running loop, its agents and slots, pass and gate limits, daily spend, merge and push, and safety and releases](docs/assets/screenshots/settings-loop-controls.png)
+
+Loop controls show what the loop runs with right now, read from `.helix/config.yaml` and written back to it.
+
 ## Install
 
 Helix Loop needs Node 26 or later, git, and Claude Code, Codex or both, signed in with their subscriptions.
