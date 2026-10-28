@@ -134,7 +134,7 @@
     const agentBoxes = {};
     const runStrip = h('div', { class: 'glass runstrip' },
       h('div', { class: 'row', style: { gap: '10px' } }, h('span', { class: `dot ${l.running && !s.paused ? 'on' : l.running ? 'warn' : ''}`, style: { width: '10px', height: '10px' } }),
-        h('div', null, h('div', { style: { fontSize: '17px', fontWeight: 500 } }, HX.loopPill()), h('div', { class: 'small soft' }, l.running ? ['since ', F.dayTime(Date.parse(l.since ?? new Date().toISOString())), ` · pid ${l.pid} · ${F.plural(s.live.length, 'pass')} in flight`] : l.lastExit ? `last run ended ${F.when(l.lastExit.at)}${l.lastExit.detail ? `: ${l.lastExit.detail}` : ''}` : 'not started yet'))),
+        h('div', null, h('div', { style: { fontSize: '17px', fontWeight: 500 } }, HX.loopPill()), h('div', { class: 'small soft' }, l.running ? ['since ', F.dayTime(Date.parse(l.since ?? new Date().toISOString())), ` · pid ${l.pid} · ${F.plural(s.live.length, 'pass', 'passes')} in flight`] : l.lastExit ? `last run ended ${F.when(l.lastExit.at)}${l.lastExit.detail ? `: ${l.lastExit.detail}` : ''}` : 'not started yet'))),
       h('div', { class: 'stack', style: { gap: '4px' } },
         h('div', { class: 'row' }, ['claude', 'codex'].map((a) => {
           const hh = X.health?.find((x) => x.agent === a);
