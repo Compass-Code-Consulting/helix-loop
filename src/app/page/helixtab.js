@@ -204,8 +204,8 @@
     const summary = t.replies.filter((r) => r.kind === 'summary').at(-1);
     return h('div', { class: 'page stack lg', style: { maxWidth: '860px' } },
       h('div', { class: 'crumb' }, h('a', { href: '#helix/conversations' }, HX.icon('arrow-left'), 'Conversations'), h('span', { class: 'sep' }, '/'), h('span', null, label(t.target)), HX.tag(t.state, t.state === 'resolved' ? 'tag-ok' : 'tag-accent'), /^(T|HT)-/.test(t.target) ? h('a', { href: `#map/${t.target.split('~')[0]}`, class: 'small' }, 'Open on the Map') : null),
+      // The root comment is the conversation's first message too (threads.ts), so it is drawn only as that.
       h('div', { class: 'thread stack' },
-        h('div', { class: 'msg owner' }, h('div', { class: 'small muted' }, `${HX.owner()} · ${F.when(t.root.at)}`), h('div', { style: { whiteSpace: 'pre-wrap' } }, t.root.text)),
         t.messages.map((m) => {
           if (m.kind === 'decision') return h('div', { class: 'small muted' }, `${HX.owner()} ${m.decision} the proposal${m.text ? `: ${m.text}` : '.'}`);
           if (m.kind === 'proposal') {
