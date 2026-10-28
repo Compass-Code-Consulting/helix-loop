@@ -61,14 +61,7 @@
     M.placedAt = undefined;
     B = {
       tools: h('div', { class: 'bar1' }),
-      legend: h('div', { class: 'legend' },
-        h('span', null, h('i', { style: { background: 'var(--ok)' } }), '✓ done'),
-        h('span', null, h('i', { style: { background: 'repeating-linear-gradient(135deg,var(--color-accent) 0 3px,var(--color-accent-600) 3px 6px)' } }), '◐ building'),
-        h('span', null, h('i', { style: { boxShadow: 'inset 0 0 0 1px var(--color-neutral-500)' } }), '○ ready'),
-        h('span', null, h('i', { style: { border: '1.5px dashed var(--crit)' } }), '! needs you'),
-        h('span', null, h('i', { style: { background: 'repeating-linear-gradient(135deg,var(--warn) 0 3px,transparent 3px 6px)' } }), 'human task'),
-        h('span', null, '▸ folded: green share is merged'),
-        h('span', null, h('i', { style: { width: '1px', height: '12px', background: 'var(--color-text)' } }), 'now')),
+      legend: h('div', { class: 'legend', role: 'group', 'aria-label': 'Show or hide' }),
       gantt: h('div', { class: 'gantt' }),
       panel: h('aside', { class: `panel${opt('panel', true) === false ? ' closed' : ''}`, 'aria-label': 'Detail' }),
     };
@@ -78,6 +71,7 @@
     });
     pinch();
     fill(M.el, h('section', { class: 'map' }, B.tools, B.legend, B.gantt), B.panel);
+    renderLegend();
     renderTools();
     renderPanel();
   }
@@ -123,17 +117,40 @@
       HX.btn('Export', HX.act(async () => { await HX.post('/api/export', { what: 'map' }); HX.toast('Exporting the static map (helix-loop map)…'); }), 'btn-ghost'));
   }
 
+  // The legend doubles as the Map's filters: each kind of row and each line it names shows or hides when clicked,
+  // and the Map remembers which are off. "Folded" only explains how a folded row is drawn, so it stays text.
+  const hiddenNow = () => new Set(String(opt('hide', '')).split(',').filter(Boolean)); // stored as text: done,human
+  const shown = (key) => !hiddenNow().has(key);
+  function renderLegend() {
+    const off = hiddenNow();
+    const dash = (color, step = 3) => h('i', { class: 'dash', style: { background: `repeating-linear-gradient(to bottom, ${color} 0 ${step}px, transparent ${step}px ${step + 2}px)` } });
+    const toggle = (key, swatch, text, title) => h('button', {
+      type: 'button', class: `lkey${off.has(key) ? ' off' : ''}`, 'aria-pressed': String(!off.has(key)), title: `${title ? `${title}\n` : ''}${off.has(key) ? 'Hidden: click to show' : 'Click to hide'}`,
+      onclick: () => {
+        const next = hiddenNow();
+        next.has(key) ? next.delete(key) : next.add(key);
+        HX.setUi('map.hide', [...next].join(','));
+        renderLegend();
+        layout();
+      },
+    }, swatch, text);
+    const b = M.board;
+    fill(B.legend,
+      toggle('done', h('i', { style: { background: 'var(--ok)' } }), '✓ done', 'Merged tasks'),
+      toggle('building', h('i', { style: { background: 'repeating-linear-gradient(135deg,var(--color-accent) 0 3px,var(--color-accent-600) 3px 6px)' } }), '◐ building', 'Tasks in a pass now'),
+      toggle('ready', h('i', { style: { boxShadow: 'inset 0 0 0 1px var(--color-neutral-500)' } }), '○ ready', 'Tasks waiting for a builder, or for the work they wait on'),
+      toggle('needs', h('i', { style: { border: '1.5px dashed var(--crit)' } }), '! needs you', 'Tasks waiting on you, or parked'),
+      toggle('human', h('i', { style: { background: 'repeating-linear-gradient(135deg,var(--warn) 0 3px,transparent 3px 6px)' } }), 'human task', 'Your human tasks, at the top'),
+      h('span', { class: 'lnote' }, '▸ folded: green share is merged'),
+      toggle('now', h('i', { style: { width: '1px', height: '12px', background: 'var(--color-text)' } }), 'now'),
+      b?.codeFinish != null ? [toggle('code', dash('var(--color-accent)'), 'code complete', TITLE.code), toggle('project', dash('var(--crit)'), 'project complete', TITLE.project)] : b ? toggle('project', dash('var(--crit)'), 'projected finish') : null,
+      b?.milestones.length ? toggle('milestone', dash('var(--ms)', 2), 'milestone', 'When each milestone was reached, or is projected to be') : null,
+      b?.unplaced.length ? h('span', { class: 'derived t-warn', style: { marginLeft: 'auto' }, title: 'They name a story .helix/plan/taskset.yaml does not declare: helix-loop validate lists them' }, `${F.plural(b.unplaced.length, 'task')} not in the TaskSet`) : null);
+  }
+
   async function load() {
     M.board = await HX.api('/api/board');
-    B.legend.querySelector('.derived')?.remove();
-    // The finish lines: code complete and project complete, or the one projected finish.
-    B.legend.querySelectorAll('.finkey').forEach((n) => n.remove());
-    const key = (color, text, title) => h('span', { class: 'finkey', title }, h('i', { class: 'dash', style: { background: `repeating-linear-gradient(to bottom, ${color} 0 3px, transparent 3px 5px)` } }), text);
-    B.legend.append(...(M.board.codeFinish != null
-      ? [key('var(--color-accent)', 'code complete', TITLE.code), key('var(--crit)', 'project complete', TITLE.project)]
-      : [key('var(--crit)', 'projected finish')]));
-    if (M.board.milestones.length) B.legend.append(h('span', { class: 'finkey', title: 'When each milestone was reached, or is projected to be' }, h('i', { class: 'dash', style: { background: 'repeating-linear-gradient(to bottom, var(--ms) 0 2px, transparent 2px 4px)' } }), 'milestone'));
-    if (M.board.unplaced.length) B.legend.append(h('span', { class: 'derived t-warn', style: { marginLeft: 'auto' }, title: 'They name a story .helix/plan/taskset.yaml does not declare: helix-loop validate lists them' }, `${F.plural(M.board.unplaced.length, 'task')} not in the TaskSet`));
+    renderLegend();
     M.byId = new Map([...M.board.tasks, ...M.board.human.map((x) => ({ ...x, kind: 'human' }))].map((t) => [t.id, t]));
     M.itemById = new Map(M.board.items.map((i) => [i.id, i]));
     layout();
@@ -144,7 +161,7 @@
   // ---- which rows show ----
   function layout(keepScroll) {
     if (!M.board) return;
-    const r = HX.mapRows(M.board, { view: viewNow(), scope: opt('scope', 'frontier'), milestone: milestoneNow(), q: M.q, owner: HX.owner(), fold: (id) => HX.ui(`fold:${id}`) });
+    const r = HX.mapRows(M.board, { view: viewNow(), scope: opt('scope', 'frontier'), milestone: milestoneNow(), q: M.q, owner: HX.owner(), fold: (id) => HX.ui(`fold:${id}`), hidden: hiddenNow() });
     M.rows = r.rows;
     if (M.totals !== r.text) {
       M.totals = r.text;
@@ -297,13 +314,13 @@
     const fits = (c) => clear(span(c), [x(now) - 44, x(now) + 44]) && chips.every((o) => clear(span(c), span(o)));
     // Ending at its line if it can, else starting there.
     const add = (c) => (fits(c) ? chips.push(c) : fits({ ...c, start: true }) ? chips.push({ ...c, start: true, cls: `${c.cls} start` }) : 0);
-    add({ cls: 'finchip', text: code != null ? 'Project complete' : 'Finish', at: x(finish), title: code != null ? `Project complete ${F.dayTime(finish)}: ${TITLE.project.toLowerCase()}` : `Projected finish ${F.dayTime(finish)}` });
-    if (code != null) add({ cls: 'finchip code', text: 'Code complete', at: x(code), title: `Code complete ${F.dayTime(code)}: ${TITLE.code.toLowerCase()}` });
+    if (shown('project')) add({ cls: 'finchip', text: code != null ? 'Project complete' : 'Finish', at: x(finish), title: code != null ? `Project complete ${F.dayTime(finish)}: ${TITLE.project.toLowerCase()}` : `Projected finish ${F.dayTime(finish)}` });
+    if (code != null && shown('code')) add({ cls: 'finchip code', text: 'Code complete', at: x(code), title: `Code complete ${F.dayTime(code)}: ${TITLE.code.toLowerCase()}` });
     const covered = (t) => Math.abs(x(t) - x(now)) <= 56 || chips.some((c) => !clear([x(t) + 4, x(t) + 48], span(c)));
     // The milestones, each a dated line with its title in the strip under the axis, cut to the room before the next
     // one; the one picked in the filter stands out, and its tooltip says when.
     const picked = milestoneNow();
-    const ms = M.board.milestones.map((m, i) => ({ ...m, n: i + 1 })).filter((m) => m.at != null).sort((a, b) => a.at - b.at);
+    const ms = shown('milestone') ? M.board.milestones.map((m, i) => ({ ...m, n: i + 1 })).filter((m) => m.at != null).sort((a, b) => a.at - b.at) : [];
     // Milestones close together keep their order: a chip that would cover the one before moves right, without its
     // marker, and shows only its number when there is no room for its title.
     let end = -Infinity;
@@ -321,9 +338,9 @@
     M.lines = h('div', { class: 'g-lines', style: { left: `${cw}px`, width: `${width}px` } },
       ticks.map((t) => h('i', { style: { left: `${x(t)}px` } })),
       ms.map((m) => h('i', { class: `ms${m.reached ? ' reached' : ''}${m.key === picked ? ' picked' : ''}`, style: { left: `${x(m.at)}px` } })),
-      h('i', { class: 'now', style: { left: `${x(now)}px` } }),
-      code != null ? h('i', { class: 'fin code', style: { left: `${x(code)}px` } }) : null,
-      h('i', { class: 'fin', style: { left: `${x(finish)}px` } }));
+      shown('now') ? h('i', { class: 'now', style: { left: `${x(now)}px` } }) : null,
+      code != null && shown('code') ? h('i', { class: 'fin code', style: { left: `${x(code)}px` } }) : null,
+      shown('project') ? h('i', { class: 'fin', style: { left: `${x(finish)}px` } }) : null);
     const grid = h('div', { class: `grid${ms.length ? ' with-ms' : ''}`, style: { width: `${cw + width}px` } },
       h('div', { class: 'g-head' },
         h('div', { class: 'lab', style: { width: `${cw}px` } }, HX.mapColumnTitle(viewNow()), h('label', { class: 'check wrapc' }, wrapBox, 'Wrap')),
@@ -331,7 +348,7 @@
           // A label the "now" chip or a finish chip would cover is left out; its gridline stays.
           ticks.filter((t) => !covered(t)).map((t) => h('span', { class: 'tick', style: { left: `${x(t)}px` } }, label(t))),
           chips.map((c) => h('span', { class: c.cls, title: c.title, style: { left: `${c.at + 1}px` } }, c.text)),
-          h('span', { class: 'nowchip', style: { left: `${x(now)}px` } }, new Date(now).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })),
+          shown('now') ? h('span', { class: 'nowchip', style: { left: `${x(now)}px` } }, new Date(now).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })) : null,
           ms.length ? h('div', { class: 'msstrip' }, msLabels) : null)),
       h('div', { style: { position: 'relative' } }, M.lines, M.body),
       resize);

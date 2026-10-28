@@ -272,6 +272,11 @@ main { position: relative; z-index: 1; height: calc(100% - var(--top-h)); overfl
 .map .bar1 { display: flex; align-items: center; gap: 10px; padding: 10px 20px 6px; flex-wrap: wrap; }
 .map .legend { display: flex; gap: 16px; padding: 2px 20px 8px; font-size: 12px; color: var(--color-neutral-300); flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .lkey { display: inline-flex; align-items: center; gap: 6px; margin: -2px -6px; padding: 2px 6px; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; cursor: pointer; }
+.legend .lkey:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); color: var(--color-text); }
+.legend .lkey:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.legend .lkey.off { opacity: .45; text-decoration: line-through; }
+.legend .lkey.off i { filter: grayscale(1); }
 .legend i { display: inline-block; width: 16px; height: 8px; border-radius: 2px; }
 .legend i.dash { width: 1px; height: 12px; border-radius: 0; }
 .gantt { flex: 1; min-height: 0; overflow: auto; position: relative; background: var(--ground); box-shadow: inset 0 1px 0 var(--color-divider); }

@@ -28,7 +28,7 @@ interface Rows {
   totals: Record<string, number>;
   text: string;
 }
-type MapRows = (board: Board, o: { view?: string; scope?: string; milestone?: string; q?: string; owner?: string; fold?: (id: string) => string | undefined }) => Rows;
+type MapRows = (board: Board, o: { view?: string; scope?: string; milestone?: string; q?: string; owner?: string; fold?: (id: string) => string | undefined; hidden?: Set<string> }) => Rows;
 
 const page = {} as { HX: { mapRows: MapRows; mapView: (v: string) => string; mapColumnTitle: (v: string) => string } };
 runInNewContext(readFileSync(new URL('../src/app/page/maprows.js', import.meta.url), 'utf8'), page);
@@ -109,4 +109,29 @@ test('a View the page doesn\'t know is Hybrid, and the server migrates the old T
   assert.equal(loadSettings(file).ui!['map.view'], 'epic');
   writeFileSync(file, stringify({ ui: { 'map.view': 'tasks' } }));
   assert.equal(loadSettings(file).ui!['map.view'], 'task');
+});
+
+test('the legend kinds hide their rows: tasks by state, the human tasks, and an item once all its work is hidden', () => {
+  const all = rows({ view: 'task', scope: 'all' });
+  const statusOf = new Map(board.tasks.map((t) => [t.id, t.status]));
+  const doneIds = ids(all, 'task').filter((id) => statusOf.get(id) === 'done');
+  assert.ok(doneIds.length > 0 && doneIds.length < ids(all, 'task').length, 'the fixture has done and open work');
+  const noDone = rows({ view: 'task', scope: 'all', hidden: new Set(['done']) });
+  assert.deepEqual(ids(noDone, 'task'), ids(all, 'task').filter((id) => statusOf.get(id) !== 'done'));
+  assert.equal(noDone.text, all.text, 'the totals count the TaskSet, not what shows');
+  // The human tasks go as one.
+  assert.ok(ids(all, 'human').length > 0);
+  const noHuman = rows({ view: 'task', scope: 'all', hidden: new Set(['human']) });
+  assert.deepEqual(ids(noHuman, 'human'), []);
+  assert.ok(!noHuman.rows.some((r) => r.id === 'lane:human'));
+  // An item whose work is all merged goes with "done"; an item with open work stays, its bar still counting the merged.
+  const features = rows({ view: 'feature', scope: 'all' });
+  const featuresOpen = rows({ view: 'feature', scope: 'all', hidden: new Set(['done']) });
+  const finished = features.rows.filter((r) => r.kind === 'item' && r.roll!.done === r.roll!.total).map((r) => r.id);
+  assert.ok(finished.length > 0);
+  assert.deepEqual(ids(featuresOpen, 'item'), ids(features, 'item').filter((id) => !finished.includes(id)));
+  const partly = featuresOpen.rows.find((r) => r.kind === 'item' && r.roll!.done > 0);
+  assert.ok(partly, 'a feature partly merged still shows its merged share');
+  // Every kind hidden: nothing but nothing.
+  assert.deepEqual(rows({ view: 'hybrid', scope: 'all', hidden: new Set(['done', 'building', 'ready', 'needs', 'human']) }).rows, []);
 });

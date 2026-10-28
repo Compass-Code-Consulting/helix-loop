@@ -33,13 +33,20 @@
     };
   }
 
+  // The legend's kinds of task, which double as filters: as the chart draws them (map.js row).
+  const kindOf = (t) => (t.status === 'done' ? 'done' : t.status === 'claimed' ? 'building' : t.status === 'needs_human' || t.status === 'parked' ? 'needs' : 'ready');
+
   // o: { view, scope ('frontier' | 'all' | 'critical'), milestone (a key, or ''), q (search text), owner,
-  // fold(id) → 'open' | 'closed' | undefined }. Returns the rows in order and the toolbar's totals.
+  // fold(id) → 'open' | 'closed' | undefined, hidden (a Set of the legend's kinds switched off: done, building,
+  // ready, needs, human) }. Returns the rows in order and the toolbar's totals. Hidden kinds take rows away, never
+  // work from an item's bar: an epic still shows how much of it is merged with its merged tasks hidden.
   function mapRows(board, o) {
     const view = viewOf(o.view);
     const scope = o.scope ?? 'frontier';
     const q = (o.q ?? '').trim().toLowerCase();
     const fold = o.fold ?? (() => undefined);
+    const hidden = o.hidden ?? new Set();
+    const visible = (t) => !hidden.has(kindOf(t));
     const byTask = new Map(board.tasks.map((t) => [t.id, t]));
     const items = new Map(board.items.map((i) => [i.id, i]));
     const crit = new Set(board.criticalPath);
@@ -60,15 +67,16 @@
     const nameHits = new Set(q ? board.items.filter(named).map((i) => i.id) : []);
     const above = new Set(q ? board.items.filter((i) => nameHits.has(i.id)).flatMap((i) => chain(i).map((x) => x.id)) : []);
     const covered = (i) => !!q && chain(i).some((x) => nameHits.has(x.id));
-    const showTask = (t, owner) => (q ? hit(t) || covered(owner) : scope === 'critical' ? crit.has(t.id) : scope === 'frontier' ? t.frontier : true);
+    const showTask = (t, owner) => visible(t) && (q ? hit(t) || covered(owner) : scope === 'critical' ? crit.has(t.id) : scope === 'frontier' ? t.frontier : true);
     const roll = new Map();
     const rolled = (i) => {
       if (!roll.has(i.id)) roll.set(i.id, rollup(tasksOf(i)));
       return roll.get(i.id);
     };
-    // An item shows when it has work in the milestone, and matches the search or the critical scope.
+    // An item shows when it has work in the milestone of a kind not hidden, and matches the search or the critical
+    // scope.
     const showItem = (i) => {
-      const ts = tasksOf(i);
+      const ts = tasksOf(i).filter(visible);
       if (!ts.length) return false;
       if (q) return above.has(i.id) || covered(i) || ts.some(hit);
       if (scope === 'critical') return ts.some((t) => crit.has(t.id));
@@ -86,7 +94,7 @@
     const rows = [];
     // People first: the human tasks the build waits on; with a milestone picked, those its work waits on.
     const waitedOn = o.milestone ? new Set(board.tasks.filter(inScope).flatMap((t) => t.waits ?? [])) : undefined;
-    const open = board.human.filter((x) => x.status !== 'done' && (!waitedOn || waitedOn.has(x.id)));
+    const open = hidden.has('human') ? [] : board.human.filter((x) => x.status !== 'done' && (!waitedOn || waitedOn.has(x.id)));
     const humans = open.filter((x) => (q ? x.id.toLowerCase().includes(q) || x.title.toLowerCase().includes(q) : scope === 'all' ? true : scope === 'critical' ? x.critical : x.frontier)).sort((a, b) => b.held - a.held);
     if (humans.length) {
       rows.push({ kind: 'head', id: 'lane:human', text: `Human tasks · ${o.owner ?? 'you'}`, meta: `${humans.length} of ${open.length} open`, human: true });
@@ -137,6 +145,7 @@
 
   HX.mapRows = mapRows;
   HX.mapRollup = rollup;
+  HX.mapKindOf = kindOf;
   HX.mapView = viewOf;
   HX.mapColumnTitle = columnTitle;
   HX.MAP_VIEWS = VIEWS;

@@ -29,6 +29,7 @@ The TaskSet against time, from the projection: the critical path, what is runnin
 - **Milestone:** one milestone's work alone, each item rolled up from it, with the human tasks it waits on; clicking a milestone's title on the timeline does the same.
 
 Pinch on a trackpad to zoom the time scale; Hours, Days and Weeks are presets.
+The legend doubles as filters: click done, building, ready, needs you or human task to hide or show those rows (an item goes once all its work is hidden, its bar still counting the rest), and now, the finish lines or milestone to hide or show those lines; the Map remembers which are off.
 Selecting a task opens its detail: where it sits (Lane › Epic › Feature › Story), its milestone and demo, the placeholder it is built against or wires in, why it stopped, its builder history, its commits on main, its notes.
 Selecting a lane, an epic, a feature or a story shows its outcome or need, its progress and its tasks by state.
 `helix-loop task <id>`, `helix-loop tasks --under <key>` and `helix-loop milestones` show the same; `helix-loop plan map` writes a static version of the chart.
