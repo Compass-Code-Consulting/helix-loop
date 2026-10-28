@@ -13,9 +13,13 @@ my-product/
       index.json         generated: section keys and requirement IDs
       clarifications.md  answers sent from the app, waiting to be folded into the spec
     plan/
-      taskset.yaml       the TaskSet: stages, timelines, lanes and their epics
-      tasks/T-####.yaml  one file per builder task
+      taskset.yaml       the TaskSet: its revision, timelines, and Lane › Epic › Feature › Story
+      milestones.yaml    Helix Milestones: the delivery order, as demoable outcomes
+      tasks/T-####.yaml  one file per builder task, naming its story
       human/HT-##.yaml   one file per human task
+      history/
+        index.yaml       each revision of the TaskSet: when, who, why, and what it added
+        r<N>/            a superseded revision, kept whole: taskset.yaml, milestones.yaml, tasks/, human/
       synthetic-reqs.yaml  requirements the spec states only in prose
       deferred-reqs.yaml   requirements left for later on purpose
       ImplementationPlan.md, HumanImplementationPlan.md, DependencyMap.html
@@ -34,7 +38,7 @@ my-product/
 
 ## What to commit
 
-Commit `config.yaml`, `spec/`, `plan/`, `prompts/` and `helix/` with the project: they are its source, and the loop commits its own plan updates (a task merged, a task waiting on you) into the same repository.
+Commit `config.yaml`, `spec/`, `plan/` (its `history/` too), `prompts/` and `helix/` with the project: they are its source, and the loop commits its own plan updates (a task merged, a task waiting on you) into the same repository.
 `.helix/.gitignore` keeps the rest out.
 
 ## Where the tool's own files are
