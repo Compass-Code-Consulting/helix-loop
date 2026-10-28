@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="947" height="631" viewBox="0 0 947 631" role="img" aria-label="Helix Loop: a double helix beside what Helix Loop does">
+<style>
+.bg{fill:#ffffff;stroke:#d0d7de} g{fill:#6e7781} .p0{fill:#0969da} .p1{fill:#8250df} .p2{fill:#6e7781} .title{fill:#1f2328;font-weight:600} .rule{fill:#8c959f} .key{fill:#953800} .value{fill:#0a3069} .dark{display:none}
+@media (prefers-color-scheme: dark) { .bg{fill:#0d1117;stroke:#30363d} g{fill:#8b949e} .p0{fill:#79c0ff} .p1{fill:#d2a8ff} .p2{fill:#8b949e} .title{fill:#e6edf3;font-weight:600} .rule{fill:#6e7681} .key{fill:#ffa657} .value{fill:#a5d6ff} .light{display:none} .dark{display:inline} }
+</style>
+<rect class="bg" x="0.5" y="0.5" width="946" height="630" rx="12"/>
+<g font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" xml:space="preserve">
+<g class="light">
+<text x="28" y="42"> <tspan class="p1">+hmmds                        </tspan><tspan class="p0">-/oyyhdh-</tspan></text>
+<text x="28" y="59"><tspan class="p1">:mNNNNNo        </tspan><tspan class="p2">--:--::://</tspan><tspan class="p0">//+ossyyhddmNo</tspan></text>
+<text x="28" y="76"> <tspan class="p1">dmNNNNd</tspan><tspan class="p2">++ooosssysyd/o</tspan><tspan class="p0">o+++oossyhhdmmmms </tspan></text>
+<text x="28" y="93"> <tspan class="p1">+mmNNNNN</tspan><tspan class="p2">y++///:</tspan><tspan class="p0">://////+ossyhddmmmhs+   </tspan></text>
+<text x="28" y="110">  <tspan class="p1">smNNNNNNy:</tspan><tspan class="p0">`-://///+osyhddmdyo/:       </tspan></text>
+<text x="28" y="127">   <tspan class="p1">+mNNNNmy</tspan><tspan class="p0">o////+osyhdddy+:             </tspan></text>
+<text x="28" y="144">    <tspan class="p1">-sNd</tspan><tspan class="p0">s////+oyhddmms                  </tspan></text>
+<text x="28" y="161">     <tspan class="p0">-++/+osyhdmm</tspan><tspan class="p2">mmNh                   </tspan></text>
+<text x="28" y="178">   <tspan class="p0">-+ooosyhdmm</tspan><tspan class="p1">mdd</tspan><tspan class="p2">mNNmm</tspan><tspan class="p1">ho/-              </tspan></text>
+<text x="28" y="195">  <tspan class="p0">:oossydmm</tspan><tspan class="p2">ddd</tspan><tspan class="p1">ddddhh</tspan><tspan class="p2">dmNNm</tspan><tspan class="p1">dyso/:         </tspan></text>
+<text x="28" y="212"> <tspan class="p0">:ssyhdmmo</tspan><tspan class="p2">+osyhdddddmhdmmm</tspan><tspan class="p1">ysyyyyso+/    </tspan></text>
+<text x="28" y="229"> <tspan class="p0">syyhdmm/        </tspan><tspan class="p2">-//oydmmmmmddd</tspan><tspan class="p1">yyssyys/ </tspan></text>
+<text x="28" y="246"><tspan class="p0">-yhdmmmh</tspan><tspan class="p2">o++++++++++::++oyysyyyy</tspan><tspan class="p1">ssssyhdm/</tspan></text>
+<text x="28" y="263"><tspan class="p0">:hddmmNh</tspan><tspan class="p2">++ooooooooo::ooosy</tspan><tspan class="p1">so+oossyhdmmm/</tspan></text>
+<text x="28" y="280"> <tspan class="p0">ydmmNNm/    </tspan><tspan class="p2">---:::/</tspan><tspan class="p1">/////++ossyhddmmmy/ </tspan></text>
+<text x="28" y="297"> <tspan class="p0">:dmmNNNm</tspan><tspan class="p2">+oossyo</tspan><tspan class="p1">+//////+osyhddmmhy+/    </tspan></text>
+<text x="28" y="314">  <tspan class="p0">/dmmmmmmm</tspan><tspan class="p2">h</tspan><tspan class="p1">++/////+osyhdddys/:         </tspan></text>
+<text x="28" y="331">   <tspan class="p0">-ymmmmy</tspan><tspan class="p1">+/////+oyhddyo/-              </tspan></text>
+<text x="28" y="348">     <tspan class="p0">/h</tspan><tspan class="p1">s////+osyhdd</tspan><tspan class="p2">mm-                  </tspan></text>
+<text x="28" y="365">    <tspan class="p1">`////+oshddd</tspan><tspan class="p0">hhh</tspan><tspan class="p2">mmh</tspan><tspan class="p0">-                 </tspan></text>
+<text x="28" y="382">   <tspan class="p1">:+++osyddm</tspan><tspan class="p2">mmmmdddmm</tspan><tspan class="p0">hyo+/-            </tspan></text>
+<text x="28" y="399">  <tspan class="p1">/oosshdms- </tspan><tspan class="p0">+ydmm</tspan><tspan class="p2">mmmmddh</tspan><tspan class="p0">yyyso+:-       </tspan></text>
+<text x="28" y="416"> <tspan class="p1">/osyhdmm</tspan><tspan class="p2">yoo++//o</tspan><tspan class="p0">ydddd</tspan><tspan class="p2">ddmmmmh</tspan><tspan class="p0">ssssso+/-  </tspan></text>
+<text x="28" y="433"> <tspan class="p1">ssyhdmd</tspan><tspan class="p2">++oosssyyyyyshhhyyyhyyys</tspan><tspan class="p0">soosyhs </tspan></text>
+<text x="28" y="450"><tspan class="p1">:yhhdmmo         </tspan><tspan class="p2">--- ::/++osy</tspan><tspan class="p0">yoooosyhdm+</tspan></text>
+<text x="28" y="467"><tspan class="p1">-hhdmmmy</tspan><tspan class="p2">//++++oooooo:oo/</tspan><tspan class="p0">////++ossyhdmmd:</tspan></text>
+<text x="28" y="484"> <tspan class="p1">sddmmmm</tspan><tspan class="p2">d+//+/::/:</tspan><tspan class="p0">::://///+osyhhdmmdy+  </tspan></text>
+<text x="28" y="501">  <tspan class="p1">ydmmmmmd/  </tspan><tspan class="p0">--:://///++osyhddhso/-     </tspan></text>
+<text x="28" y="518">   <tspan class="p1">ymmmmmmh</tspan><tspan class="p0">+///////+oshhdyo+:           </tspan></text>
+<text x="28" y="535">    <tspan class="p1">+dmmh</tspan><tspan class="p0">+/////+osyhdh+:                </tspan></text>
+<text x="28" y="552">      <tspan class="p1">odh</tspan><tspan class="p0">///+oyhdd</tspan><tspan class="p2">mmo                   </tspan></text>
+<text x="28" y="569">        <tspan class="p1">/s</tspan><tspan class="p0">syhdd</tspan><tspan class="p1">h</tspan><tspan class="p2">hmmmds</tspan><tspan class="p1">+:                </tspan></text>
+<text x="28" y="586">          <tspan class="p1">-+yddhhysy</tspan><tspan class="p2">hmmd</tspan><tspan class="p1">ho+/:           </tspan></text>
+<text x="28" y="603">              <tspan class="p1">/shdhhyy</tspan><tspan class="p2">hmN</tspan><tspan class="p1">s++ydd+        </tspan></text>
+</g>
+<g class="dark">
+<text x="28" y="42"> <tspan class="p1">--````                        </tspan><tspan class="p0">:/+oo+/-.</tspan></text>
+<text x="28" y="59"><tspan class="p1">`:-`````        </tspan><tspan class="p2">``-`-//+++</tspan><tspan class="p0">+osyyyso+/:--`</tspan></text>
+<text x="28" y="76"> <tspan class="p1">::--`-:</tspan><tspan class="p2">ssssysyysss:+h</tspan><tspan class="p0">hdddhhysoo+/:---` </tspan></text>
+<text x="28" y="93"> <tspan class="p1">`:---`--</tspan><tspan class="p2">```....</tspan><tspan class="p0">:oydmNmdhyso+/::---``   </tspan></text>
+<text x="28" y="110">  <tspan class="p1">`-------`.</tspan><tspan class="p0">-+ymNNNmdhyo+/::--``.       </tspan></text>
+<text x="28" y="127">   <tspan class="p1">`-----:o</tspan><tspan class="p0">hmNNNmhys+/::-``             </tspan></text>
+<text x="28" y="144">    <tspan class="p1">.`-/</tspan><tspan class="p0">ymNNmdhso/::-`                  </tspan></text>
+<text x="28" y="161">     <tspan class="p0">/ydmmhys+/::</tspan><tspan class="p2">-:--                   </tspan></text>
+<text x="28" y="178">   <tspan class="p0">-yhhhys+/::</tspan><tspan class="p1">://</tspan><tspan class="p2">----:</tspan><tspan class="p1">::-.              </tspan></text>
+<text x="28" y="195">  <tspan class="p0">:yhyso/::</tspan><tspan class="p2">///</tspan><tspan class="p1">////++</tspan><tspan class="p2">/---:</tspan><tspan class="p1">/+/:-`         </tspan></text>
+<text x="28" y="212"> <tspan class="p0">:yyso/:-`</tspan><tspan class="p2">``--:::///:+/::-</tspan><tspan class="p1">ssssoo+/:-    </tspan></text>
+<text x="28" y="229"> <tspan class="p0">oso+:--`        </tspan><tspan class="p2">...``--::::///</tspan><tspan class="p1">osssso/` </tspan></text>
+<text x="28" y="246"><tspan class="p0">`o+/:--+</tspan><tspan class="p2">sssssssssss/-ssoossssss</tspan><tspan class="p1">yyyso+/:.</tspan></text>
+<text x="28" y="263"><tspan class="p0">`+/:----</tspan><tspan class="p2">``---------``--:+s</tspan><tspan class="p1">yhdhhyso+/::-.</tspan></text>
+<text x="28" y="280"> <tspan class="p0">//:----.    </tspan><tspan class="p2">`-:/+o+</tspan><tspan class="p1">yhmNmmdhyso+/:::--. </tspan></text>
+<text x="28" y="297"> <tspan class="p0">`::----:</tspan><tspan class="p2">ssssssy</tspan><tspan class="p1">dmNNNNmdhyso+/::--``    </tspan></text>
+<text x="28" y="314">  <tspan class="p0">`-:---:::</tspan><tspan class="p2">:</tspan><tspan class="p1">ohNNNNNmhyso//:--`.         </tspan></text>
+<text x="28" y="331">   <tspan class="p0">.---::o</tspan><tspan class="p1">dNNNNmdyso//--`.              </tspan></text>
+<text x="28" y="348">     <tspan class="p0">.:</tspan><tspan class="p1">ymNNmmhyo+/:</tspan><tspan class="p2">:-.                  </tspan></text>
+<text x="28" y="365">    <tspan class="p1">-ymmmdhso/:/</tspan><tspan class="p0">+++</tspan><tspan class="p2">:--</tspan><tspan class="p0">.                 </tspan></text>
+<text x="28" y="382">   <tspan class="p1">+dddhyo/::</tspan><tspan class="p2">::::/+/:-</tspan><tspan class="p0">+o/:-.            </tspan></text>
+<text x="28" y="399">  <tspan class="p1">shhyso/:-. </tspan><tspan class="p0">.`-::</tspan><tspan class="p2">::-::+o</tspan><tspan class="p0">osso+/:`       </tspan></text>
+<text x="28" y="416"> <tspan class="p1">+yyso/::</tspan><tspan class="p2">oooo+++/</tspan><tspan class="p0">/////</tspan><tspan class="p2">//:---+</tspan><tspan class="p0">yyyyso+:.  </tspan></text>
+<text x="28" y="433"> <tspan class="p1">sso+::-</tspan><tspan class="p2">``--::::///+`+ooooooosss</tspan><tspan class="p0">yhyys+- </tspan></text>
+<text x="28" y="450"><tspan class="p1">-oo+:::`         </tspan><tspan class="p2">`-` :://+++o</tspan><tspan class="p0">syhhhys+/:`</tspan></text>
+<text x="28" y="467"><tspan class="p1">`++/:--+</tspan><tspan class="p2">yhhhhhhhhhh++hdm</tspan><tspan class="p0">NNNmmdhyso+/::-.</tspan></text>
+<text x="28" y="484"> <tspan class="p1">://:--:</tspan><tspan class="p2">:--`````.-</tspan><tspan class="p0">oydNNNNmdhyso+/:::-`  </tspan></text>
+<text x="28" y="501">  <tspan class="p1">::::----`  </tspan><tspan class="p0">-+hmNNNNmmdyso+/::--`.     </tspan></text>
+<text x="28" y="518">   <tspan class="p1">-::::::o</tspan><tspan class="p0">hmNNNNNmdhso+/:-``           </tspan></text>
+<text x="28" y="535">    <tspan class="p1">`-::+</tspan><tspan class="p0">dNNNNmdhso+/:-`                </tspan></text>
+<text x="28" y="552">      <tspan class="p1">`-+</tspan><tspan class="p0">NNmdys+/:</tspan><tspan class="p2">::`                   </tspan></text>
+<text x="28" y="569">        <tspan class="p1">.:</tspan><tspan class="p0">so+//</tspan><tspan class="p1">+</tspan><tspan class="p2">+:::::</tspan><tspan class="p1">:-                </tspan></text>
+<text x="28" y="586">          <tspan class="p1">.`-:/+ooys</tspan><tspan class="p2">+:-/</tspan><tspan class="p1">oo+/-           </tspan></text>
+<text x="28" y="603">              <tspan class="p1">.`:/+oss</tspan><tspan class="p2">+--</tspan><tspan class="p1">smds/-`        </tspan></text>
+</g>
+<text class="title" x="397.6" y="169.5">helix@loop</text>
+<text class="rule" x="397.6" y="186.5">──────────────</text>
+<text x="397.6" y="203.5"><tspan class="key">Builds:</tspan><tspan class="value" x="498.40000000000003">"a product from its spec, while you steer"</tspan></text>
+<text x="397.6" y="220.5"><tspan class="key">Agents:</tspan><tspan class="value" x="498.40000000000003">"Claude Code and Codex, in parallel"</tspan></text>
+<text x="397.6" y="237.5"><tspan class="key">Plan.Scope:</tspan><tspan class="value" x="498.40000000000003">"Lane › Epic › Feature › Story › Task"</tspan></text>
+<text x="397.6" y="254.5"><tspan class="key">Plan.Order:</tspan><tspan class="value" x="498.40000000000003">"Helix Milestones, earliest first"</tspan></text>
+<text x="397.6" y="271.5"><tspan class="key">Pass:</tspan><tspan class="value" x="498.40000000000003">"one task, one agent, one git worktree"</tspan></text>
+<text x="397.6" y="288.5"><tspan class="key">Gate:</tspan><tspan class="value" x="498.40000000000003">"the repository's full check, before every merge"</tspan></text>
+<text x="397.6" y="305.5"><tspan class="key">Pacing:</tspan><tspan class="value" x="498.40000000000003">"every subscription lasts the week"</tspan></text>
+<text x="397.6" y="322.5"><tspan class="key">Pilot:</tspan><tspan class="value" x="498.40000000000003">"Cautious · Prudent · Intrepid · YOLO"</tspan></text>
+<text x="397.6" y="339.5"><tspan class="key">Steer:</tspan><tspan class="value" x="498.40000000000003">"the app, or the helix-loop CLI"</tspan></text>
+<text x="397.6" y="356.5"><tspan class="key">Runtime:</tspan><tspan class="value" x="498.40000000000003">"Node 26 and git"</tspan></text>
+<text class="title" x="397.6" y="390.5">Get started</text>
+<text class="rule" x="397.6" y="407.5">──────────────</text>
+<text x="397.6" y="424.5"><tspan class="key">Install:</tspan><tspan class="value" x="498.40000000000003">"./scripts/install.sh"</tspan></text>
+<text x="397.6" y="441.5"><tspan class="key">Plan:</tspan><tspan class="value" x="498.40000000000003">"/helix spec › /helix taskset › /helix milestones"</tspan></text>
+<text x="397.6" y="458.5"><tspan class="key">Check:</tspan><tspan class="value" x="498.40000000000003">"helix-loop doctor"</tspan></text>
+<text x="397.6" y="475.5"><tspan class="key">Run:</tspan><tspan class="value" x="498.40000000000003">"helix-loop run"</tspan></text>
+</g>
+</svg>

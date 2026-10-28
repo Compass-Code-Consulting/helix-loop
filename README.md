@@ -1,3 +1,5 @@
+![Helix Loop: a double helix beside a card of what Helix Loop does](docs/assets/banner.svg)
+
 # Helix Loop
 
 Build a product from a spec with headless coding agents, Claude Code and Codex, in a loop you steer.
