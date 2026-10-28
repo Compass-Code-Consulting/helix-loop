@@ -33,6 +33,7 @@ export interface BoardTask {
   projected: boolean;
   fails: number[]; // when each failed attempt ended
   attempts: number; // counted attempts
+  failing?: boolean; // open, and its last attempt failed
   waits?: string[]; // what it waits on that needs a person: open human tasks, tasks that need you
   held?: number; // open tasks waiting on it, directly or not (waiting items only)
   frontier: boolean;
@@ -215,6 +216,7 @@ export function buildBoard(input: BoardInput): Board & { projection: Projection;
       projected: t.status !== 'done',
       fails: fails.get(t.id) ?? [],
       attempts: countedAttempts(t),
+      ...(lastFailed ? { failing: true } : {}),
       ...(waits.length ? { waits } : {}),
       ...(isWaiting ? { held: downstream(plan, dependents, t.id).size } : {}),
       frontier: runningIds.has(t.id) || t.status === 'claimed' || isWaiting || lastFailed || nextUp,

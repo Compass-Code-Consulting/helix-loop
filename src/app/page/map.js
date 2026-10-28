@@ -1,9 +1,10 @@
-// The Map (spec §6.4): lanes, epics and tasks against time, drawn by the page from the server's board. Hybrid
-// folds finished epics and those with nothing on the frontier; the Frontier scope opens only what is running,
-// next, failing or waiting on a person, so thousands of tasks read as a few dozen rows. Folds, Wrap and the task
-// column's width are kept in .helix/app.yaml, as is the time scale: Hours, Days and Weeks are presets, and a pinch on a
-// trackpad zooms the scale between them and beyond, around the time under the pointer. Rows are drawn only where
-// the view can see them.
+// The Map (spec §6.4): the TaskSet against time, drawn by the page from the server's board. The View picks the level,
+// Lane › Epic › Feature › Story › Task, or Hybrid, which nests them with folds: finished items and those with nothing
+// on the frontier fold, and the Frontier scope opens only what is running, next, failing or waiting on a person, so
+// thousands of tasks read as a few dozen rows (maprows.js decides the rows). Each milestone is a dated line across
+// the chart, and the Milestone filter keeps its work alone. Folds, Wrap and the task column's width are kept in
+// .helix/app.yaml, as is the time scale: Hours, Days and Weeks are presets, and a pinch on a trackpad zooms the scale
+// between them and beyond, around the time under the pointer. Rows are drawn only where the view can see them.
 (() => {
   'use strict';
   const { h, fill, F, S } = HX;
@@ -54,6 +55,10 @@
   const presetOf = (px) => Object.keys(PX).find((k) => Math.abs(PX[k] / px - 1) < 0.01) ?? null;
   let B;
   function build() {
+    // A new chart opens with "now" in view, however the last one was scrolled.
+    M.axis = undefined;
+    M.body = null;
+    M.placedAt = undefined;
     B = {
       tools: h('div', { class: 'bar1' }),
       legend: h('div', { class: 'legend' },
@@ -62,7 +67,7 @@
         h('span', null, h('i', { style: { boxShadow: 'inset 0 0 0 1px var(--color-neutral-500)' } }), '○ ready'),
         h('span', null, h('i', { style: { border: '1.5px dashed var(--crit)' } }), '! needs you'),
         h('span', null, h('i', { style: { background: 'repeating-linear-gradient(135deg,var(--warn) 0 3px,transparent 3px 6px)' } }), 'human task'),
-        h('span', null, '▸ folded epic: green share is merged'),
+        h('span', null, '▸ folded: green share is merged'),
         h('span', null, h('i', { style: { width: '1px', height: '12px', background: 'var(--color-text)' } }), 'now')),
       gantt: h('div', { class: 'gantt' }),
       panel: h('aside', { class: `panel${opt('panel', true) === false ? ' closed' : ''}`, 'aria-label': 'Detail' }),
@@ -77,8 +82,16 @@
     renderPanel();
   }
 
+  const VIEW_LABELS = [['lane', 'Lane'], ['epic', 'Epic'], ['feature', 'Feature'], ['story', 'Story'], ['task', 'Task'], ['hybrid', 'Hybrid']];
+  const viewNow = () => HX.mapView(opt('view', 'hybrid'));
+  // The milestone filter, while the board still has it.
+  const milestoneNow = () => {
+    const k = opt('milestone', '');
+    return M.board?.milestones.some((m) => m.key === k) ? k : '';
+  };
+
   function renderTools() {
-    const search = h('input', { class: 'input search', placeholder: 'Find a task, epic or commit', value: M.q, 'aria-label': 'Find' });
+    const search = h('input', { class: 'input search', placeholder: 'Find a task, story, feature or commit', value: M.q, 'aria-label': 'Find' });
     search.oninput = () => {
       M.q = search.value.trim();
       layout();
@@ -89,11 +102,22 @@
         if (hit) select(hit.id);
       }
     };
+    const ms = M.board?.milestones ?? [];
+    const pick = h('select', { class: 'input msel', 'aria-label': 'Milestone', title: 'Show one milestone\'s work' },
+      h('option', { value: '' }, 'All milestones'),
+      ms.map((m, i) => h('option', { value: m.key, selected: m.key === milestoneNow() }, `${i + 1}. ${m.title}${m.reached ? ' ✓' : ''}`)));
+    pick.onchange = () => {
+      HX.setUi('map.milestone', pick.value);
+      renderTools();
+      layout();
+    };
     fill(B.tools,
       h('span', { class: 'muted' }, 'View'),
-      HX.seg([['tasks', 'Tasks'], ['epics', 'Epics'], ['hybrid', 'Hybrid']], opt('view', 'hybrid'), (v) => { HX.setUi('map.view', v); renderTools(); layout(); }),
+      HX.seg(VIEW_LABELS, viewNow(), (v) => { HX.setUi('map.view', v); renderTools(); layout(); }),
       HX.seg([['frontier', 'Frontier'], ['all', 'All'], ['critical', 'Critical path']], opt('scope', 'frontier'), (v) => { HX.setUi('map.scope', v); renderTools(); layout(); }),
+      ms.length ? pick : null,
       search,
+      M.totals ? h('span', { class: 'totals', title: milestoneNow() ? 'In the milestone picked' : 'In the TaskSet' }, M.totals) : null,
       h('span', { class: 'grow' }),
       HX.seg([['hours', 'Hours'], ['days', 'Days'], ['weeks', 'Weeks']], presetOf(pxNow()), (v) => { HX.setUi('map.scale', v); HX.setUi('map.px', PX[v]); renderTools(); layout(true); }, 'scaleseg'),
       HX.btn('Export', HX.act(async () => { await HX.post('/api/export', { what: 'map' }); HX.toast('Exporting the static map (helix-loop map)…'); }), 'btn-ghost'));
@@ -108,75 +132,40 @@
     B.legend.append(...(M.board.codeFinish != null
       ? [key('var(--color-accent)', 'code complete', TITLE.code), key('var(--crit)', 'project complete', TITLE.project)]
       : [key('var(--crit)', 'projected finish')]));
-    if (M.board.derivedEpics) B.legend.append(h('span', { class: 'derived muted', style: { marginLeft: 'auto' }, title: '.helix/plan/taskset.yaml does not exist yet: the epics are one per lane and feature. Settings › Spec and TaskSet writes them down.' }, 'Epics derived from features'));
+    if (M.board.milestones.length) B.legend.append(h('span', { class: 'finkey', title: 'When each milestone was reached, or is projected to be' }, h('i', { class: 'dash', style: { background: 'repeating-linear-gradient(to bottom, var(--ms) 0 2px, transparent 2px 4px)' } }), 'milestone'));
+    if (M.board.unplaced.length) B.legend.append(h('span', { class: 'derived t-warn', style: { marginLeft: 'auto' }, title: 'They name a story .helix/plan/taskset.yaml does not declare: helix-loop validate lists them' }, `${F.plural(M.board.unplaced.length, 'task')} not in the TaskSet`));
     M.byId = new Map([...M.board.tasks, ...M.board.human.map((x) => ({ ...x, kind: 'human' }))].map((t) => [t.id, t]));
-    M.epicById = new Map(M.board.epics.map((e) => [e.id, e]));
-    renderTools();
+    M.itemById = new Map(M.board.items.map((i) => [i.id, i]));
     layout();
     if (M.sel && !M.detail) loadDetail();
     else if (!M.sel) renderPanel(); // its legend note names the finish lines the board has
   }
 
   // ---- which rows show ----
-  function folded(e, view, scope) {
-    const manual = HX.ui(`fold:${e.id}`);
-    if (manual === 'open') return false;
-    if (manual === 'closed') return true;
-    if (view === 'epics') return true;
-    if (view === 'tasks') return false;
-    if (scope === 'all') return e.done === e.tasks.length;
-    return e.done === e.tasks.length || !e.frontier;
-  }
-
   function layout(keepScroll) {
     if (!M.board) return;
-    const view = opt('view', 'hybrid');
-    const scope = opt('scope', 'frontier');
-    const q = M.q.toLowerCase();
-    const crit = new Set(M.board.criticalPath);
-    // A task by its id, its title, or the commit it merged as.
-    const match = (t) => !q || t.id.toLowerCase().includes(q) || t.title.toLowerCase().includes(q) || (q.length >= 6 && /^[0-9a-f]+$/.test(q) && t.commit?.startsWith(q));
-    const show = (t) => (q ? match(t) : scope === 'critical' ? crit.has(t.id) : scope === 'frontier' ? t.frontier : true);
-    const rows = [];
-    // People first: the human tasks the build waits on.
-    const humans = M.board.human.filter((x) => x.status !== 'done' && (q ? match(x) : scope === 'all' ? true : scope === 'critical' ? x.critical : x.frontier)).sort((a, b) => b.held - a.held);
-    if (humans.length) {
-      rows.push({ kind: 'lane', id: 'lane:human', text: `Human tasks · ${HX.owner()}`, meta: `${humans.length} of ${M.board.human.filter((x) => x.status !== 'done').length} open`, color: 'var(--warn)' });
-      for (const x of humans) rows.push({ kind: 'human', id: x.id, t: x });
+    const r = HX.mapRows(M.board, { view: viewNow(), scope: opt('scope', 'frontier'), milestone: milestoneNow(), q: M.q, owner: HX.owner(), fold: (id) => HX.ui(`fold:${id}`) });
+    M.rows = r.rows;
+    if (M.totals !== r.text) {
+      M.totals = r.text;
+      renderTools();
     }
-    for (const l of M.board.lanes) {
-      const laneRows = [];
-      for (const eid of l.epics) {
-        const e = M.epicById.get(eid);
-        const ts = e.tasks.map((id) => M.byId.get(id)).filter(Boolean);
-        const hits = ts.filter(show);
-        const epicMatch = q && e.title.toLowerCase().includes(q);
-        if (q && !hits.length && !epicMatch) continue;
-        if (scope === 'critical' && !hits.length) continue;
-        const isFolded = q ? false : folded(e, view, scope);
-        laneRows.push({ kind: 'epic', id: e.id, e, folded: isFolded });
-        if (!isFolded) for (const t of epicMatch && !hits.length ? ts : hits) laneRows.push({ kind: 'task', id: t.id, t });
-      }
-      if (!laneRows.length) continue;
-      rows.push({ kind: 'lane', id: `lane:${l.name}`, text: l.name, meta: `${Math.round((l.done / Math.max(1, l.total)) * 100)}%`, color: HX.laneColor(l.name) ?? 'var(--color-accent)' });
-      rows.push(...laneRows);
-    }
-    M.rows = rows;
     // The time axis: from the first visible bar (at most four weeks back) to the projected finish.
     const now = M.board.now;
-    const bars = rows.flatMap((r) => (r.t ? [r.t.start ?? r.t.expectedDone, r.t.end ?? r.t.expectedDone] : r.e ? [r.e.start, r.e.end] : [])).filter((x) => x != null);
+    const bars = M.rows.flatMap((x) => (x.t ? [x.t.start ?? x.t.expectedDone, x.t.end ?? x.t.expectedDone] : x.roll ? [x.roll.start, x.roll.end] : [])).filter((v) => v != null);
     const t0 = Math.max(Math.min(now - 86_400_000, ...bars), now - 28 * 86_400_000);
     const t1 = Math.max(now + 2 * 86_400_000, M.board.finish, ...bars) + 86_400_000;
     const start = new Date(new Date(t0).toDateString()).getTime();
+    // The time at the chart's left edge stays there: another view, scope or filter can start the axis elsewhere.
+    const was = M.axis ? M.axis.start + B.gantt.scrollLeft / M.axis.px : undefined;
     M.axis = { start, end: t1, px: pxNow() };
-    const was = B.gantt.scrollLeft;
     drawGrid();
-    if (!keepScroll && !M.scrolledOnce) {
-      // Open with "now" a little in from the left of the chart.
+    // Open with "now" a little in from the left of the chart, and again when the scale it was placed at changes (the
+    // saved scale arrives with the page's state, after a first layout at the default one).
+    if (keepScroll || was === undefined || M.placedAt !== M.axis.px) {
       B.gantt.scrollLeft = Math.max(0, x(now) - 160);
-      M.scrolledOnce = true;
-    } else if (keepScroll) B.gantt.scrollLeft = Math.max(0, x(now) - 160);
-    else B.gantt.scrollLeft = was;
+      M.placedAt = M.axis.px;
+    } else B.gantt.scrollLeft = Math.max(0, (was - start) * M.axis.px);
     if (M.reveal) reveal(M.reveal);
   }
 
@@ -196,6 +185,7 @@
       const off = Math.max(cw, Math.min(r.width, at - r.left));
       const t = M.axis.start + (B.gantt.scrollLeft + off - cw) / M.axis.px;
       M.axis.px = px;
+      M.placedAt = px; // the pinch keeps the time under the pointer: it is no reason to jump back to now
       HX.setUi('map.px', px);
       drawGrid();
       B.gantt.scrollLeft = Math.max(0, cw + (t - M.axis.start) * px - off);
@@ -310,20 +300,39 @@
     add({ cls: 'finchip', text: code != null ? 'Project complete' : 'Finish', at: x(finish), title: code != null ? `Project complete ${F.dayTime(finish)}: ${TITLE.project.toLowerCase()}` : `Projected finish ${F.dayTime(finish)}` });
     if (code != null) add({ cls: 'finchip code', text: 'Code complete', at: x(code), title: `Code complete ${F.dayTime(code)}: ${TITLE.code.toLowerCase()}` });
     const covered = (t) => Math.abs(x(t) - x(now)) <= 56 || chips.some((c) => !clear([x(t) + 4, x(t) + 48], span(c)));
+    // The milestones, each a dated line with its title in the strip under the axis, cut to the room before the next
+    // one; the one picked in the filter stands out, and its tooltip says when.
+    const picked = milestoneNow();
+    const ms = M.board.milestones.map((m, i) => ({ ...m, n: i + 1 })).filter((m) => m.at != null).sort((a, b) => a.at - b.at);
+    // Milestones close together keep their order: a chip that would cover the one before moves right, without its
+    // marker, and shows only its number when there is no room for its title.
+    let end = -Infinity;
+    const msLabels = ms.map((m, i) => {
+      const at = x(m.at);
+      const left = Math.max(at, end + 4);
+      const room = (i + 1 < ms.length ? x(ms[i + 1].at) : width) - left - 8;
+      const titled = room > 60;
+      end = left + (titled ? Math.min(room, m.title.length * 6.2 + 30) : 22);
+      const when = `${m.reached ? 'Reached' : 'Projected'} ${F.dayTime(m.at)}`;
+      return h('span', { class: `mschip${m.reached ? ' reached' : ''}${m.key === picked ? ' picked' : ''}${left > at + 1 ? ' moved' : ''}`, style: { left: `${left}px`, maxWidth: `${titled ? room : 22}px` }, title: `${m.n}. ${m.title}\n${when}\nDemo: ${m.demo}`, onclick: () => { HX.setUi('map.milestone', m.key === picked ? '' : m.key); renderTools(); layout(); } },
+        h('b', null, String(m.n)), titled ? h('span', null, m.title) : null);
+    });
     M.body = h('div', { style: { position: 'relative' } });
     M.lines = h('div', { class: 'g-lines', style: { left: `${cw}px`, width: `${width}px` } },
       ticks.map((t) => h('i', { style: { left: `${x(t)}px` } })),
+      ms.map((m) => h('i', { class: `ms${m.reached ? ' reached' : ''}${m.key === picked ? ' picked' : ''}`, style: { left: `${x(m.at)}px` } })),
       h('i', { class: 'now', style: { left: `${x(now)}px` } }),
       code != null ? h('i', { class: 'fin code', style: { left: `${x(code)}px` } }) : null,
       h('i', { class: 'fin', style: { left: `${x(finish)}px` } }));
-    const grid = h('div', { class: 'grid', style: { width: `${cw + width}px` } },
+    const grid = h('div', { class: `grid${ms.length ? ' with-ms' : ''}`, style: { width: `${cw + width}px` } },
       h('div', { class: 'g-head' },
-        h('div', { class: 'lab', style: { width: `${cw}px` } }, 'Lane › epic › task', h('label', { class: 'check wrapc' }, wrapBox, 'Wrap')),
+        h('div', { class: 'lab', style: { width: `${cw}px` } }, HX.mapColumnTitle(viewNow()), h('label', { class: 'check wrapc' }, wrapBox, 'Wrap')),
         h('div', { class: 'axis', style: { width: `${width}px` } },
           // A label the "now" chip or a finish chip would cover is left out; its gridline stays.
           ticks.filter((t) => !covered(t)).map((t) => h('span', { class: 'tick', style: { left: `${x(t)}px` } }, label(t))),
           chips.map((c) => h('span', { class: c.cls, title: c.title, style: { left: `${c.at + 1}px` } }, c.text)),
-          h('span', { class: 'nowchip', style: { left: `${x(now)}px` } }, new Date(now).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })))),
+          h('span', { class: 'nowchip', style: { left: `${x(now)}px` } }, new Date(now).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })),
+          ms.length ? h('div', { class: 'msstrip' }, msLabels) : null)),
       h('div', { style: { position: 'relative' } }, M.lines, M.body),
       resize);
     B.gantt.replaceChildren(grid);
@@ -340,8 +349,10 @@
     const viewH = B.gantt.clientHeight || 800;
     const from = wrap ? 0 : Math.max(0, Math.floor(top / ROW) - 20);
     const to = wrap ? n : Math.min(n, Math.ceil((top + viewH) / ROW) + 20);
-    if (!force && M.drawn && M.drawn.from === from && M.drawn.to === to && M.drawn.v === liveStamp()) return;
-    M.drawn = { from, to, v: liveStamp() };
+    // Sideways scrolling moves the item bars' labels into view, a step at a time.
+    const left = Math.round(B.gantt.scrollLeft / 48);
+    if (!force && M.drawn && M.drawn.from === from && M.drawn.to === to && M.drawn.left === left && M.drawn.v === liveStamp()) return;
+    M.drawn = { from, to, left, v: liveStamp() };
     M.body.style.height = wrap ? '' : `${n * ROW}px`;
     M.lines.style.height = wrap ? '' : `${n * ROW}px`;
     const frag = M.rows.slice(from, to).map((r, i) => {
@@ -354,26 +365,42 @@
   }
   const liveStamp = () => (S.state?.live ?? []).map((p) => `${p.task}${p.phase}${p.progress ?? ''}`).join('|');
 
+  // Each level's indent in the label column: lanes, then epics, features, stories and tasks.
+  const INDENT = [14, 26, 38, 50, 62];
+  const LEVEL = { lane: 'Lane', epic: 'Epic', feature: 'Feature', story: 'Story' };
+
   function row(r) {
     const cw = colW();
     const track = h('div', { class: 'g-track', style: { width: `${x(M.axis.end)}px` } });
-    if (r.kind === 'lane') {
-      return h('div', { class: 'g-row lane' }, h('div', { class: 'g-lab', style: { width: `${cw}px`, color: r.color, paddingLeft: '14px' } }, h('span', { class: 'tx' }, r.text), h('span', { class: 'meta' }, r.meta)), track);
+    if (r.kind === 'head') {
+      const color = r.human ? 'var(--warn)' : (HX.laneColor(r.item.repo) ?? 'var(--color-accent)');
+      return h('div', { class: 'g-row lane' }, h('div', { class: 'g-lab', style: { width: `${cw}px`, color, paddingLeft: '14px' } }, h('span', { class: 'tx' }, r.text), h('span', { class: 'meta' }, r.meta)), track);
     }
-    if (r.kind === 'epic') {
-      const e = r.e;
-      const done = e.done === e.tasks.length;
-      const label = h('button', { type: 'button', class: 'g-lab', style: { width: `${cw}px`, paddingLeft: '22px' }, 'aria-expanded': String(!r.folded), onclick: () => {
-        HX.setUi(`fold:${e.id}`, r.folded ? 'open' : 'closed');
-        layout();
+    if (r.kind === 'item') {
+      const i = r.item;
+      const e = r.roll;
+      const done = e.done === e.total;
+      const foldable = r.folded !== undefined;
+      const sel = M.sel === `item:${i.id}`;
+      const lane = i.level === 'lane';
+      const glyph = done ? '✓' : foldable ? (r.folded ? '▸' : '▾') : e.running ? '◐' : '';
+      const label = h('button', { type: 'button', class: 'g-lab', style: { width: `${cw}px`, paddingLeft: `${INDENT[r.depth] ?? 14}px`, ...(lane ? { color: HX.laneColor(i.repo) ?? 'var(--color-accent)' } : {}) }, 'aria-expanded': foldable ? String(!r.folded) : null, title: trailText(i), onclick: () => {
+        if (foldable) {
+          HX.setUi(`fold:${i.id}`, r.folded ? 'open' : 'closed');
+          layout();
+        } else selectItem(i);
       } },
-      h('span', { class: `gl ${done ? 'ok' : ''}` }, done ? '✓' : r.folded ? '▸' : '▾'), h('span', { class: 'tx' }, e.title), h('span', { class: 'meta' }, e.running ? '◐' : e.failing ? '!' : ''));
+      h('span', { class: `gl ${done ? 'ok' : ''}` }, glyph), h('span', { class: 'tx' }, i.title), h('span', { class: 'meta' }, foldable && e.running ? '◐' : e.failing ? '!' : ''));
       if (e.start != null && e.end != null) {
-        const p = e.done / Math.max(1, e.tasks.length);
-        const meta = `${done ? '✓ ' : ''}${e.done}/${e.tasks.length}${e.waitsOn && !done ? ` · waits ${e.waitsOn}` : ''}`;
-        track.append(h('div', { class: `g-bar epic ${done ? 'done' : 'prog'}`, style: { left: `${x(e.start)}px`, width: `${Math.max(14, x(e.end) - x(e.start))}px`, '--p': `${p * 100}%` }, title: `${e.title}: ${e.done} of ${e.tasks.length} merged`, onclick: () => selectEpic(e) }, meta));
+        const p = e.done / Math.max(1, e.total);
+        const meta = `${done ? '✓ ' : ''}${e.done}/${e.total}${e.waitsOn && !done ? ` · waits ${e.waitsOn}` : ''}`;
+        const bl = x(e.start);
+        const bw = Math.max(done ? 16 : 8 + meta.length * 6, x(e.end) - bl);
+        // Its label starts where the bar comes into view, so a bar begun weeks ago still says how far it has got.
+        const inset = Math.max(0, Math.min(B.gantt.scrollLeft - bl, bw - meta.length * 6 - 10));
+        track.append(h('div', { class: `g-bar item ${done ? 'done' : 'prog'}${sel ? ' sel' : ''}`, style: { left: `${bl}px`, width: `${bw}px`, paddingLeft: `${5 + inset}px`, '--p': `${p * 100}%` }, title: `${i.title}: ${e.done} of ${e.total} merged${done ? '' : `, projected to finish ${F.dayTime(e.end)}`}`, onclick: () => selectItem(i) }, meta));
       }
-      return h('div', { class: `g-row epic${done ? ' done' : ''}` }, label, track);
+      return h('div', { class: `g-row item ${i.level}${done ? ' done' : ''}${sel ? ' sel' : ''}` }, label, track);
     }
     const t = r.t;
     const human = r.kind === 'human';
@@ -381,7 +408,7 @@
     const st = human ? 'human' : t.status === 'done' ? 'done' : t.status === 'claimed' ? 'run' : t.status === 'needs_human' || t.status === 'parked' ? 'need' : t.waits?.length ? 'blocked' : 'ready';
     const glyph = { human: ['◆', t.late ? 'crit' : 'warn'], done: ['✓', 'ok'], run: ['◐', 'acc'], need: ['!', 'crit'], blocked: ['○', ''], ready: ['○', ''] }[st];
     const sel = M.sel === t.id;
-    const label = h('button', { type: 'button', class: 'g-lab', style: { width: `${cw}px`, paddingLeft: human ? '22px' : '40px' }, 'data-jk': '', onclick: () => select(t.id) },
+    const label = h('button', { type: 'button', class: 'g-lab', style: { width: `${cw}px`, paddingLeft: human ? '26px' : `${INDENT[r.depth] ?? 26}px` }, 'data-jk': '', onclick: () => select(t.id) },
       h('span', { class: `gl ${glyph[1]}` }, glyph[0]), h('span', { class: 'id' }, t.id), h('span', { class: 'tx', title: t.title }, t.title),
       h('span', { class: 'meta' }, human ? `holds ${t.held}` : live ? `(${HX.BADGE[live.agent]})` : t.status === 'claimed' && t.agent ? `(${HX.BADGE[t.agent]})` : ''));
     const s = human ? Math.min(t.latestStart ?? M.board.now, M.board.now) : t.start;
@@ -409,16 +436,25 @@
     renderPanel();
     if (id) loadDetail();
   }
-  function selectEpic(e) {
-    M.sel = `epic:${e.id}`;
-    M.detail = { epic: e };
+  function selectItem(i) {
+    M.sel = `item:${i.id}`;
+    M.detail = { item: i };
+    drawRows(true);
+    if (B.panel.classList.contains('closed')) togglePanel();
     renderPanel();
   }
+  // An item's place: "Team notes › App shell and sign-in", outermost first, without the lane.
+  const trailOf = (i) => {
+    const out = [];
+    for (let x = i; x; x = x.parent ? M.itemById.get(x.parent) : undefined) out.unshift(x);
+    return out;
+  };
+  const trailText = (i) => trailOf(i).map((x) => x.title).join(' › ');
   HX.openTask = (id) => HX.go(`#map/${id}`);
 
   async function loadDetail() {
     const id = M.sel;
-    if (!id || id.startsWith('epic:')) return;
+    if (!id || id.startsWith('item:')) return;
     try {
       const d = await HX.api('/api/task', { id });
       if (M.sel !== id) return;
@@ -440,14 +476,14 @@
     const d = M.detail;
     const strip = h('div', { class: 'strip' },
       HX.btn(HX.icon('sidebar-simple'), togglePanel, 'btn-ghost collapse', { title: 'Show the detail panel', 'aria-label': 'Show the detail panel' }),
-      M.sel && !M.sel.startsWith('epic:') ? h('span', { class: 'vid' }, M.sel) : null,
+      M.sel && !M.sel.startsWith('item:') ? h('span', { class: 'vid' }, M.sel) : null,
       d?.task || d?.human ? HX.statusTag((d.task ?? d.human).status) : null);
     const head = h('div', { class: 'row' }, h('span', { class: 'grow' }), HX.btn(HX.icon('sidebar-simple'), togglePanel, 'btn-ghost collapse', { title: 'Collapse the panel', 'aria-label': 'Collapse the panel' }));
     let body;
-    if (!M.sel) body = h('div', { class: 'stack' }, h('h6', { class: 'cap' }, 'Nothing selected'), h('p', { class: 'muted' }, 'Pick a task, a human task or an epic to see its state, why it stopped, its builder history and its commits on main.'), legendNote());
+    if (!M.sel) body = h('div', { class: 'stack' }, h('h6', { class: 'cap' }, 'Nothing selected'), h('p', { class: 'muted' }, 'Pick a task, a human task, a story, a feature, an epic or a lane to see its state, why it stopped, its builder history and its commits on main.'), legendNote());
     else if (!d) body = h('div', { class: 'muted' }, 'Loading…');
     else if (d.error) body = h('div', { class: 't-crit' }, d.error);
-    else if (d.epic && !d.task && !d.human) body = epicDetail(d.epic);
+    else if (d.item) body = itemDetail(d.item);
     else if (d.human) body = HX.humanPanel(d);
     else body = taskPanel(d);
     const keep = B.panel.querySelector('.in')?.scrollTop ?? 0;
@@ -457,32 +493,55 @@
     M.lastPanel = d?.task?.id;
   }
 
-  const legendNote = () => h('p', { class: 'small muted' }, `Merged work is solid green with a check; running tasks pulse; a red notch is a failed attempt; human tasks are hatched, red when late. ${M.board?.codeFinish != null ? 'The dashed purple line is code complete, with human tasks done when needed; the dashed red one is project complete, with their lead times.' : 'The dashed red line is the projected finish.'}`);
+  const legendNote = () => h('p', { class: 'small muted' }, `Merged work is solid green with a check; running tasks pulse; a red notch is a failed attempt; human tasks are hatched, red when late. ${M.board?.codeFinish != null ? 'The dashed purple line is code complete, with human tasks done when needed; the dashed red one is project complete, with their lead times.' : 'The dashed red line is the projected finish.'}${M.board?.milestones.length ? ' Each dotted line is a milestone, where it was reached or is projected; pick one to see its work alone.' : ''}`);
 
-  function epicDetail(e) {
-    const ts = e.tasks.map((id) => M.byId.get(id)).filter(Boolean);
+  // A lane, epic, feature or story: where it sits, what it is for, how far it has got, and its tasks by state.
+  function itemDetail(i) {
+    const picked = milestoneNow();
+    const ts = i.tasks.map((id) => M.byId.get(id)).filter((t) => t && (!picked || t.milestone === picked));
+    const e = HX.mapRollup(ts);
     const by = (s) => ts.filter((t) => t.status === s);
+    const trail = trailOf(i).slice(0, -1);
+    const inMs = [...new Set(ts.map((t) => t.milestone).filter(Boolean))].map((k) => M.board.milestones.find((m) => m.key === k)).filter(Boolean);
+    const open = M.rows.some((r) => r.id === i.id && r.folded === false);
     return h('div', { class: 'stack lg' },
-      h('div', { class: 'row wrap' }, HX.tag('Epic', 'tag-accent'), HX.tag(HX.laneShort(e.lane), 'tag-neutral'), e.stage ? HX.tag(e.stage, 'tag-mono') : null),
-      h('h3', null, e.title),
-      h('div', { class: 'soft' }, `${e.done} of ${e.tasks.length} merged${e.running ? ` · ${e.running} building` : ''}${e.failing ? ` · ${e.failing} failing` : ''}${e.waiting ? ` · ${e.waiting} waiting on a person` : ''}`),
-      h('div', { class: 'progress' }, h('i', { style: { width: `${(e.done / Math.max(1, e.tasks.length)) * 100}%` } })),
-      e.end ? h('div', { class: 'muted' }, `${e.done === e.tasks.length ? 'Finished' : 'Projected to finish'} ${F.dayTime(e.end)}`) : null,
+      h('div', { class: 'row wrap' }, HX.tag(LEVEL[i.level], 'tag-accent'), HX.tag(HX.laneShort(i.repo), 'tag-neutral'), picked ? HX.tag(`in ${M.board.milestones.find((m) => m.key === picked)?.title ?? picked}`, 'tag-outline') : null),
+      trail.length ? h('div', { class: 'crumbs small' }, trail.map((x, n) => [n ? h('span', { class: 'muted' }, ' › ') : null, h('button', { type: 'button', class: 'link', onclick: () => selectItem(x) }, x.title)])) : null,
+      h('h3', null, i.title),
+      i.about ? h('p', { class: 'soft' }, i.about) : null,
+      h('div', { class: 'soft' }, `${e.done} of ${F.plural(e.total, 'task')} merged${e.running ? ` · ${e.running} building` : ''}${e.failing ? ` · ${e.failing} failing` : ''}${e.waiting ? ` · ${e.waiting} waiting on a person` : ''}`),
+      h('div', { class: 'progress' }, h('i', { style: { width: `${(e.done / Math.max(1, e.total)) * 100}%` } })),
+      e.end ? h('div', { class: 'muted' }, `${e.done === e.total ? 'Finished' : 'Projected to finish'} ${F.dayTime(e.end)}`) : null,
       e.waitsOn ? h('div', null, 'Most of its open work waits on ', HX.taskLink(e.waitsOn, 'mono')) : null,
+      inMs.length ? h('div', { class: 'stack', style: { gap: '4px' } }, h('h6', { class: 'cap' }, inMs.length === 1 ? 'Milestone' : `In ${inMs.length} milestones`), inMs.map((m) => milestoneLine(m))) : null,
       [['claimed', 'Building'], ['needs_human', 'Needs you'], ['parked', 'Parked'], ['ready', 'Ready'], ['done', 'Merged']].map(([s, label]) => by(s).length ? h('div', { class: 'stack', style: { gap: '4px' } }, h('h6', { class: 'cap' }, `${label} · ${by(s).length}`), by(s).slice(0, 12).map((t) => h('div', { class: 'row' }, HX.taskLink(t.id, 'mono small muted'), h('span', { class: 'ell' }, t.title), t.critical ? HX.tag('critical', 'tag-crit') : null)), by(s).length > 12 ? h('div', { class: 'muted small' }, `and ${by(s).length - 12} more`) : null) : null),
-      HX.btn(M.rows.some((r) => r.kind === 'epic' && r.id === e.id && !r.folded) ? 'Fold it on the Map' : 'Open it on the Map', () => { HX.setUi(`fold:${e.id}`, M.rows.some((r) => r.kind === 'epic' && r.id === e.id && !r.folded) ? 'closed' : 'open'); layout(); renderPanel(); }));
+      viewNow() === 'hybrid' ? HX.btn(open ? 'Fold it on the Map' : 'Open it on the Map', () => { HX.setUi(`fold:${i.id}`, open ? 'closed' : 'open'); layout(); renderPanel(); }) : null);
   }
 
-  // onEpic: what the epic tag does. On the Map it shows the epic in the panel; elsewhere it opens the task there.
-  function taskPanel(d, onEpic = selectEpic) {
+  // A milestone in the panel: its number and title, when, and its demo.
+  function milestoneLine(m) {
+    const n = (M.board?.milestones ?? []).findIndex((x) => x.key === m.key) + 1;
+    return h('div', { class: 'msline' },
+      h('div', { class: 'row' }, n ? h('span', { class: `msnum${m.reached ? ' reached' : ''}` }, String(n)) : null, h('b', { class: 'grow', style: { fontWeight: 500 } }, m.title), m.at ? h('span', { class: 'small muted' }, `${m.reached ? 'reached' : 'projected'} ${F.day(m.at)}`) : null),
+      h('div', { class: 'small soft' }, `Demo: ${m.demo}`));
+  }
+
+  // onItem: what a breadcrumb does. On the Map it shows that item in the panel; elsewhere it opens the task there.
+  function taskPanel(d, onItem = selectItem) {
     const t = d.task;
     const b = d.board ?? {};
     const merged = t.status === 'done';
     const commits = d.commits?.commits ?? [];
     const lastPass = [...(d.history ?? [])].reverse().find((x) => x.log);
     const els = [];
-    els.push(h('div', { class: 'row wrap' }, HX.statusTag(t.status), HX.tag(t.id, 'tag-mono'), d.epic ? h('button', { type: 'button', class: 'tag tag-neutral', style: { border: 0, cursor: 'pointer' }, onclick: () => onEpic(d.epic) }, d.epic.title) : null, t.priority === 'fix_first' ? HX.tag('fix first', 'tag-warn') : null, b.critical ? HX.tag('critical path', 'tag-crit') : null));
+    els.push(h('div', { class: 'row wrap' }, HX.statusTag(t.status), HX.tag(t.id, 'tag-mono'), t.priority === 'fix_first' ? HX.tag('fix first', 'tag-warn') : null, b.critical ? HX.tag('critical path', 'tag-crit') : null, t.placeholder_for?.length ? HX.tag('placeholder', 'tag-outline') : null, t.wires?.length ? HX.tag('wiring', 'tag-outline') : null));
+    // Lane › Epic › Feature › Story: each opens in the panel.
+    if (d.trail?.length) els.push(h('div', { class: 'crumbs small' }, d.trail.map((x, n) => [n ? h('span', { class: 'muted' }, ' › ') : null, h('button', { type: 'button', class: 'link', title: LEVEL[x.level], onclick: () => { const i = M.itemById?.get(x.id); if (i) onItem(i); } }, x.title)])));
     els.push(h('h3', null, t.title));
+    if (d.milestone) els.push(milestoneLine(M.board?.milestones.find((m) => m.key === d.milestone.key) ?? d.milestone));
+    // A placeholder and its wiring, both ways.
+    if (t.placeholder_for?.length) els.push(h('div', { class: 'boxed small' }, 'Built before ', t.placeholder_for.map((x, n) => [n ? ', ' : '', HX.taskLink(x, 'mono')]), ', against a placeholder its notes and acceptance describe. ', d.wiredBy?.length ? ['Wired in by ', d.wiredBy.map((w, n) => [n ? ', ' : '', HX.taskLink(w.id, 'mono')]), '.'] : h('span', { class: 't-crit' }, 'No task wires it in yet.')));
+    if (t.wires?.length) els.push(h('div', { class: 'boxed small' }, 'Replaces the placeholder in ', t.wires.map((x, n) => [n ? ', ' : '', HX.taskLink(x, 'mono')]), ' with the real ', [...new Set(t.wires.flatMap((x) => M.byId?.get(x)?.placeholderFor ?? []))].map((x, n) => [n ? ', ' : '', HX.taskLink(x, 'mono')]), '.'));
     if (merged) {
       const m = d.merged;
       els.push(h('div', { class: 'soft' }, `Merged ${m ? F.dayTime(Date.parse(m.at)) : ''} by ${HX.AGENT[m?.agent] ?? m?.agent ?? '–'} · ${F.plural(t.attempts.length, 'attempt')} · ${F.dur(d.cost.ms)} in all · ${F.usd(d.cost.usd)}`));
@@ -498,8 +557,7 @@
       const why = whyStopped(d);
       if (why) els.push(h('div', { class: 'boxed', style: { boxShadow: 'inset 0 0 0 1px oklch(0.72 0.14 35 / .5)' } }, h('h6', { class: 'cap t-crit', style: { marginBottom: '4px' } }, 'Why it stopped'), why));
       els.push(h('dl', { class: 'kv' },
-        h('dt', null, 'Lane'), h('dd', null, t.repo),
-        h('dt', null, 'Stage'), h('dd', null, t.stage),
+        h('dt', null, 'Repo'), h('dd', null, t.repo),
         b.start ? [h('dt', null, t.status === 'claimed' ? 'Started' : 'Projected'), h('dd', null, `${F.dayTime(b.start)}${b.end ? ` to ${F.time(new Date(b.end).toISOString())}` : ''}`)] : null,
         t.reqs.length ? [h('dt', null, 'Requirements'), h('dd', { class: 'mono small' }, t.reqs.join(', '))] : null,
         t.blocked_by.length ? [h('dt', null, 'Waits on'), h('dd', null, t.blocked_by.map((x, i) => [i ? ', ' : '', HX.taskLink(x, 'mono small')]))] : null,

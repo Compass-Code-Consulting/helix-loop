@@ -4,8 +4,8 @@
 (() => {
   'use strict';
   const { h, fill, F, S } = HX;
-  const KIND_ORDER = ['your_tasks', 'ask', 'fix', 'stopped', 'questions', 'credential', 'scope', 'release', 'resolved', 'notices'];
-  const KIND_LABEL = { your_tasks: 'your tasks', ask: 'Helix asks', fix: 'fix ready', questions: 'questions', credential: 'credential', scope: 'scope', release: 'release', stopped: 'needs you', resolved: 'resolved', notices: 'noise' };
+  const KIND_ORDER = ['your_tasks', 'ask', 'fix', 'stopped', 'questions', 'credential', 'scope', 'release', 'milestone', 'resolved', 'notices'];
+  const KIND_LABEL = { your_tasks: 'your tasks', ask: 'Helix asks', fix: 'fix ready', questions: 'questions', credential: 'credential', scope: 'scope', release: 'release', milestone: 'milestone', stopped: 'needs you', resolved: 'resolved', notices: 'noise' };
 
   const V = { el: null, data: null, welcome: undefined, open: new Set(), sel: new Map(), seenTimer: null, by: 'cause', page: 0 };
 
@@ -123,6 +123,7 @@
 
   function costLabel(g) {
     if (g.kind === 'release') return 'production';
+    if (g.kind === 'milestone') return 'ready to review';
     if (g.kind === 'resolved') return 'already applied';
     if (g.kind === 'notices') return 'holds nothing';
     const parts = [g.held ? `holds ${F.plural(g.held, 'task')}` : 'holds nothing yet'];
@@ -138,9 +139,9 @@
         h('button', { type: 'button', class: 'chev', 'aria-label': open ? 'Close' : 'Open', 'aria-expanded': String(open), onclick: () => toggle(g) }, HX.icon(open ? 'caret-down' : 'caret-right')),
         h('span', { class: 'n' }, F.n(g.members.length)),
         h('div', { style: { minWidth: 0 } },
-          h('div', { class: 'row' }, h('span', { class: 't ell' }, g.title), HX.tag(KIND_LABEL[g.kind] ?? g.kind, g.kind === 'ask' ? 'tag-accent' : 'tag-neutral'), g.groupedBy === 'helix' ? h('span', { class: 'tiny t-acc' }, 'grouped by Helix') : null),
+          h('div', { class: 'row' }, h('span', { class: 't ell' }, g.title), HX.tag(KIND_LABEL[g.kind] ?? g.kind, g.kind === 'ask' ? 'tag-accent' : g.kind === 'milestone' ? 'tag-ok' : 'tag-neutral'), g.groupedBy === 'helix' ? h('span', { class: 'tiny t-acc' }, 'grouped by Helix') : null),
           h('div', { class: 'why ell' }, g.cause)),
-        HX.costBar(g.kind === 'release' ? max * 0.04 : g.held, max, g.critical, costLabel(g)),
+        HX.costBar(g.kind === 'release' || g.kind === 'milestone' ? max * 0.04 : g.held, max, g.critical, costLabel(g)),
         h('div', { class: 'acts' }, HX.btn(g.action.label, primary(g), 'btn-primary'), HX.btn(open ? 'Close' : 'Review', () => toggle(g)))));
     if (open) el.append(h('div', { class: 'body' }, batchBar(g, sel), memberTable(g, sel)));
     return el;
@@ -165,7 +166,7 @@
       if (g.action.screen) return HX.go(`#home/${encodeURIComponent(g.id)}`);
       if (g.action.op === 'dismiss') {
         await HX.post('/api/dismiss', { ids: [...g.members.map((m) => m.id), `group:${g.id}:${g.members.length}`] });
-        return HX.toast(`Dismissed ${F.plural(g.members.length, 'notice')}.`);
+        return HX.toast(g.kind === 'milestone' ? 'Marked reviewed.' : `Dismissed ${F.plural(g.members.length, 'notice')}.`);
       }
       if (g.action.op === 'hand_back') return batch(g, 'hand_back', selection(g));
     });
@@ -211,13 +212,13 @@
     const isHuman = g.kind === 'your_tasks';
     const head = h('div', { class: 'mrow hd' },
       h('input', { type: 'checkbox', 'aria-label': 'Select all', checked: sel.size === g.members.length, onchange: (e) => { for (const m of g.members) e.target.checked ? sel.add(m.id) : sel.delete(m.id); render(); } }),
-      h('span', null, isHuman ? 'Human task' : 'Task'), h('span', null, isHuman ? 'Lateness' : 'Lane'), h('span', null, isHuman ? 'Holds' : g.kind === 'stopped' || g.kind === 'fix' ? 'Failed' : 'Count'), h('span', null, isHuman ? 'State' : g.kind === 'questions' ? 'Question' : 'Last error'));
+      h('span', null, isHuman ? 'Human task' : g.kind === 'milestone' ? 'Milestone' : 'Task'), h('span', null, isHuman ? 'Lateness' : g.kind === 'milestone' ? '' : 'Lane'), h('span', null, isHuman ? 'Holds' : g.kind === 'stopped' || g.kind === 'fix' ? 'Failed' : g.kind === 'milestone' ? '' : 'Count'), h('span', null, isHuman ? 'State' : g.kind === 'questions' ? 'Question' : g.kind === 'milestone' ? 'Releases' : 'Last error'));
     const rows = shown.map((m) => h('div', { class: 'mrow' },
       h('input', { type: 'checkbox', checked: sel.has(m.id), 'aria-label': `Select ${m.id}`, onchange: (e) => { e.target.checked ? sel.add(m.id) : sel.delete(m.id); render(); } }),
-      h('span', { class: 'ell' }, /^(T|HT)-/.test(m.id) ? HX.taskLink(m.id) : h('span', { class: 'id' }, m.id), ' ', m.title),
-      h('span', { class: `ell ${isHuman && /late/.test(m.late ?? '') ? 't-crit' : 'muted'}` }, isHuman ? (m.late ?? '') : HX.laneShort(m.lane)),
+      h('span', { class: 'ell' }, /^(T|HT)-/.test(m.id) ? [HX.taskLink(m.id), ' '] : g.kind === 'milestone' ? null : [h('span', { class: 'id' }, m.id), ' '], m.title),
+      h('span', { class: `ell ${isHuman && /late/.test(m.late ?? '') ? 't-crit' : 'muted'}` }, isHuman ? (m.late ?? '') : m.lane ? HX.laneShort(m.lane) : ''),
       h('span', null, m.count != null ? (isHuman ? F.n(m.count) : `${m.count}×`) : ''),
-      h('span', { class: `ell ${isHuman || g.kind === 'questions' ? 'soft' : 'err'}`, title: m.detail ?? '' }, m.detail ?? '')));
+      h('span', { class: `ell ${isHuman || g.kind === 'questions' || g.kind === 'milestone' ? 'soft' : 'err'}`, title: m.detail ?? '' }, m.detail ?? '')));
     return h('div', { class: 'mtable' }, head, rows, g.members.length > shown.length ? h('div', { class: 'more' }, `and ${g.members.length - shown.length} more; ${g.action.screen ? `${g.action.label} shows every one` : 'the batch actions apply to all selected'}`) : null);
   }
 

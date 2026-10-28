@@ -662,6 +662,13 @@ export async function startApp(opts: { root: string; port: number; open?: boolea
           if (!/^\/[\w ./@-]+$/.test(from) || from.includes('..')) throw new HttpError(400, 'an absolute path to a TaskSet folder or zip');
           return reply(res, 200, cliJob('real', `Check a TaskSet against the running plan`, ['taskset', 'import', from, ...(body.apply ? ['--apply'] : []), ...(body.dry ? ['--dry-run'] : [])]));
         }
+        case '/api/milestones/check':
+        case '/api/milestones/apply': {
+          const from = String(body.path ?? '').replace(/^~(?=\/)/, process.env.HOME ?? '~');
+          if (!/^\/[\w ./@-]+$/.test(from) || from.includes('..')) throw new HttpError(400, 'an absolute path to a Milestones folder');
+          const apply = path.endsWith('/apply');
+          return reply(res, 200, cliJob('real', apply ? 'Apply Helix Milestones' : 'Check Helix Milestones against the plan', ['milestones', apply ? 'apply' : 'check', from]));
+        }
         case '/api/skill/pack':
           return reply(res, 200, await packSkill(PACKAGE_ROOT, join(paths(roots.real).runs, 'helix-skill.zip')));
         case '/api/skill/install': {

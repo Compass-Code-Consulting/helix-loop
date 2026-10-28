@@ -10,7 +10,7 @@ import type { Incident } from './incidents.ts';
 // from what can be known exactly (the same human task, failure, variable or requirement); Helix's names and
 // merges arrive through the incidents.
 
-export type GroupKind = 'your_tasks' | 'ask' | 'fix' | 'questions' | 'credential' | 'scope' | 'release' | 'stopped' | 'resolved' | 'notices';
+export type GroupKind = 'your_tasks' | 'ask' | 'fix' | 'questions' | 'credential' | 'scope' | 'release' | 'milestone' | 'stopped' | 'resolved' | 'notices';
 
 export const GROUP_LABEL: Record<GroupKind, string> = {
   your_tasks: 'your tasks',
@@ -20,6 +20,7 @@ export const GROUP_LABEL: Record<GroupKind, string> = {
   credential: 'credential',
   scope: 'scope',
   release: 'release',
+  milestone: 'milestone',
   stopped: 'needs you',
   resolved: 'resolved',
   notices: 'noise',
@@ -227,6 +228,27 @@ export function triage(input: TriageInput): Group[] {
     });
   }
 
+  // Milestones the loop reached, each once, until the owner has reviewed its demo. A milestone reached again (work
+  // added to it after it was reached) asks again.
+  const reachedAt = new Map<string, Extract<LedgerEvent, { kind: 'milestone' }>>();
+  for (const e of input.events) if (e.kind === 'milestone') reachedAt.set(e.key, e);
+  for (const e of reachedAt.values()) {
+    const id = `milestone:${e.key}:${e.at}`;
+    if (input.dismissed.has(id)) continue;
+    make({
+      id,
+      kind: 'milestone',
+      title: `Milestone reached: ${e.title}`,
+      cause: `Review it: ${e.demo}`,
+      members: [{ id, title: e.title, detail: `Released ${e.repos.join(', ') || 'nothing new'}` }],
+      holders: [],
+      critical: false,
+      action: { label: 'Reviewed', op: 'dismiss' },
+      groupedBy: 'exact',
+      at: e.at,
+    });
+  }
+
   // What Helix resolved on the owner's behalf, not yet reviewed.
   const unrated = input.hitl.records.filter((r) => !input.hitl.ratings.has(r.id));
   if (unrated.length) {
@@ -266,7 +288,7 @@ export function triage(input: TriageInput): Group[] {
   return groups.filter((g) => g.members.length && !input.dismissed.has(`group:${g.id}:${g.members.length}`));
 }
 
-const ORDER: GroupKind[] = ['your_tasks', 'ask', 'fix', 'stopped', 'questions', 'credential', 'scope', 'release', 'resolved', 'notices'];
+const ORDER: GroupKind[] = ['your_tasks', 'ask', 'fix', 'stopped', 'questions', 'credential', 'scope', 'release', 'milestone', 'resolved', 'notices'];
 // By cost of delay: what each holds up, the critical ones first among equals; noise and records last.
 export function sortGroups(groups: Group[]): Group[] {
   const tail = (g: Group) => (g.kind === 'resolved' || g.kind === 'notices' ? 1 : 0);

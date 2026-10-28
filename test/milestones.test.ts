@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { parse, stringify } from 'yaml';
 import { buildBoard } from '../src/app/board.ts';
+import { snapshot } from '../src/app/state.ts';
+import { buildView } from '../src/app/views.ts';
 import { main } from '../src/cli/main.ts';
 import { configPath, loadConfig, paths, projectInfo } from '../src/config.ts';
 import type { LedgerEvent } from '../src/ledger.ts';
@@ -384,4 +386,17 @@ test('importing a TaskSet over one is the next revision too: the old one, milest
   const history = parse(readFileSync(join(p.history, 'index.yaml'), 'utf8')).revisions;
   assert.deepEqual(history.map((x: { revision: number; snapshot?: string }) => [x.revision, x.snapshot]), [[1, 'history/r1/'], [2, 'history/r2/'], [3, undefined]]);
   assert.match(history[2].why, /^TaskSet imported: 1 task added, 0 removed$/);
+});
+
+test('Home asks the owner to review a reached milestone\'s demo, once, until it is reviewed', () => {
+  const root = project();
+  const p = paths(root);
+  mkdirSync(p.runs, { recursive: true });
+  const reached = { kind: 'milestone', at: '2026-10-25T16:00:00.000Z', key: 'walking-skeleton', title: 'The app builds, deploys and signs a person in', demo: 'Sign in with an email code, land in an empty workspace.', repos: ['acme-app'] };
+  writeFileSync(p.ledger, `${JSON.stringify(reached)}\n${JSON.stringify({ ...reached, at: '2026-10-26T10:00:00.000Z' })}\n`);
+  const groups = (dismissed: string[]) => buildView(root, snapshot(root), loadConfig(root), { dismissed: new Set(dismissed) }).groups.filter((g) => g.kind === 'milestone');
+  const [g, ...more] = groups([]);
+  assert.equal(more.length, 0, 'reached twice: asked once, for the latest');
+  assert.deepEqual([g!.title, g!.cause, g!.action], ['Milestone reached: The app builds, deploys and signs a person in', 'Review it: Sign in with an email code, land in an empty workspace.', { label: 'Reviewed', op: 'dismiss' }]);
+  assert.deepEqual(groups([g!.members[0]!.id]), []);
 });

@@ -16,11 +16,15 @@ export interface AppSettings {
 
 const agent = (a: unknown): AgentName | undefined => (AGENTS.includes(a as AgentName) ? (a as AgentName) : undefined);
 
+// The Map's View before the TaskSet had features and stories: Tasks and Epics, now Task and Epic.
+const MAP_VIEWS: Record<string, string> = { tasks: 'task', epics: 'epic' };
+
 export function loadSettings(file: string): AppSettings {
   if (!existsSync(file)) return {};
   try {
     const s = (parse(readFileSync(file, 'utf8')) ?? {}) as AppSettings & { steward?: AgentName };
     const ui = s.ui && typeof s.ui === 'object' ? Object.fromEntries(Object.entries(s.ui).filter(([, v]) => ['string', 'number', 'boolean'].includes(typeof v))) : undefined;
+    if (ui && typeof ui['map.view'] === 'string' && MAP_VIEWS[ui['map.view']]) ui['map.view'] = MAP_VIEWS[ui['map.view']]!;
     return {
       // Before Helix had two roles, the one agent setting was the steward's: now the assistant's.
       helix: { assistant: agent(s.helix?.assistant) ?? agent(s.steward), monitor: agent(s.helix?.monitor) },

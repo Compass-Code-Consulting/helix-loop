@@ -7,7 +7,7 @@ import type { LedgerEvent } from '../ledger.ts';
 import { loadPlan } from '../plan/store.ts';
 import type { HumanTask, Plan } from '../types.ts';
 import { runningTasks } from '../app/actions.ts';
-import type { Board } from '../app/board.ts';
+import { dependentsOf, downstream, type Board } from '../app/board.ts';
 import { undoChange, type Change } from '../app/changes.ts';
 import { applyChanges, applyRecorded } from '../app/fixes.ts';
 import { readReads } from '../app/helix.ts';
@@ -182,7 +182,11 @@ export function humanCard(plan: Plan, board: Board, id: string) {
   if (!h) throw new OpError(404, `no human task ${id}`);
   const b = board.human.find((x) => x.id === id);
   const waiting = [...[...plan.tasks.values()].filter((t) => t.blocked_by.includes(h.id) && t.status !== 'done'), ...[...plan.human.values()].filter((x) => x.blocked_by.includes(h.id) && x.status !== 'done')];
-  return { ...h, held: b?.held ?? 0, late: b?.late ?? false, latestStart: b?.latestStart, critical: b?.critical ?? false, steps: stepsOf(h), done: doneSteps(h), unblocks: waiting.map((t) => ({ id: t.id, title: t.title, status: t.status })) };
+  // The milestones its wait holds back: those with open work behind it, directly or not, in delivery order.
+  const behind = downstream(plan, dependentsOf(plan), h.id);
+  const holdsBack = h.status === 'done' ? [] : board.milestones.filter((m) => m.tasks.some((id) => behind.has(id))).map((m) => ({ key: m.key, title: m.title, n: board.milestones.indexOf(m) + 1 }));
+  const serves = h.story ? plan.taskset?.stories.get(h.story)?.title : undefined;
+  return { ...h, held: b?.held ?? 0, late: b?.late ?? false, latestStart: b?.latestStart, critical: b?.critical ?? false, steps: stepsOf(h), done: doneSteps(h), unblocks: waiting.map((t) => ({ id: t.id, title: t.title, status: t.status })), holdsBack, ...(serves ? { serves } : {}) };
 }
 
 // ---- a task's whole story ----
