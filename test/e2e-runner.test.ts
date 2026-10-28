@@ -34,6 +34,32 @@ test('the e2e runner runs the worktree script for a registered pass and returns 
   await runner.stop();
 });
 
+test('a builder runs the browser tests it names, and the whole suite only in a fix-first pass', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mushy-e2e-'));
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'w', private: true, scripts: { 'e2e:direct': 'node -e "console.log(\'ran \' + process.argv.slice(1).join(\' \'))"' } }));
+  const runner = new E2ERunner('e2e:direct', 60_000, () => {});
+  const url = await runner.start(0);
+  const run = (pass: string, args: string[]) =>
+    exec('node', [CLIENT, ...args], { env: { ...process.env, HELIX_E2E_RUNNER: url, HELIX_E2E_PASS: pass } }).then(
+      (r) => ({ code: 0, out: r.stdout }),
+      (e: { code: number; stdout: string; stderr: string }) => ({ code: e.code, out: e.stdout + e.stderr }),
+    );
+  const feature = runner.register(dir);
+  for (const args of [[], ['--project=chromium'], ['--project', 'chromium', '--workers', '4']]) {
+    const r = await run(feature, args);
+    assert.equal(r.code, 2, args.join(' '));
+    assert.match(r.out, /not the whole suite/);
+  }
+  for (const args of [['e2e/x.e2e.test.ts'], ['--project', 'chromium', 'composer'], ['-g', '[NAV-28]'], ['--only-changed'], ['--last-failed']]) {
+    const r = await run(feature, args);
+    assert.equal(r.code, 0, args.join(' '));
+    assert.match(r.out, /^ran /m);
+  }
+  const fixFirst = runner.register(dir, { wholeSuite: true });
+  assert.equal((await run(fixFirst, [])).code, 0);
+  await runner.stop();
+});
+
 test('a run ends with its pass, and once the runner stops, the process can exit at once', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'mushy-e2e-'));
   const pidFile = join(dir, 'run.pid');
@@ -46,7 +72,7 @@ test('a run ends with its pass, and once the runner stops, the process can exit 
     const runner = new E2ERunner('e2e:direct', 20 * 60_000, () => {});
     const url = await runner.start(0);
     const pass = runner.register(${JSON.stringify(dir)});
-    fetch(url + '/run', { method: 'POST', headers: { 'x-helix-pass': pass }, body: '{}' }).then((r) => r.text()).catch(() => '');
+    fetch(url + '/run', { method: 'POST', headers: { 'x-helix-pass': pass }, body: '{"args":["e2e/slow.e2e.test.ts"]}' }).then((r) => r.text()).catch(() => '');
     for (let i = 0; i < 100 && !existsSync(${JSON.stringify(pidFile)}); i++) await new Promise((r) => setTimeout(r, 100));
     const pid = Number(readFileSync(${JSON.stringify(pidFile)}, 'utf8'));
     runner.unregister(pass);

@@ -17,6 +17,25 @@ import { Semaphore } from './semaphore.ts';
 
 export const EXIT_MARKER = '__HELIX_E2E_EXIT__=';
 
+// A builder runs the browser tests its change touched; the whole suite is the gate's (and, with scoped gates,
+// main's whole-suite runs'). A run counts as narrowed when it names test files or a filter on their paths, a
+// title filter (-g), or Playwright's --only-changed, --last-failed or --list. Only a fix-first pass, which may need
+// to repeat a suite to show a flaky test fixed, may run the whole suite.
+const VALUE_OPTIONS = new Set(['--project', '-c', '--config', '-j', '--workers', '--reporter', '--timeout', '--retries', '--repeat-each', '--max-failures', '--output', '--shard', '--trace', '--global-timeout', '--tsconfig', '--grep-invert', '--browser']);
+const NARROWING_OPTIONS = new Set(['-g', '--grep', '--only-changed', '--last-failed', '--list']);
+export function narrowsRun(args: string[]): boolean {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    const name = a.split('=')[0]!;
+    if (NARROWING_OPTIONS.has(name)) return true;
+    if (!a.startsWith('-')) return true; // a test file, or a filter on test files' paths
+    if (VALUE_OPTIONS.has(name) && !a.includes('=')) i++;
+  }
+  return false;
+}
+export const WHOLE_SUITE_REFUSED =
+  "a pass runs the browser tests its change touched, not the whole suite (the loop runs that): name the test files you changed or your acceptance tests' file, such as `pnpm e2e e2e/x.e2e.test.ts`, or filter by title with -g '[ID]'\n";
+
 // What a pass asked of the runner, for its metrics: runs, the time they took, and how many failed.
 export interface E2EUse {
   runs: number;
@@ -26,6 +45,7 @@ export interface E2EUse {
 
 interface PassEntry {
   worktree: string;
+  wholeSuite: boolean; // may run every browser test at once (narrowsRun)
   busy: boolean;
   stop?: (why: string) => void; // ends the run in progress
   use: E2EUse;
@@ -58,9 +78,9 @@ export class E2ERunner {
     return this.url;
   }
 
-  register(worktree: string): string {
+  register(worktree: string, opts: { wholeSuite?: boolean } = {}): string {
     const id = randomBytes(24).toString('hex');
-    this.passes.set(id, { worktree, busy: false, use: { runs: 0, ms: 0, failed: 0 } });
+    this.passes.set(id, { worktree, wholeSuite: opts.wholeSuite ?? false, busy: false, use: { runs: 0, ms: 0, failed: 0 } });
     return id;
   }
 
@@ -97,6 +117,10 @@ export class E2ERunner {
       return void res.writeHead(400).end('body must be JSON: {"args": [...]}\n');
     }
     if (args.some((a) => a.length > 500 || a.includes('\0'))) return void res.writeHead(400).end('bad argument\n');
+    if (!entry.wholeSuite && !narrowsRun(args)) {
+      this.log(`e2e runner: refused a whole-suite run in ${entry.worktree}`);
+      return void res.writeHead(422).end(WHOLE_SUITE_REFUSED);
+    }
 
     entry.busy = true;
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
