@@ -57,7 +57,7 @@
                           "required": ["title", "need"],
                           "properties": {
                             "title": { "type": "string", "minLength": 3, "maxLength": 80 },
-                            "need": { "type": "string", "pattern": "^As an? .+, I want .+, so that .+", "description": "\"As a …, I want …, so that …\": the person it serves, what they need, and why." }
+                            "need": { "type": "string", "pattern": "^As (an?|the) .+, I want .+, so that .+", "description": "\"As a …, I want …, so that …\" (or \"As the …\"): the person it serves, what they need, and why." }
                           }
                         }
                       }

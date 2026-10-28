@@ -18,9 +18,8 @@ From `examples/mini-taskset/`, with an illustrative `repo` (the loop's task sche
 ```yaml
 id: T-0002
 repo: web-app
-stage: day1
+story: confirm-address
 area: core/waitlist
-epic: waitlist-core
 title: A new sign-up gets a confirmation email whose one-click link confirms it
 reqs: [WL-2]
 spec: ["§4 Waitlist", "§4 Requirements"]
@@ -40,10 +39,9 @@ notes: |
 | Field | Rule |
 | --- | --- |
 | `id` | `T-` and four digits, unique, and the file is named `T-####.yaml`. |
-| `repo` | The lane: a repository `taskset.yaml` declares. |
-| `stage` | A stage from the build plan. The task's blockers are in this stage or earlier. |
+| `repo` | The repository it builds: its lane's `repo`. |
+| `story` | The user story it serves, a key `taskset.yaml` declares in the lane that builds `repo`. Its feature, epic and lane follow. |
 | `area` | The module the task owns while it runs (below). |
-| `epic` | The epic's key in its lane. |
 | `title` | What will be true when the task is done, in plain words, 8 to 160 characters. "Posts screen lists the queue grouped by day with state badges", not "Implement posts list". |
 | `reqs` | The requirement IDs it delivers: spec IDs or synthetic IDs. |
 | `spec` | Citation keys of the narrowest sections the builder needs: `§11 Composer`, not `§11`. A claimed requirement's own text is injected without being cited. |
@@ -53,6 +51,7 @@ notes: |
 | `status`, `claimed_by`, `attempts` | `ready`, `null` and `[]` on every new task; the loop owns them after that. |
 | `notes` | What the builder needs beyond the spec (below). Plain text, at most about 1,500 characters. |
 | `priority` | Leave it out, except `fix_first` for a bug the loop or a person found (below). |
+| `placeholder_for`, `wires` | Left out when you cut tasks; the Milestones step writes them, for a task built against a placeholder and the task that wires the real thing in ([milestones.md](milestones.md)). |
 
 Leave out the fields the loop writes (`summary`, `attempts` entries) and any loop-specific pins (`agent`, `role`) unless the loop's own conventions call for them.
 
@@ -105,7 +104,7 @@ Choose it so independent work runs in parallel and dependent work in one module 
 
 - `blocked_by` lists task IDs (`T-0130`) and human task IDs (`HT-16`), in any lane.
 - **Only real needs.** A blocker is something without which the task cannot be built or tested. "Related to" is not a dependency.
-- **Same stage or earlier**, never a later stage.
+- **Real needs, never order.** What should come first is the milestones' to say; an edge only says what can't be built or tested without it. Where the milestones want a task before something it needs, the Milestones step builds it against a placeholder instead ([milestones.md](milestones.md)).
 - **Human tasks rarely block build tasks.** Build and test against the stand-ins; only the contract test or the deploy needs the real account.
 - A shared skeleton capability (the end-to-end harness, the design system package) is a blocker of the first tasks that use it, not of every task.
 
@@ -164,6 +163,6 @@ Plan so that this is rare: a task that contradicts the spec, depends on somethin
 - Every claimed requirement has an acceptance line, and every line's tags are in `reqs`.
 - At least one test goes through the real entry point; screen tasks have an e2e test with the accessibility check.
 - Its area lets unrelated work run beside it.
-- Every blocker is real, and none is in a later stage.
+- Every blocker is real.
 - Its spec citations are the narrowest that give the builder what it needs.
 - Its notes hold decisions, not rules and not the spec.

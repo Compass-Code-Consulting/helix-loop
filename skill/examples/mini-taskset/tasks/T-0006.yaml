@@ -1,11 +1,10 @@
 id: T-0006
-repo: acme-website
-stage: day1
-area: website/home
-epic: waitlist-page
-title: The home page's waitlist form posts to the app and shows that the address is on the list
+repo: acme-app
+story: join-with-email
+area: web/waitlist-form
+title: The public waitlist page's form joins the waitlist and shows that the address is on the list
 reqs: [WL-6]
-spec: ["§5 Website home"]
+spec: ["§5 Waitlist page"]
 acceptance:
   - "e2e: [WL-6] submitting a valid address shows Check your inbox, with no serious axe violations"
   - "e2e: [WL-6] an invalid address shows the field error next to the input and keeps what was typed"
@@ -15,4 +14,4 @@ status: ready
 claimed_by: null
 attempts: []
 notes: |
-  The form posts to the app's public waitlist endpoint (T-0001, another lane); in tests, point it at a stand-in that answers 202 and 400 as T-0001 does.
+  The form posts to the public waitlist endpoint T-0001 serves.

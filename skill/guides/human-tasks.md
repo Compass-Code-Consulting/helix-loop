@@ -35,6 +35,7 @@ status: todo
 | --- | --- |
 | `id` | `HT-` and a number, unique, and the file is named `HT-#.yaml`. |
 | `title` | What to do and why it matters, in one line. |
+| `story` | Optional: the user story it clearly serves. Human tasks stay outside the hierarchy and the milestones; they are ordered by when each must start. |
 | `done_check` | How anyone can tell it is done, without asking the owner (below). |
 | `lead_time_days` | Calendar days from starting to done, waits included (below). |
 | `agent_can_help` | `yes`, `partly` or `no`. |

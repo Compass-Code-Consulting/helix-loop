@@ -4,6 +4,6 @@ WL-2 Confirm the address from a one-click link
 WL-3 One sign-up per address
 WL-4 Joining is rate limited per client
 WL-5 Admins export confirmed sign-ups as CSV
-WL-6 The website's waitlist form and its states
+WL-6 The waitlist page's form and its states
 WL-7 The confirmation page
 WL-8 The confirmation email really reaches an inbox

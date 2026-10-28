@@ -1,16 +1,19 @@
 id: T-0007
-repo: acme-website
-stage: day1
-area: website/home
-epic: waitlist-page
-title: The waitlist form tells a visitor plainly when they are sending too fast or the app is down
+repo: acme-app
+story: fair-joining
+area: web/waitlist-form
+title: The waitlist form tells a visitor plainly when they are sending too fast or the app is down, before the limit exists
 reqs: [WL-6]
-spec: ["§5 Website home"]
+spec: ["§5 Waitlist page"]
 acceptance:
-  - "e2e: [WL-6] a 429 from the app shows Try again in a minute and disables the button until then"
+  - "e2e: [WL-6] a 429 from the stand-in endpoint shows Try again in a minute and disables the button until then"
   - "e2e: [WL-6] a network error or a 5xx shows Something went wrong with a retry key, and the typed address is kept"
 blocked_by: [T-0006]
+placeholder_for: [T-0003]
 estimate_passes: 0.5
 status: ready
 claimed_by: null
 attempts: []
+notes: |
+  Built before the rate limit (T-0003), against a placeholder: the form's 429 state is driven in its tests by a stand-in of the join endpoint that answers 429 with Retry-After: 60, the answer T-0003 will give.
+  Until T-0003 merges, the real endpoint never answers 429, so the state is only reachable through the stand-in; nothing else changes. T-0010 proves it against the real limit.

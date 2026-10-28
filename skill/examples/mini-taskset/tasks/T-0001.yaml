@@ -1,8 +1,7 @@
 id: T-0001
 repo: acme-app
-stage: day1
+story: join-with-email
 area: core/waitlist
-epic: waitlist-core
 title: A visitor joins the waitlist with an email address and gets a pending sign-up
 reqs: [WL-1, WL-3]
 spec: ["§4 Waitlist", "§4 Requirements"]

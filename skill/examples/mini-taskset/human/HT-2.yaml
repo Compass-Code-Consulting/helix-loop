@@ -1,5 +1,5 @@
 id: HT-2
-title: Approve the waitlist form and confirmation page copy before the website goes live
+title: Approve the waitlist page and confirmation page copy before they go live
 done_check: "The owner's approval of the copy is recorded in DECISIONS.md with the commit it approved"
 lead_time_days: 0.5
 agent_can_help: "no"

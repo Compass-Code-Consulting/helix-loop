@@ -1,8 +1,7 @@
 id: T-0005
 repo: acme-app
-stage: day1
+story: confirm-address
 area: ci/contract
-epic: waitlist-core
 title: A nightly contract test sends a real confirmation email and finds it in the test inbox
 reqs: [WL-8]
 spec: ["§4 Requirements"]
