@@ -124,18 +124,33 @@
       }
     },
   };
+  // A setting changed here wins over the server's copy until a state fetched after its save has it: a live update
+  // that left before the save landed would otherwise put the old value back, and the next change would save over it.
   let uiTimer;
   const uiPending = {};
+  const uiLocal = new Map(); // key → { v, savedAt }: savedAt once the server has written it
   HX.ui = (k, fallback) => HX.S.state?.ui?.[k] ?? fallback;
   HX.setUi = (k, v) => {
     if (HX.S.state) HX.S.state.ui = { ...(HX.S.state.ui ?? {}), [k]: v };
     uiPending[k] = v;
+    uiLocal.set(k, { v });
     clearTimeout(uiTimer);
     uiTimer = setTimeout(() => {
       const body = { ...uiPending };
       for (const key of Object.keys(uiPending)) delete uiPending[key];
-      HX.post('/api/ui', body).catch(() => undefined);
+      HX.post('/api/ui', body).then(() => {
+        const at = performance.now();
+        for (const [key, v] of Object.entries(body)) if (uiLocal.get(key)?.v === v) uiLocal.set(key, { v, savedAt: at });
+      }).catch(() => undefined);
     }, 400);
+  };
+  // Lays the settings changed here over a state fetched at `asked` (performance.now()), dropping those it has.
+  HX.keepUi = (state, asked) => {
+    for (const [k, e] of uiLocal) {
+      if (e.savedAt !== undefined && e.savedAt < asked) uiLocal.delete(k);
+      else state.ui = { ...(state.ui ?? {}), [k]: e.v };
+    }
+    return state;
   };
 
   // ---- state ----
@@ -224,25 +239,39 @@
     document.title = `${s.counts?.home ? `(${s.counts.home}) ` : ''}Helix Loop${s.dryRun ? ' · dry run' : ''}`;
   };
 
-  // ---- the router: #tab/part/part ----
+  // ---- the router: #tab/part/part?key=value ----
+  // The query holds a view's filters (the Map's view, scope, milestone, hidden kinds, search and scale), so a URL
+  // opens the page as it was; a view keeps it current with HX.setRoute, which replaces the entry without a reroute.
   let mounted = null;
   HX.go = (hash) => {
     if (location.hash === hash) route();
     else location.hash = hash;
   };
+  const parse = () => {
+    const [path, query = ''] = location.hash.replace(/^#\/?/, '').split('?');
+    const [tab = 'home', ...parts] = path.split('/').map(decodeURIComponent);
+    return { tab, parts, params: new URLSearchParams(query) };
+  };
+  HX.setRoute = (parts, params) => {
+    const path = [S.route.tab, ...parts.filter((p) => p != null && p !== '')].map((p) => encodeURIComponent(p).replace(/%3A/g, ':')).join('/');
+    const query = params ? new URLSearchParams(params).toString().replace(/%2C/g, ',') : '';
+    const hash = `#${path}${query ? `?${query}` : ''}`;
+    if (location.hash !== hash) history.replaceState(null, '', hash);
+    S.route = { ...S.route, parts, params: new URLSearchParams(query) };
+  };
   function route() {
-    const [tab = 'home', ...parts] = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
+    const { tab, parts, params } = parse();
     const name = HX.views[tab] ? tab : 'home';
     for (const a of $('tabs').querySelectorAll('a')) a.toggleAttribute('aria-current', a.dataset.tab === name) && a.setAttribute('aria-current', 'page');
     $('tabs').classList.remove('open');
     const same = mounted && mounted.name === name;
-    S.route = { tab: name, parts };
-    if (same && mounted.view.route) return mounted.view.route(parts);
+    S.route = { tab: name, parts, params };
+    if (same && mounted.view.route) return mounted.view.route(parts, params);
     mounted?.view.unmount?.();
     const el = h('div', { class: 'view' });
     $('main').replaceChildren(el);
     mounted = { name, view: HX.views[name], el };
-    mounted.view.mount(el, parts);
+    mounted.view.mount(el, parts, params);
   }
   window.addEventListener('hashchange', route);
   HX.route = route;
@@ -262,7 +291,8 @@
     want.what.clear();
     want.state = false;
     try {
-      S.state = await HX.api('/api/state');
+      const asked = performance.now();
+      S.state = HX.keepUi(await HX.api('/api/state'), asked);
       for (const j of S.state.jobs ?? []) S.jobs.set(j.id, j);
       HX.renderTop();
     } catch (e) {

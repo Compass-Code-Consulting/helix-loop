@@ -279,6 +279,15 @@ main { position: relative; z-index: 1; height: calc(100% - var(--top-h)); overfl
 .legend .lkey.off i { filter: grayscale(1); }
 .legend i { display: inline-block; width: 16px; height: 8px; border-radius: 2px; }
 .legend i.dash { width: 1px; height: 12px; border-radius: 0; }
+.legend i.arrow { position: relative; width: 16px; height: 8px; border-radius: 0; background: linear-gradient(var(--color-accent), var(--color-accent)) left center / 12px 1.5px no-repeat; }
+.legend i.arrow::after { content: ''; position: absolute; right: 0; top: 50%; transform: translateY(-50%); border: 4px solid transparent; border-left: 5px solid var(--color-accent); border-right: 0; }
+/* The selection's dependency lines: over the bars, under the sticky task column. */
+.g-deps { position: absolute; top: 0; z-index: 2; pointer-events: none; overflow: visible; }
+.g-deps path { fill: none; stroke: var(--color-accent); stroke-width: 1.6; opacity: .9; }
+.g-deps path.via { stroke-dasharray: 4 3; }
+.g-deps path.crit { stroke: var(--crit); }
+.g-deps marker path { fill: var(--color-accent); stroke: none; opacity: 1; stroke-dasharray: none; }
+.g-deps marker.crit path { fill: var(--crit); }
 .gantt { flex: 1; min-height: 0; overflow: auto; position: relative; background: var(--ground); box-shadow: inset 0 1px 0 var(--color-divider); }
 .gantt .grid { position: relative; min-width: 100%; }
 .g-head { position: sticky; top: 0; z-index: 4; display: flex; height: 30px; background: color-mix(in srgb, var(--color-bg) 92%, transparent); box-shadow: inset 0 -1px 0 var(--color-divider); }

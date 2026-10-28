@@ -29,9 +29,15 @@ The TaskSet against time, from the projection: the critical path, what is runnin
 - **Milestone:** one milestone's work alone, each item rolled up from it, with the human tasks it waits on; clicking a milestone's title on the timeline does the same.
 
 Pinch on a trackpad to zoom the time scale; Hours, Days and Weeks are presets.
-The legend doubles as filters: click done, building, ready, needs you or human task to hide or show those rows (an item goes once all its work is hidden, its bar still counting the rest), and now, the finish lines or milestone to hide or show those lines; the Map remembers which are off.
+The legend doubles as filters: click done, building, ready, needs you or human task to hide or show those rows (an item goes once all its work is hidden, its bar still counting the rest), and now, the dependencies, the finish lines or milestone to hide or show those lines.
 Selecting a task opens its detail: where it sits (Lane › Epic › Feature › Story), its milestone and demo, the placeholder it is built against or wires in, why it stopped, its builder history, its commits on main, its notes.
 Selecting a lane, an epic, a feature or a story shows its outcome or need, its progress and its tasks by state.
+Either way, the Map draws the selection's dependencies: a line from each row it waits on and to each row that waits on it, red on the critical path, dashed where it passes through tasks the view doesn't show.
+A selected task always has a row, whatever the scope and filters, or its folded row stands for it.
+
+The URL holds the Map as you see it, so a link opens it the same way: `#map/T-1106?view=feature&scope=all&ms=publishing&hide=done,human&q=reels&scale=hours`.
+The path is the selection (a task, or `item:feature:channel-connections`), and each filter left out is at its default.
+A plain `#map` opens with the filters you used last, which the app keeps in `.helix/app.yaml` with the folds, Wrap and the task column's width.
 `helix-loop task <id>`, `helix-loop tasks --under <key>` and `helix-loop milestones` show the same; `helix-loop plan map` writes a static version of the chart.
 
 ## Live

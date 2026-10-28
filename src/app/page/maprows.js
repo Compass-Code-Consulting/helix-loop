@@ -38,8 +38,10 @@
 
   // o: { view, scope ('frontier' | 'all' | 'critical'), milestone (a key, or ''), q (search text), owner,
   // fold(id) → 'open' | 'closed' | undefined, hidden (a Set of the legend's kinds switched off: done, building,
-  // ready, needs, human) }. Returns the rows in order and the toolbar's totals. Hidden kinds take rows away, never
-  // work from an item's bar: an epic still shows how much of it is merged with its merged tasks hidden.
+  // ready, needs, human), sel (the selected task's id) }. Returns the rows in order and the toolbar's totals. Hidden
+  // kinds take rows away, never work from an item's bar: an epic still shows how much of it is merged with its
+  // merged tasks hidden. The selected task shows whatever the scope and filters, where its folds allow, so a link to
+  // it lands on it.
   function mapRows(board, o) {
     const view = viewOf(o.view);
     const scope = o.scope ?? 'frontier';
@@ -67,7 +69,7 @@
     const nameHits = new Set(q ? board.items.filter(named).map((i) => i.id) : []);
     const above = new Set(q ? board.items.filter((i) => nameHits.has(i.id)).flatMap((i) => chain(i).map((x) => x.id)) : []);
     const covered = (i) => !!q && chain(i).some((x) => nameHits.has(x.id));
-    const showTask = (t, owner) => visible(t) && (q ? hit(t) || covered(owner) : scope === 'critical' ? crit.has(t.id) : scope === 'frontier' ? t.frontier : true);
+    const showTask = (t, owner) => t.id === o.sel || (visible(t) && (q ? hit(t) || covered(owner) : scope === 'critical' ? crit.has(t.id) : scope === 'frontier' ? t.frontier : true));
     const roll = new Map();
     const rolled = (i) => {
       if (!roll.has(i.id)) roll.set(i.id, rollup(tasksOf(i)));
@@ -76,6 +78,7 @@
     // An item shows when it has work in the milestone of a kind not hidden, and matches the search or the critical
     // scope.
     const showItem = (i) => {
+      if (o.sel && i.tasks.includes(o.sel)) return true;
       const ts = tasksOf(i).filter(visible);
       if (!ts.length) return false;
       if (q) return above.has(i.id) || covered(i) || ts.some(hit);
@@ -140,10 +143,87 @@
     return { view, rows, totals, text };
   }
 
+  // The dependency lines for the selection: a task, a human task, or `item:<id>` (a lane, epic, feature or story, as
+  // all its tasks). They are its own: from what it waits on and to what waits on it, and, for an item, between its
+  // tasks; whole chains would cover the chart from any task many others build on. Each end is drawn at the row that
+  // shows its task: the task's own, or the folded row that holds it (a Lane to Story view's rows hold their tasks). A
+  // task hidden by the scope or a filter is passed through to the nearest shown, and that line is marked `via`.
+  // Returns [{ from, to, via, crit }] by row index, from the row waited on to the row that waits; `crit` on the
+  // critical path.
+  function mapEdges(board, rows, sel) {
+    if (!sel) return [];
+    const deps = new Map([...board.tasks, ...board.human].map((t) => [t.id, t.deps ?? []]));
+    const dependents = new Map();
+    for (const [id, ds] of deps) for (const d of ds) dependents.set(d, [...(dependents.get(d) ?? []), id]);
+    const items = new Map(board.items.map((i) => [i.id, i]));
+    const chosen = new Set(sel.startsWith('item:') ? (items.get(sel.slice(5))?.tasks ?? []) : deps.has(sel) ? [sel] : []);
+    if (!chosen.size) return [];
+    // The chains both ways, for the hidden tasks a line passes through.
+    const reach = (next) => {
+      const seen = new Set();
+      const stack = [...chosen];
+      while (stack.length) for (const x of next.get(stack.pop()) ?? []) if (!chosen.has(x) && !seen.has(x)) seen.add(x), stack.push(x);
+      return seen;
+    };
+    const up = reach(deps);
+    const down = reach(dependents);
+    const relevant = new Set([...chosen, ...up, ...down]);
+    const rowOf = rowsOf(rows);
+    // The nearest predecessors that have a row, through those that have none.
+    const shownBefore = (b) => {
+      const out = [];
+      const seen = new Set();
+      const walk = (n, via) => {
+        for (const a of deps.get(n) ?? []) {
+          if (seen.has(a) || !relevant.has(a)) continue;
+          seen.add(a);
+          if (rowOf.has(a)) out.push([a, via]);
+          else walk(a, true);
+        }
+      };
+      walk(b, false);
+      return out;
+    };
+    const own = (a, b) => chosen.has(a) || chosen.has(b);
+    const crit = new Set(board.criticalPath);
+    const out = new Map();
+    for (const b of relevant) {
+      if (!rowOf.has(b)) continue;
+      for (const [a, via] of shownBefore(b)) {
+        if (!own(a, b)) continue;
+        const from = rowOf.get(a);
+        const to = rowOf.get(b);
+        if (from === to) continue;
+        const key = `${from}>${to}`;
+        const e = out.get(key) ?? { from, to, via: true, crit: false };
+        e.via &&= via;
+        e.crit ||= !via && crit.has(a) && crit.has(b);
+        out.set(key, e);
+      }
+    }
+    return [...out.values()];
+  }
+
+  // Where each task is drawn, by row index: folded rows (and a level view's rows) hold their tasks, the deepest one
+  // winning, and a task's own row wins over all; an open row in Hybrid holds nothing, its tasks being shown or
+  // filtered out.
+  const DEPTH = { lane: 0, epic: 1, feature: 2, story: 3 };
+  function rowsOf(rows) {
+    const rowOf = new Map();
+    rows.map((r, n) => [r, n]).filter(([r]) => r.kind === 'item' && r.folded !== false).sort(([a], [b]) => DEPTH[a.item.level] - DEPTH[b.item.level])
+      .forEach(([r, n]) => { for (const id of r.item.tasks) rowOf.set(id, n); });
+    rows.forEach((r, n) => { if (r.kind === 'task' || r.kind === 'human') rowOf.set(r.id, n); });
+    return rowOf;
+  }
+  // The row that shows the selection: an item's own, or the row that draws a task (above).
+  const selectedRow = (rows, sel) => (!sel ? -1 : sel.startsWith('item:') ? rows.findIndex((r) => r.kind === 'item' && r.id === sel.slice(5)) : (rowsOf(rows).get(sel) ?? -1));
+
   // What the Map's left column says it holds, per view.
   const columnTitle = (view) => ({ lane: 'Lane', epic: 'Lane › epic', feature: 'Lane › feature', story: 'Lane › story', task: 'Lane › task', hybrid: 'Lane › epic › feature › story' })[viewOf(view)];
 
   HX.mapRows = mapRows;
+  HX.mapEdges = mapEdges;
+  HX.mapSelectedRow = selectedRow;
   HX.mapRollup = rollup;
   HX.mapKindOf = kindOf;
   HX.mapView = viewOf;

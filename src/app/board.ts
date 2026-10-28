@@ -34,6 +34,7 @@ export interface BoardTask {
   fails: number[]; // when each failed attempt ended
   attempts: number; // counted attempts
   failing?: boolean; // open, and its last attempt failed
+  deps?: string[]; // every task and human task it waits on (blocked_by), for the Map's dependency lines
   waits?: string[]; // what it waits on that needs a person: open human tasks, tasks that need you
   held?: number; // open tasks waiting on it, directly or not (waiting items only)
   frontier: boolean;
@@ -47,6 +48,7 @@ export interface BoardHuman {
   title: string;
   status: 'todo' | 'in_progress' | 'done';
   held: number;
+  deps?: string[]; // the human tasks it waits on (blocked_by)
   leadDays: number;
   latestStart?: number; // when it must start for the build not to wait on it
   late: boolean;
@@ -217,6 +219,7 @@ export function buildBoard(input: BoardInput): Board & { projection: Projection;
       fails: fails.get(t.id) ?? [],
       attempts: countedAttempts(t),
       ...(lastFailed ? { failing: true } : {}),
+      ...(t.blocked_by.length ? { deps: t.blocked_by } : {}),
       ...(waits.length ? { waits } : {}),
       ...(isWaiting ? { held: downstream(plan, dependents, t.id).size } : {}),
       frontier: runningIds.has(t.id) || t.status === 'claimed' || isWaiting || lastFailed || nextUp,
@@ -236,6 +239,7 @@ export function buildBoard(input: BoardInput): Board & { projection: Projection;
       title: h.title,
       status: h.status,
       held,
+      ...(h.blocked_by.length ? { deps: h.blocked_by } : {}),
       leadDays: h.lead_time_days,
       latestStart,
       late,

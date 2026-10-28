@@ -28,11 +28,20 @@ interface Rows {
   totals: Record<string, number>;
   text: string;
 }
-type MapRows = (board: Board, o: { view?: string; scope?: string; milestone?: string; q?: string; owner?: string; fold?: (id: string) => string | undefined; hidden?: Set<string> }) => Rows;
+type MapRows = (board: Board, o: { view?: string; scope?: string; milestone?: string; q?: string; owner?: string; fold?: (id: string) => string | undefined; hidden?: Set<string>; sel?: string }) => Rows;
 
-const page = {} as { HX: { mapRows: MapRows; mapView: (v: string) => string; mapColumnTitle: (v: string) => string } };
+interface Edge {
+  from: number;
+  to: number;
+  via: boolean;
+  crit: boolean;
+}
+type MapEdges = (board: unknown, rows: unknown[], sel: string | null) => Edge[];
+type MapSelectedRow = (rows: unknown[], sel: string | null) => number;
+
+const page = {} as { HX: { mapRows: MapRows; mapEdges: MapEdges; mapSelectedRow: MapSelectedRow; mapView: (v: string) => string; mapColumnTitle: (v: string) => string } };
 runInNewContext(readFileSync(new URL('../src/app/page/maprows.js', import.meta.url), 'utf8'), page);
-const { mapRows, mapView, mapColumnTitle } = page.HX;
+const { mapRows, mapEdges, mapSelectedRow, mapView, mapColumnTitle } = page.HX;
 
 const board = buildBoard({ plan: loadPlan(paths(FIXTURE).tasks, paths(FIXTURE).human), events: [] as LedgerEvent[], agents: [], running: [], config: loadConfig(FIXTURE), now: Date.parse('2026-10-27T18:00:00Z') });
 // Plain values: the page's arrays come from another realm.
@@ -134,4 +143,58 @@ test('the legend kinds hide their rows: tasks by state, the human tasks, and an 
   assert.ok(partly, 'a feature partly merged still shows its merged share');
   // Every kind hidden: nothing but nothing.
   assert.deepEqual(rows({ view: 'hybrid', scope: 'all', hidden: new Set(['done', 'building', 'ready', 'needs', 'human']) }).rows, []);
+});
+
+// The dependency lines, on a board small enough to read: A ← B ← C ← D (each waits on the one before), E ← F apart,
+// stories s1 (A, B) and s2 (C, D) in feature f, and the critical path A, B, C.
+const small = {
+  tasks: [{ id: 'A' }, { id: 'B', deps: ['A'] }, { id: 'C', deps: ['B'] }, { id: 'D', deps: ['C'] }, { id: 'E' }, { id: 'F', deps: ['E'] }],
+  human: [],
+  criticalPath: ['A', 'B', 'C'],
+  items: [
+    { id: 'feature:f', level: 'feature', tasks: ['A', 'B', 'C', 'D'] },
+    { id: 'story:s1', level: 'story', parent: 'feature:f', tasks: ['A', 'B'] },
+    { id: 'story:s2', level: 'story', parent: 'feature:f', tasks: ['C', 'D'] },
+  ],
+};
+const taskRow = (id: string) => ({ kind: 'task', id });
+const itemRow = (id: string, folded?: boolean) => ({ kind: 'item', id, item: small.items.find((i) => i.id === id), ...(folded === undefined ? {} : { folded }) });
+const edges = (rowList: unknown[], sel: string) => (JSON.parse(JSON.stringify(mapEdges(small, rowList, sel))) as Edge[]).map((e) => `${e.from}>${e.to}${e.via ? ' via' : ''}${e.crit ? ' crit' : ''}`).sort();
+
+test('a selected task draws its own dependencies, both ways, and nothing further', () => {
+  assert.ok(board.tasks.some((t) => t.deps?.length), 'the board carries each task\'s dependencies');
+  const all = ['A', 'B', 'C', 'D', 'E', 'F'].map(taskRow);
+  assert.deepEqual(edges(all, 'B'), ['0>1 crit', '1>2 crit']);
+  assert.deepEqual(edges(all, 'D'), ['2>3']);
+  assert.deepEqual(edges(all, 'E'), ['4>5']);
+  assert.equal(mapEdges(small, all, null).length, 0);
+});
+
+test('a hidden task is passed through, dashed; a folded row or a level view\'s row holds its tasks; an open row holds none', () => {
+  // B hidden (a filter, or off the frontier): C's line comes from A, through it.
+  assert.deepEqual(edges([taskRow('A'), taskRow('C'), taskRow('D')], 'C'), ['0>1 via', '1>2']);
+  // Story view: s1 holds A and B, s2 holds C and D; selecting s2 draws s1 → s2, its own edges staying inside.
+  assert.deepEqual(edges([itemRow('story:s1'), itemRow('story:s2')], 'item:story:s2'), ['0>1 crit']);
+  // Hybrid with s1 folded and s2 open on its tasks: C's line starts at s1's row.
+  assert.deepEqual(edges([itemRow('feature:f', false), itemRow('story:s1', true), itemRow('story:s2', false), taskRow('C'), taskRow('D')], 'C'), ['1>3 crit', '3>4']);
+  // s2 open with its tasks filtered out: nothing holds them, so no line points at the open row.
+  assert.deepEqual(edges([itemRow('feature:f', false), itemRow('story:s1', true), itemRow('story:s2', false)], 'item:story:s1'), []);
+});
+
+test('the selection\'s row: its own, else the folded row that holds it', () => {
+  const hybrid = [itemRow('feature:f', false), itemRow('story:s1', true), itemRow('story:s2', false), taskRow('C')];
+  assert.equal(mapSelectedRow(hybrid, 'C'), 3);
+  assert.equal(mapSelectedRow(hybrid, 'A'), 1);
+  assert.equal(mapSelectedRow(hybrid, 'D'), -1);
+  assert.equal(mapSelectedRow(hybrid, 'item:story:s2'), 2);
+  assert.equal(mapSelectedRow(hybrid, null), -1);
+});
+
+test('the selected task shows whatever the scope and filters, so a link to it lands on it', () => {
+  const merged = board.tasks.find((t) => t.status === 'done' && !t.frontier)!;
+  assert.ok(!ids(rows({ view: 'task' }), 'task').includes(merged.id), 'off the frontier, it is not shown');
+  assert.ok(ids(rows({ view: 'task', sel: merged.id }), 'task').includes(merged.id));
+  assert.ok(ids(rows({ view: 'task', hidden: new Set(['done']), sel: merged.id }), 'task').includes(merged.id));
+  // In Hybrid, the folds stay as they are: the folded row holding it stands for it.
+  assert.ok(mapSelectedRow(rows({ view: 'hybrid', sel: merged.id }).rows, merged.id) >= 0);
 });

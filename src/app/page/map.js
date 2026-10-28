@@ -2,9 +2,12 @@
 // Lane › Epic › Feature › Story › Task, or Hybrid, which nests them with folds: finished items and those with nothing
 // on the frontier fold, and the Frontier scope opens only what is running, next, failing or waiting on a person, so
 // thousands of tasks read as a few dozen rows (maprows.js decides the rows). Each milestone is a dated line across
-// the chart, and the Milestone filter keeps its work alone. Folds, Wrap and the task column's width are kept in
-// .helix/app.yaml, as is the time scale: Hours, Days and Weeks are presets, and a pinch on a trackpad zooms the scale
-// between them and beyond, around the time under the pointer. Rows are drawn only where the view can see them.
+// the chart, and the Milestone filter keeps its work alone. The filters (View, scope, milestone, the legend's kinds,
+// the search and the time scale) and the selection are in the URL, so a link opens the Map as it was; the ones last
+// used, folds, Wrap and the task column's width are kept in .helix/app.yaml. Hours, Days and Weeks are presets of the
+// time scale, and a pinch on a trackpad zooms it between them and beyond, around the time under the pointer. Selecting
+// a row draws its dependencies: lines from what it waits on and to what waits on it. Rows are drawn only where the
+// view can see them.
 (() => {
   'use strict';
   const { h, fill, F, S } = HX;
@@ -15,22 +18,35 @@
   const DAY = 86_400_000;
   // Tick steps, finest first: the first at least 60 px apart is used.
   const STEPS = [3_600_000, 3 * 3_600_000, 6 * 3_600_000, 12 * 3_600_000, DAY, 2 * DAY, 7 * DAY, 14 * DAY, 28 * DAY];
-  const M = { el: null, board: null, sel: null, detail: null, q: '', rows: [], scrollTop: 0 };
+  const M = { el: null, board: null, sel: null, detail: null, q: '', rows: [], scrollTop: 0, f: {} };
 
   HX.views.map = {
-    mount(el, parts) {
+    mount(el, parts, params) {
       M.el = el;
-      M.sel = parts[0] ?? HX.store.get('mapSel') ?? null;
+      M.sel = parts[0] || HX.store.get('mapSel') || null;
       M.reveal = M.sel;
+      fromRoute(params);
       build();
+      syncRoute();
       load();
     },
-    route(parts) {
-      if (parts[0] && parts[0] !== M.sel) {
-        M.reveal = parts[0];
-        select(parts[0], true);
-        reveal(parts[0]);
+    // A link to a task, or a URL edited by hand or met going back: its filters, then its selection.
+    route(parts, params) {
+      if (named(params) && filterQuery(params) !== filterQuery(new URLSearchParams(queryOf()))) {
+        fromRoute(params);
+        renderTools();
+        renderLegend();
+        layout();
       }
+      const id = parts[0];
+      if (id && id !== M.sel) {
+        M.reveal = id;
+        if (id.startsWith('item:')) {
+          const i = M.itemById?.get(id.slice(5));
+          if (i) selectItem(i);
+        } else select(id);
+        reveal(id);
+      } else syncRoute();
     },
     async update(what) {
       if (what.has('logs') && what.size === 1) return drawRows();
@@ -47,12 +63,61 @@
   };
 
   const opt = (k, d) => HX.ui(`map.${k}`, d);
-  // Pixels per millisecond: the pinched scale if there is one, else the preset picked last.
-  const pxNow = () => {
+  // Pixels per millisecond last used: the pinched scale if there is one, else the preset picked last.
+  const pxSaved = () => {
     const v = Number(opt('px', 0));
     return v >= PX_MIN && v <= PX_MAX ? v : PX[opt('scale', 'days')] ?? PX.days;
   };
   const presetOf = (px) => Object.keys(PX).find((k) => Math.abs(PX[k] / px - 1) < 0.01) ?? null;
+
+  // ---- the filters, in the URL: #map/T-1234?view=feature&scope=all&ms=publishing&hide=done,human&q=reels&scale=hours ----
+  // A parameter left out is its default; a URL with none of them takes the filters last used here, and then shows
+  // them. Each change is saved as the last used, and replaces the URL without adding to the history.
+  const FILTERS = { view: ['map.view', 'hybrid'], scope: ['map.scope', 'frontier'], ms: ['map.milestone', ''], hide: ['map.hide', ''] };
+  const KEYS = [...Object.keys(FILTERS), 'q', 'scale'];
+  const named = (params) => !!params && KEYS.some((k) => params.has(k));
+  const filterQuery = (params) => KEYS.map((k) => `${k}=${params?.get(k) ?? ''}`).join('&');
+  // Pixels per millisecond from `scale`: a preset's name, or pixels per day.
+  const scaleOf = (s) => (PX[s] ? PX[s] : Number(s) > 0 ? Math.max(PX_MIN, Math.min(PX_MAX, Number(s) / DAY)) : PX.days);
+  function fromRoute(params) {
+    const url = named(params);
+    for (const [k, [key, d]] of Object.entries(FILTERS)) M.f[k] = url ? (params.get(k) ?? d) : String(HX.ui(key, d));
+    M.f.px = url ? scaleOf(params.get('scale')) : pxSaved();
+    if (url) M.q = params.get('q') ?? '';
+    if (url) persist();
+  }
+  function persist() {
+    for (const [k, [key]] of Object.entries(FILTERS)) if (HX.ui(key) !== M.f[k]) HX.setUi(key, M.f[k]);
+    if (HX.ui('map.px') !== M.f.px) {
+      HX.setUi('map.px', M.f.px);
+      if (presetOf(M.f.px)) HX.setUi('map.scale', presetOf(M.f.px));
+    }
+  }
+  // The filters as URL parameters, each left out at its default.
+  function queryOf() {
+    const p = {};
+    if (M.f.view !== 'hybrid') p.view = M.f.view;
+    if (M.f.scope !== 'frontier') p.scope = M.f.scope;
+    if (M.f.ms) p.ms = M.f.ms;
+    if (M.f.hide) p.hide = M.f.hide;
+    if (M.q) p.q = M.q;
+    const preset = presetOf(M.f.px);
+    if (preset !== 'days') p.scale = preset ?? String(Math.round(M.f.px * DAY * 100) / 100);
+    return p;
+  }
+  const syncRoute = () => HX.setRoute(M.sel ? [M.sel] : [], queryOf());
+  // Typing and pinching change the URL once they settle: browsers limit how often a page may replace it.
+  let syncTimer;
+  const syncSoon = () => {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncRoute, 250);
+  };
+  function setFilter(k, v) {
+    M.f[k] = v;
+    persist();
+    syncRoute();
+  }
+  const pxNow = () => M.f.px;
   let B;
   function build() {
     // A new chart opens with "now" in view, however the last one was scrolled.
@@ -77,17 +142,15 @@
   }
 
   const VIEW_LABELS = [['lane', 'Lane'], ['epic', 'Epic'], ['feature', 'Feature'], ['story', 'Story'], ['task', 'Task'], ['hybrid', 'Hybrid']];
-  const viewNow = () => HX.mapView(opt('view', 'hybrid'));
+  const viewNow = () => HX.mapView(M.f.view);
   // The milestone filter, while the board still has it.
-  const milestoneNow = () => {
-    const k = opt('milestone', '');
-    return M.board?.milestones.some((m) => m.key === k) ? k : '';
-  };
+  const milestoneNow = () => (M.board?.milestones.some((m) => m.key === M.f.ms) ? M.f.ms : '');
 
   function renderTools() {
     const search = h('input', { class: 'input search', placeholder: 'Find a task, story, feature or commit', value: M.q, 'aria-label': 'Find' });
     search.oninput = () => {
       M.q = search.value.trim();
+      syncSoon();
       layout();
     };
     search.onkeydown = (e) => {
@@ -101,25 +164,25 @@
       h('option', { value: '' }, 'All milestones'),
       ms.map((m, i) => h('option', { value: m.key, selected: m.key === milestoneNow() }, `${i + 1}. ${m.title}${m.reached ? ' ✓' : ''}`)));
     pick.onchange = () => {
-      HX.setUi('map.milestone', pick.value);
+      setFilter('ms', pick.value);
       renderTools();
       layout();
     };
     fill(B.tools,
       h('span', { class: 'muted' }, 'View'),
-      HX.seg(VIEW_LABELS, viewNow(), (v) => { HX.setUi('map.view', v); renderTools(); layout(); }),
-      HX.seg([['frontier', 'Frontier'], ['all', 'All'], ['critical', 'Critical path']], opt('scope', 'frontier'), (v) => { HX.setUi('map.scope', v); renderTools(); layout(); }),
+      HX.seg(VIEW_LABELS, viewNow(), (v) => { setFilter('view', v); renderTools(); layout(); }),
+      HX.seg([['frontier', 'Frontier'], ['all', 'All'], ['critical', 'Critical path']], M.f.scope, (v) => { setFilter('scope', v); renderTools(); layout(); }),
       ms.length ? pick : null,
       search,
       M.totals ? h('span', { class: 'totals', title: milestoneNow() ? 'In the milestone picked' : 'In the TaskSet' }, M.totals) : null,
       h('span', { class: 'grow' }),
-      HX.seg([['hours', 'Hours'], ['days', 'Days'], ['weeks', 'Weeks']], presetOf(pxNow()), (v) => { HX.setUi('map.scale', v); HX.setUi('map.px', PX[v]); renderTools(); layout(true); }, 'scaleseg'),
+      HX.seg([['hours', 'Hours'], ['days', 'Days'], ['weeks', 'Weeks']], presetOf(pxNow()), (v) => { setFilter('px', PX[v]); renderTools(); layout(true); }, 'scaleseg'),
       HX.btn('Export', HX.act(async () => { await HX.post('/api/export', { what: 'map' }); HX.toast('Exporting the static map (helix-loop map)…'); }), 'btn-ghost'));
   }
 
   // The legend doubles as the Map's filters: each kind of row and each line it names shows or hides when clicked,
   // and the Map remembers which are off. "Folded" only explains how a folded row is drawn, so it stays text.
-  const hiddenNow = () => new Set(String(opt('hide', '')).split(',').filter(Boolean)); // stored as text: done,human
+  const hiddenNow = () => new Set(M.f.hide.split(',').filter(Boolean)); // as text: done,human
   const shown = (key) => !hiddenNow().has(key);
   function renderLegend() {
     const off = hiddenNow();
@@ -129,7 +192,7 @@
       onclick: () => {
         const next = hiddenNow();
         next.has(key) ? next.delete(key) : next.add(key);
-        HX.setUi('map.hide', [...next].join(','));
+        setFilter('hide', [...next].join(','));
         renderLegend();
         layout();
       },
@@ -143,6 +206,7 @@
       toggle('human', h('i', { style: { background: 'repeating-linear-gradient(135deg,var(--warn) 0 3px,transparent 3px 6px)' } }), 'human task', 'Your human tasks, at the top'),
       h('span', { class: 'lnote' }, '▸ folded: green share is merged'),
       toggle('now', h('i', { style: { width: '1px', height: '12px', background: 'var(--color-text)' } }), 'now'),
+      toggle('deps', h('i', { class: 'arrow' }), 'dependencies', 'Select a row to draw lines from what it waits on and to what waits on it; dashed where they pass through rows not shown'),
       b?.codeFinish != null ? [toggle('code', dash('var(--color-accent)'), 'code complete', TITLE.code), toggle('project', dash('var(--crit)'), 'project complete', TITLE.project)] : b ? toggle('project', dash('var(--crit)'), 'projected finish') : null,
       b?.milestones.length ? toggle('milestone', dash('var(--ms)', 2), 'milestone', 'When each milestone was reached, or is projected to be') : null,
       b?.unplaced.length ? h('span', { class: 'derived t-warn', style: { marginLeft: 'auto' }, title: 'They name a story .helix/plan/taskset.yaml does not declare: helix-loop validate lists them' }, `${F.plural(b.unplaced.length, 'task')} not in the TaskSet`) : null);
@@ -153,15 +217,26 @@
     renderLegend();
     M.byId = new Map([...M.board.tasks, ...M.board.human.map((x) => ({ ...x, kind: 'human' }))].map((t) => [t.id, t]));
     M.itemById = new Map(M.board.items.map((i) => [i.id, i]));
+    // An item selected by the URL or last time, as this board has it.
+    if (M.sel?.startsWith('item:')) {
+      const i = M.itemById.get(M.sel.slice(5));
+      if (i) M.detail = { item: i };
+      else {
+        M.sel = null;
+        M.detail = null;
+        syncRoute();
+      }
+    }
     layout();
     if (M.sel && !M.detail) loadDetail();
+    else if (M.detail?.item) renderPanel();
     else if (!M.sel) renderPanel(); // its legend note names the finish lines the board has
   }
 
   // ---- which rows show ----
   function layout(keepScroll) {
     if (!M.board) return;
-    const r = HX.mapRows(M.board, { view: viewNow(), scope: opt('scope', 'frontier'), milestone: milestoneNow(), q: M.q, owner: HX.owner(), fold: (id) => HX.ui(`fold:${id}`), hidden: hiddenNow() });
+    const r = HX.mapRows(M.board, { view: viewNow(), scope: M.f.scope, milestone: milestoneNow(), q: M.q, owner: HX.owner(), fold: (id) => HX.ui(`fold:${id}`), hidden: hiddenNow(), sel: M.sel && !M.sel.startsWith('item:') ? M.sel : undefined });
     M.rows = r.rows;
     if (M.totals !== r.text) {
       M.totals = r.text;
@@ -203,7 +278,9 @@
       const t = M.axis.start + (B.gantt.scrollLeft + off - cw) / M.axis.px;
       M.axis.px = px;
       M.placedAt = px; // the pinch keeps the time under the pointer: it is no reason to jump back to now
-      HX.setUi('map.px', px);
+      M.f.px = px;
+      persist();
+      syncSoon();
       drawGrid();
       B.gantt.scrollLeft = Math.max(0, cw + (t - M.axis.start) * px - off);
       const seg = B.tools.querySelector('.scaleseg');
@@ -238,9 +315,9 @@
     });
   }
 
-  // Brings a row into view: the selected task, when it was opened from elsewhere.
+  // Brings a row into view: the selection, when it was opened from elsewhere; its own row, or the one that holds it.
   function reveal(id) {
-    const i = M.rows.findIndex((r) => r.id === id);
+    const i = HX.mapSelectedRow(M.rows, id);
     if (i < 0) return;
     M.reveal = null;
     const top = i * ROW;
@@ -331,7 +408,7 @@
       const titled = room > 60;
       end = left + (titled ? Math.min(room, m.title.length * 6.2 + 30) : 22);
       const when = `${m.reached ? 'Reached' : 'Projected'} ${F.dayTime(m.at)}`;
-      return h('span', { class: `mschip${m.reached ? ' reached' : ''}${m.key === picked ? ' picked' : ''}${left > at + 1 ? ' moved' : ''}`, style: { left: `${left}px`, maxWidth: `${titled ? room : 22}px` }, title: `${m.n}. ${m.title}\n${when}\nDemo: ${m.demo}`, onclick: () => { HX.setUi('map.milestone', m.key === picked ? '' : m.key); renderTools(); layout(); } },
+      return h('span', { class: `mschip${m.reached ? ' reached' : ''}${m.key === picked ? ' picked' : ''}${left > at + 1 ? ' moved' : ''}`, style: { left: `${left}px`, maxWidth: `${titled ? room : 22}px` }, title: `${m.n}. ${m.title}\n${when}\nDemo: ${m.demo}`, onclick: () => { setFilter('ms', m.key === picked ? '' : m.key); renderTools(); layout(); } },
         h('b', null, String(m.n)), titled ? h('span', null, m.title) : null);
     });
     M.body = h('div', { style: { position: 'relative' } });
@@ -350,11 +427,16 @@
           chips.map((c) => h('span', { class: c.cls, title: c.title, style: { left: `${c.at + 1}px` } }, c.text)),
           shown('now') ? h('span', { class: 'nowchip', style: { left: `${x(now)}px` } }, new Date(now).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })) : null,
           ms.length ? h('div', { class: 'msstrip' }, msLabels) : null)),
-      h('div', { style: { position: 'relative' } }, M.lines, M.body),
+      h('div', { style: { position: 'relative' } }, M.lines, M.body, M.deps = svgEl('svg', { class: 'g-deps', 'aria-hidden': 'true' })),
       resize);
+    M.deps.style.left = `${cw}px`;
+    // The rows' height first: without it the chart is momentarily header-high, and the scroll put back would be cut to
+    // the top (a selection opened from a link, or the place the owner was reading when a live update redrew).
+    if (!wrap) M.body.style.height = M.lines.style.height = `${M.rows.length * ROW}px`;
     B.gantt.replaceChildren(grid);
     B.gantt.scrollTop = M.scrollTop;
     drawRows(true);
+    if (wrap) B.gantt.scrollTop = M.scrollTop;
   }
 
   // Only the rows in view (and a screen's worth either side) are in the page; with Wrap on, rows grow, so all are.
@@ -370,15 +452,75 @@
     const left = Math.round(B.gantt.scrollLeft / 48);
     if (!force && M.drawn && M.drawn.from === from && M.drawn.to === to && M.drawn.left === left && M.drawn.v === liveStamp()) return;
     M.drawn = { from, to, left, v: liveStamp() };
+    if (force) M.selRow = HX.mapSelectedRow(M.rows, M.sel);
     M.body.style.height = wrap ? '' : `${n * ROW}px`;
     M.lines.style.height = wrap ? '' : `${n * ROW}px`;
     const frag = M.rows.slice(from, to).map((r, i) => {
-      const el = row(r);
+      const el = row(r, from + i);
       if (!wrap) Object.assign(el.style, { position: 'absolute', top: `${(from + i) * ROW}px`, left: 0, right: 0 });
       return el;
     });
     M.body.replaceChildren(...frag);
     if (!n) M.body.replaceChildren(h('div', { class: 'muted', style: { padding: '20px', position: 'sticky', left: 0 } }, M.q ? `Nothing matches “${M.q}”.` : 'Nothing in this scope.'));
+    if (force) drawDeps();
+  }
+
+  // ---- dependency lines: the selection's, between the rows that show each end (maprows.js mapEdges) ----
+  const SVG = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs = {}) => {
+    const el = document.createElementNS(SVG, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    return el;
+  };
+  function drawDeps() {
+    if (!M.deps) return;
+    const wrap = opt('wrap', false) === true;
+    M.deps.setAttribute('width', String(Math.ceil(x(M.axis.end))));
+    M.deps.setAttribute('height', String(wrap ? M.body.offsetHeight : M.rows.length * ROW));
+    const edges = M.sel && shown('deps') ? HX.mapEdges(M.board, M.rows, M.sel) : [];
+    if (!edges.length) return M.deps.replaceChildren();
+    // Rows are a fixed height, except with Wrap on, when every row is in the page to be measured.
+    const kids = wrap ? [...M.body.children] : null;
+    const mid = (n) => (wrap ? kids[n] && kids[n].offsetTop + kids[n].offsetHeight / 2 : n * ROW + ROW / 2);
+    const half = (n) => (wrap ? (kids[n]?.offsetHeight ?? ROW) : ROW) / 2;
+    const marker = (id) => svgEl('marker', { id, viewBox: '0 0 6 6', refX: '5.5', refY: '3', markerWidth: '6', markerHeight: '6', markerUnits: 'userSpaceOnUse', orient: 'auto' });
+    const heads = [marker('dep-ah'), marker('dep-ah-crit')];
+    for (const m of heads) m.append(svgEl('path', { d: 'M0,0L6,3L0,6Z' }));
+    heads[1].setAttribute('class', 'crit');
+    const paths = [];
+    for (const e of edges) {
+      const a = barOf(M.rows[e.from]);
+      const b = barOf(M.rows[e.to]);
+      const y1 = mid(e.from);
+      const y2 = mid(e.to);
+      if (!a || !b || y1 == null || y2 == null) continue;
+      // From the end of the bar waited on to the start of the one that waits; around, when it starts first.
+      const x1 = a[1];
+      const x2 = b[0];
+      const d = x2 - 6 >= x1 + 4 ? `M${x1},${y1}H${x2 - 6}V${y2}H${x2}` : `M${x1},${y1}H${x1 + 5}V${y2 + (y2 > y1 ? -half(e.to) : half(e.to))}H${x2 - 6}V${y2}H${x2}`;
+      paths.push(svgEl('path', { d, class: [e.via ? 'via' : '', e.crit ? 'crit' : ''].filter(Boolean).join(' '), 'marker-end': `url(#dep-ah${e.crit ? '-crit' : ''})` }));
+    }
+    M.deps.replaceChildren(svgEl('defs'), ...paths);
+    M.deps.firstChild.append(...heads);
+  }
+
+  // A row's bar in pixels, [left, right], or null without dates: row() draws it there and the lines meet it.
+  const itemMeta = (e) => `${e.done === e.total ? '✓ ' : ''}${e.done}/${e.total}${e.waitsOn && e.done !== e.total ? ` · waits ${e.waitsOn}` : ''}`;
+  function barOf(r) {
+    if (!r) return null;
+    if (r.kind === 'item') {
+      const e = r.roll;
+      if (e.start == null || e.end == null) return null;
+      const left = x(e.start);
+      return [left, left + Math.max(e.done === e.total ? 16 : 8 + itemMeta(e).length * 6, x(e.end) - left)];
+    }
+    if (r.kind !== 'task' && r.kind !== 'human') return null;
+    const human = r.kind === 'human';
+    const s = human ? Math.min(r.t.latestStart ?? M.board.now, M.board.now) : r.t.start;
+    const e = human ? r.t.expectedDone : r.t.end;
+    if (s == null || e == null) return null;
+    const left = x(s);
+    return [left, left + Math.max(!human && r.t.status === 'done' ? 8 : 6, x(e) - left)];
   }
   const liveStamp = () => (S.state?.live ?? []).map((p) => `${p.task}${p.phase}${p.progress ?? ''}`).join('|');
 
@@ -386,7 +528,7 @@
   const INDENT = [14, 26, 38, 50, 62];
   const LEVEL = { lane: 'Lane', epic: 'Epic', feature: 'Feature', story: 'Story' };
 
-  function row(r) {
+  function row(r, n) {
     const cw = colW();
     const track = h('div', { class: 'g-track', style: { width: `${x(M.axis.end)}px` } });
     if (r.kind === 'head') {
@@ -398,7 +540,7 @@
       const e = r.roll;
       const done = e.done === e.total;
       const foldable = r.folded !== undefined;
-      const sel = M.sel === `item:${i.id}`;
+      const sel = M.sel === `item:${i.id}` || n === M.selRow; // the item, or the folded row holding the selected task
       const lane = i.level === 'lane';
       const glyph = done ? '✓' : foldable ? (r.folded ? '▸' : '▾') : e.running ? '◐' : '';
       const label = h('button', { type: 'button', class: 'g-lab', style: { width: `${cw}px`, paddingLeft: `${INDENT[r.depth] ?? 14}px`, ...(lane ? { color: HX.laneColor(i.repo) ?? 'var(--color-accent)' } : {}) }, 'aria-expanded': foldable ? String(!r.folded) : null, title: trailText(i), onclick: () => {
@@ -408,11 +550,12 @@
         } else selectItem(i);
       } },
       h('span', { class: `gl ${done ? 'ok' : ''}` }, glyph), h('span', { class: 'tx' }, i.title), h('span', { class: 'meta' }, foldable && e.running ? '◐' : e.failing ? '!' : ''));
-      if (e.start != null && e.end != null) {
+      const span = barOf(r);
+      if (span) {
         const p = e.done / Math.max(1, e.total);
-        const meta = `${done ? '✓ ' : ''}${e.done}/${e.total}${e.waitsOn && !done ? ` · waits ${e.waitsOn}` : ''}`;
-        const bl = x(e.start);
-        const bw = Math.max(done ? 16 : 8 + meta.length * 6, x(e.end) - bl);
+        const meta = itemMeta(e);
+        const [bl, br] = span;
+        const bw = br - bl;
         // Its label starts where the bar comes into view, so a bar begun weeks ago still says how far it has got.
         const inset = Math.max(0, Math.min(B.gantt.scrollLeft - bl, bw - meta.length * 6 - 10));
         track.append(h('div', { class: `g-bar item ${done ? 'done' : 'prog'}${sel ? ' sel' : ''}`, style: { left: `${bl}px`, width: `${bw}px`, paddingLeft: `${5 + inset}px`, '--p': `${p * 100}%` }, title: `${i.title}: ${e.done} of ${e.total} merged${done ? '' : `, projected to finish ${F.dayTime(e.end)}`}`, onclick: () => selectItem(i) }, meta));
@@ -430,9 +573,10 @@
       h('span', { class: 'meta' }, human ? `holds ${t.held}` : live ? `(${HX.BADGE[live.agent]})` : t.status === 'claimed' && t.agent ? `(${HX.BADGE[t.agent]})` : ''));
     const s = human ? Math.min(t.latestStart ?? M.board.now, M.board.now) : t.start;
     const e = human ? t.expectedDone : t.end;
-    if (s != null && e != null) {
-      const left = x(s);
-      const w = Math.max(st === 'done' ? 8 : 6, x(e) - left);
+    const span = barOf(r);
+    if (span) {
+      const [left, right] = span;
+      const w = right - left;
       const bar = h('div', { class: `g-bar ${st}${human && t.late ? ' late' : ''}${sel ? ' sel' : ''}`, style: { left: `${left}px`, width: `${w}px` }, title: `${t.id} · ${human ? `expected done ${F.dayTime(e)}` : st === 'done' ? `merged ${F.dayTime(e)}` : `${t.projected ? 'projected ' : ''}${F.dayTime(s)} to ${F.dayTime(e)}`}`, onclick: () => select(t.id) }, st === 'done' && w > 14 ? '✓' : st === 'need' ? '!' : '');
       // A failed attempt is a red notch on the bar.
       for (const f of t.fails ?? []) if (f >= s && f <= e + 60_000) bar.append(h('i', { class: 'notch', style: { left: `${x(f) - left}px` } }));
@@ -443,12 +587,14 @@
   }
 
   // ---- the detail panel ----
-  function select(id, fromRoute) {
+  function select(id) {
     M.sel = id;
     M.detail = null;
     HX.store.set('mapSel', id ?? '');
-    if (!fromRoute) history.replaceState(null, '', id ? `#map/${id}` : '#map');
-    drawRows(true);
+    syncRoute();
+    // A task the rows don't show yet (a link, the search, the panel) gets its row; a click on a row moves none.
+    if (id && M.board && HX.mapSelectedRow(M.rows, id) < 0) layout();
+    else drawRows(true);
     if (id && B.panel.classList.contains('closed')) togglePanel();
     renderPanel();
     if (id) loadDetail();
@@ -456,6 +602,8 @@
   function selectItem(i) {
     M.sel = `item:${i.id}`;
     M.detail = { item: i };
+    HX.store.set('mapSel', M.sel);
+    syncRoute();
     drawRows(true);
     if (B.panel.classList.contains('closed')) togglePanel();
     renderPanel();
@@ -497,7 +645,7 @@
       d?.task || d?.human ? HX.statusTag((d.task ?? d.human).status) : null);
     const head = h('div', { class: 'row' }, h('span', { class: 'grow' }), HX.btn(HX.icon('sidebar-simple'), togglePanel, 'btn-ghost collapse', { title: 'Collapse the panel', 'aria-label': 'Collapse the panel' }));
     let body;
-    if (!M.sel) body = h('div', { class: 'stack' }, h('h6', { class: 'cap' }, 'Nothing selected'), h('p', { class: 'muted' }, 'Pick a task, a human task, a story, a feature, an epic or a lane to see its state, why it stopped, its builder history and its commits on main.'), legendNote());
+    if (!M.sel) body = h('div', { class: 'stack' }, h('h6', { class: 'cap' }, 'Nothing selected'), h('p', { class: 'muted' }, 'Pick a task, a human task, a story, a feature, an epic or a lane to see its state, why it stopped, its builder history and its commits on main, and to draw lines from what it waits on and to what waits on it.'), legendNote());
     else if (!d) body = h('div', { class: 'muted' }, 'Loading…');
     else if (d.error) body = h('div', { class: 't-crit' }, d.error);
     else if (d.item) body = itemDetail(d.item);

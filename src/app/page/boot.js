@@ -29,6 +29,16 @@
   };
 
   HX.hydrateIcons();
-  HX.route();
-  HX.connect();
+  // The state first: a view mounted before it would draw with the defaults in place of the owner's settings (the
+  // Map's filters among them), and the first change made there would save over the rest.
+  HX.api('/api/state')
+    .then((state) => {
+      S.state = state;
+      HX.renderTop();
+    })
+    .catch((e) => console.error(e))
+    .finally(() => {
+      HX.route();
+      HX.connect();
+    });
 })();
