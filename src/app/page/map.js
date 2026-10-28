@@ -49,6 +49,7 @@
       } else syncRoute();
     },
     async update(what) {
+      renderStatus();
       if (what.has('logs') && what.size === 1) return drawRows();
       if (['all', 'plan', 'ledger', 'live', 'reports', 'agents', 'loop', 'config'].some((w) => what.has(w))) await load();
       if (M.sel && ['all', 'plan', 'ledger', 'live', 'reports', 'threads'].some((w) => what.has(w))) loadDetail();
@@ -125,6 +126,7 @@
     M.body = null;
     M.placedAt = undefined;
     B = {
+      status: h('div', { class: 'mapstatus', 'aria-live': 'polite' }),
       tools: h('div', { class: 'bar1' }),
       legend: h('div', { class: 'legend', role: 'group', 'aria-label': 'Show or hide' }),
       gantt: h('div', { class: 'gantt' }),
@@ -136,7 +138,8 @@
       drawRows();
     });
     pinch();
-    fill(M.el, h('section', { class: 'map' }, B.tools, B.legend, h('div', { class: 'gframe' }, B.gantt, B.resize)), B.panel);
+    fill(M.el, h('section', { class: 'map' }, B.status, B.tools, B.legend, h('div', { class: 'gframe' }, B.gantt, B.resize)), B.panel);
+    renderStatus();
     renderLegend();
     renderTools();
     renderPanel();
@@ -146,6 +149,25 @@
   const viewNow = () => HX.mapView(M.f.view);
   // The milestone filter, while the board still has it.
   const milestoneNow = () => (M.board?.milestones.some((m) => m.key === M.f.ms) ? M.f.ms : '');
+
+  // The loop's state, large, over the chart: what it is doing now, and where that puts the finish.
+  function renderStatus() {
+    const s = S.state;
+    if (!s || !B?.status) return;
+    const { text, dot } = HX.loopStatus();
+    const t = s.totals;
+    const finish = s.codeFinish != null
+      ? [`code complete projected ${F.day(s.codeFinish)}`, `project complete ${F.day(s.finish)}`]
+      : s.finish != null ? [`finish projected ${F.day(s.finish)}`] : [];
+    fill(B.status,
+      h('h2', null, h('i', { class: `dot ${dot}` }), text),
+      h('p', null, [
+        `${F.plural(t.claimed, 'task')} building`,
+        `${F.n(t.done)} of ${F.n(t.tasks)} merged`,
+        s.counts?.home ? h('a', { href: '#home' }, `${F.n(s.counts.home)} waiting for you`) : null,
+        ...finish,
+      ].filter(Boolean).flatMap((p, i) => (i ? [' · ', p] : [p]))));
+  }
 
   function renderTools() {
     const search = h('input', { class: 'input search', placeholder: 'Find a task, story, feature or commit', value: M.q, 'aria-label': 'Find' });

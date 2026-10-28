@@ -220,6 +220,15 @@
   };
 
   // ---- the top bar ----
+  // The loop's state in a few words, with its dot: the top bar and the Map's headline say the same.
+  HX.loopStatus = () => {
+    const s = S.state;
+    const l = s.loop;
+    const both = s.agents.filter((a) => a.enabled).length === 2;
+    const text = !l.running ? 'Stopped' : l.stopping ? 'Stopping' : s.paused ? 'Paused · passes finishing' : l.mode === 'paused' ? 'Waiting · both agents at their limits' : l.mode.startsWith('single') ? `Running · ${HX.AGENT[l.mode.split(':')[1]]} only` : `Running · ${both ? 'both agents' : HX.AGENT[s.agents.find((a) => a.enabled)?.name] ?? ''}`;
+    const dot = l.running && !l.stopping && !s.paused && l.mode !== 'paused' ? 'on' : l.running ? 'warn' : '';
+    return { text, dot };
+  };
   HX.renderTop = () => {
     const s = S.state;
     if (!s) return;
@@ -229,11 +238,9 @@
     $('loopname').textContent = s.dryRun ? `${s.name} · dry run` : s.name;
     const p = s.pilot;
     $('pilot').textContent = p ? (p.mode === 'auto' ? `Auto-pilot · ${HX.LEVEL[p.auto_level]}` : `Active pilot · ${HX.LEVEL[p.active_level]}`) : '';
-    const l = s.loop;
-    const both = s.agents.filter((a) => a.enabled).length === 2;
-    const text = !l.running ? 'Stopped' : l.stopping ? 'Stopping' : s.paused ? 'Paused · passes finishing' : l.mode === 'paused' ? 'Waiting · both agents at their limits' : l.mode.startsWith('single') ? `Running · ${HX.AGENT[l.mode.split(':')[1]]} only` : `Running · ${both ? 'both agents' : HX.AGENT[s.agents.find((a) => a.enabled)?.name] ?? ''}`;
+    const { text, dot } = HX.loopStatus();
     const st = $('loopstate');
-    st.querySelector('.dot').className = `dot ${l.running && !l.stopping && !s.paused && l.mode !== 'paused' ? 'on' : l.running ? 'warn' : ''}`;
+    st.querySelector('.dot').className = `dot ${dot}`;
     st.querySelector('span').textContent = text;
     for (const b of $('roots').children) b.setAttribute('aria-pressed', String(b.dataset.root === S.root));
     document.title = `${s.counts?.home ? `(${s.counts.home}) ` : ''}Helix Loop${s.dryRun ? ' · dry run' : ''}`;

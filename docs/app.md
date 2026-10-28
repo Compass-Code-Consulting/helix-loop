@@ -21,7 +21,8 @@ Each group acts on all its members at once (hand them back, open the checklist, 
 
 ## Map
 
-The TaskSet against time, from the projection: the critical path, what is running, what failed, what waits on a person, the two finish dates as dashed lines, and each milestone as a dotted line with its number and title.
+At the top, the loop's state as the top bar says it, large, with what is building, what is merged, what waits on you and the projected dates.
+Below it, the TaskSet against time, from the projection: the critical path, what is running, what failed, what waits on a person, the two finish dates as dashed lines, and each milestone as a dotted line with its number and title.
 
 - **View**, from the widest to the narrowest: Lane, Epic, Feature, Story and Task show one row per item of that level, each with a bar from its first task's start to its last projected finish and its progress; Hybrid nests Lane › Epic › Feature › Story › tasks, folding what is finished or has nothing on the frontier.
   The toolbar says how many the view holds: "54 epics", or for Hybrid "4 lanes · 20 epics · 61 features · 190 stories · 765 tasks".
