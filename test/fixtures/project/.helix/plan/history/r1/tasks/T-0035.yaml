@@ -1,0 +1,14 @@
+id: T-0035
+repo: acme-docs
+story: learn-sharing
+area: docs/sharing
+title: "A guide explains copying and sending a page's link"
+reqs: [DOC-1, PB-20]
+spec: ["§11 Sharing"]
+acceptance:
+  - "e2e: [PB-20] the sharing guide shows where Copy link is"
+blocked_by: [T-0033]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

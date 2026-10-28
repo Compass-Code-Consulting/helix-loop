@@ -17,6 +17,7 @@ import { renderDependencyMap } from '../src/map/render.ts';
 import type { Approval } from '../src/release.ts';
 import type { HumanTask, MapModel, Task } from '../src/types.ts';
 import { FIXTURE } from './fixture.ts';
+import { storyOf, writeStructure } from './plans.ts';
 
 // The dry run (handoff "definition of ready"): the real loop, the real adapters and real git
 // repositories, with scripted fake `claude` and `codex` executables in place of the CLIs.
@@ -30,7 +31,7 @@ interface Setup {
   passes: (id?: string) => Extract<LedgerEvent, { kind: 'pass' }>[];
   main: (repo?: string) => string[];
   notes: { title: string; message: string }[]; // the notifications the loop sent
-  add: (tasks: Partial<Task>[]) => void; // more tasks (with ids), for a later run
+  add: (tasks: Spec[]) => void; // more tasks (with ids), for a later run
   human: (step: Partial<HumanTask> & { id: string }) => void; // writes a human step
   git: (repo: string, ...args: string[]) => string; // in the repo's primary checkout
   tags: (repo: string) => string[]; // release tags, oldest first
@@ -58,8 +59,11 @@ function scenario(name: string, fn: () => Promise<void>): void {
   });
 }
 
+// A task as a scenario writes it: what it sets, and the milestone it is in (`first` when it names none).
+type Spec = Partial<Task> & { milestone?: string };
+
 function setup(
-  tasks: Partial<Task>[],
+  tasks: Spec[],
   scenario: Record<string, string[]>,
   tune: (c: Config) => void = () => {},
   humans: (Partial<HumanTask> & { id: string })[] = [],
@@ -68,16 +72,21 @@ function setup(
   const root = mkdtempSync(join(tmpdir(), 'mushy-dryrun-'));
   const p = paths(root);
   seedControlPlane(root, FIXTURE);
-  const add = (list: Partial<Task>[]) =>
-    list.forEach((t, i) => {
+  // Every task in one lane per repo; the milestones as the specs name them (test/plans.ts).
+  const milestoneOf: Record<string, string> = {};
+  const add = (list: Spec[]) => {
+    list.forEach(({ milestone, ...t }, i) => {
       const id = t.id ?? `T-${String(i + 1).padStart(4, '0')}`;
       const full: Task = {
-        id, repo: 'acme-app', stage: 'day1', area: `area-${id.toLowerCase()}`, title: `Dry-run task ${id}`, reqs: ['PB-14'],
+        id, repo: 'acme-app', area: `area-${id.toLowerCase()}`, title: `Dry-run task ${id}`, reqs: ['PB-14'],
         spec: ['PB-14'], acceptance: [`unit: [PB-14] dry-run behaviour of ${id}`], blocked_by: [], estimate_passes: 1,
-        status: 'ready', claimed_by: null, attempts: [], ...t,
+        status: 'ready', claimed_by: null, attempts: [], ...t, story: storyOf(t.repo ?? 'acme-app'),
       };
+      if (milestone) milestoneOf[id] = milestone;
       writeFileSync(join(p.tasks, `${id}.yaml`), stringify(full));
     });
+    writeStructure(root, milestoneOf);
+  };
   const human = (h: Partial<HumanTask> & { id: string }) => {
     const full: HumanTask = { title: `Dry-run human step ${h.id}`, done_check: 'Daniel says so', lead_time_days: 1, agent_can_help: 'no', blocked_by: [], status: 'todo', ...h };
     writeFileSync(join(p.human, `${h.id}.yaml`), stringify(full));
@@ -648,14 +657,27 @@ scenario('the daily budget takes an agent out until midnight', async () => {
   assert.ok(s.modes().includes('single:codex'));
 });
 
-scenario('blocked_by and stages order the work; --max-passes stops with exit 3', async () => {
-  const s = setup([{}, { blocked_by: ['T-0001'] }, { stage: 'day2' }], {});
+scenario('blocked_by and milestones order the work; --max-passes stops with exit 3', async () => {
+  // One agent: the earlier milestone's work first, its dependencies respected, the later milestone after.
+  const s = setup([{}, { blocked_by: ['T-0001'] }, { milestone: 'second' }], {}, (c) => {
+    c.agents.codex.enabled = false;
+  });
   assert.equal(await s.run({ maxPasses: 2 }), EXIT.stopped);
   assert.equal(s.task('T-0001').status, 'done');
   assert.equal(s.task('T-0002').status, 'done');
   assert.equal(s.task('T-0003').status, 'ready');
   const order = s.passes().map((p) => p.task);
   assert.deepEqual(order, ['T-0001', 'T-0002']);
+});
+
+scenario('a milestone is a priority, not a gate: a free agent takes later work while the earlier work waits', async () => {
+  const s = setup([{}, { blocked_by: ['T-0001'] }, { milestone: 'second' }], {});
+  assert.equal(await s.run(), EXIT.allDone);
+  const first = s.passes().slice(0, 2).map((p) => p.task).sort();
+  assert.deepEqual(first, ['T-0001', 'T-0003'], 'T-0003 ran beside T-0001, not after T-0002');
+  const reached = s.ledger().filter((e): e is Extract<LedgerEvent, { kind: 'milestone' }> => e.kind === 'milestone');
+  assert.deepEqual(reached.map((e) => e.key).sort(), ['first', 'second']);
+  assert.ok(s.notes.some((n) => n.title === 'Milestone reached' && n.message.startsWith('The first milestone. Review it: ')), JSON.stringify(s.notes));
 });
 
 scenario('a mascot task pinned to Codex in the design role runs on Astra; the rest of the work is shared', async () => {
@@ -672,9 +694,9 @@ scenario('a mascot task pinned to Codex in the design role runs on Astra; the re
   assert.ok(s.passes().some((p) => p.agent === 'claude'));
 });
 
-scenario('release tags: every N merges in a repo, and when a stage closes; workflows only from ci-area tasks', async () => {
+scenario('release tags: every N merges in a repo, and in each lane a milestone touched when it is reached; workflows only from ci-area tasks', async () => {
   const s = setup(
-    [{}, {}, {}, { repo: 'acme-docs' }, { area: 'ci', stage: 'day2' }, { stage: 'day2' }],
+    [{}, {}, {}, { repo: 'acme-docs' }, { area: 'ci', milestone: 'second' }, { milestone: 'second' }],
     { 'T-0006': ['ciwrite', 'implement'], 'T-0005': ['ciwrite'] },
     (c) => {
       c.release.every_merged_tasks = 2;
@@ -684,7 +706,9 @@ scenario('release tags: every N merges in a repo, and when a stage closes; workf
   const releases = s.ledger().filter((e): e is Extract<LedgerEvent, { kind: 'release' }> => e.kind === 'release');
   const app = releases.filter((r) => r.repo === 'acme-app');
   assert.ok(app.some((r) => r.reason.startsWith('Checkpoint')), JSON.stringify(releases));
-  assert.ok(releases.some((r) => r.repo === 'acme-docs' && r.reason === 'Stage day1 closed' && r.tasks.includes('T-0004')), JSON.stringify(releases));
+  assert.ok(releases.some((r) => r.repo === 'acme-docs' && r.reason === 'Milestone reached: The first milestone' && r.tasks.includes('T-0004')), JSON.stringify(releases));
+  // The second milestone touched acme-app alone.
+  assert.ok(!releases.some((r) => r.repo === 'acme-docs' && r.reason === 'Milestone reached: Milestone second'), JSON.stringify(releases));
   const tags = execFileSync('git', ['tag', '--list', 'v*'], { cwd: join(paths(s.root).repos, 'acme-app') }).toString().trim().split('\n');
   assert.ok(tags.length >= 2 && tags.every((t) => /^v\d{4}\.\d{2}\.\d{2}\.\d+$/.test(t)), tags.join(','));
   assert.equal(s.task('T-0006').attempts[0]!.outcome, 'forbidden_paths');
@@ -778,7 +802,7 @@ scenario('no release is pushed into a repo whose origin was rewritten after its 
   });
   const origin = s.origin('acme-app');
   assert.equal(await s.run(), EXIT.allDone);
-  // T-0001 merged and was pushed; then origin/main was rewritten, and the stage closed.
+  // T-0001 merged and was pushed; then origin/main was rewritten, and the milestone was reached.
   assert.deepEqual(s.tags('acme-app'), []);
   assert.equal(execFileSync('git', ['tag', '--list'], { cwd: origin }).toString().trim(), '', 'no tag republished the dropped commit');
   const [held] = heldOf(s, 'acme-app');
@@ -800,14 +824,14 @@ scenario('a repo released only after its human step: held until HT-25 is done, t
   );
   assert.equal(await s.run(), EXIT.allDone);
   const held = heldOf(s, 'acme-website');
-  assert.deepEqual(held.map((e) => e.reason), ['Checkpoint every 2 tasks', 'Stage day1 closed']);
+  assert.deepEqual(held.map((e) => e.reason), ['Checkpoint every 2 tasks', 'Milestone reached: The first milestone']);
   assert.ok(held.every((e) => e.detail === 'until HT-25 is done (it is in_progress)'), JSON.stringify(held));
   assert.deepEqual(s.tags('acme-website'), []);
   assert.equal(s.tags('acme-app').length, 1, 'other repos release as usual');
   assert.match(s.cli('status').out, /acme-website: releases held until HT-25 is done \(in_progress\)/);
 
   s.human({ id: 'HT-25', status: 'done' });
-  s.add([{ id: 'T-0004', repo: 'acme-website', stage: 'day2' }]);
+  s.add([{ id: 'T-0004', repo: 'acme-website', milestone: 'second' }]);
   assert.equal(await s.run(), EXIT.allDone);
   const [release, ...more] = releasesOf(s, 'acme-website');
   assert.equal(more.length, 0);
@@ -827,7 +851,7 @@ scenario('a release that changes CI workflows waits for approval; later ones wai
   const repo = 'acme-app';
   const approvals = join(paths(s.root).runs, 'approvals');
   assert.equal(await s.run(), EXIT.allDone);
-  // One approval, from the first checkpoint; the next checkpoint and the stage release wait behind it.
+  // One approval, from the first checkpoint; the next checkpoint and the milestone's release wait behind it.
   const files = readdirSync(approvals);
   assert.equal(files.length, 1, files.join(', '));
   const approval = JSON.parse(readFileSync(join(approvals, files[0]!), 'utf8')) as Approval;
@@ -838,7 +862,7 @@ scenario('a release that changes CI workflows waits for approval; later ones wai
   assert.match(execSync(approval.review).toString(), /^\+on: \[push, pull_request\]$/m, 'the review command shows the change');
   assert.deepEqual(s.tags(repo), [], 'nothing was tagged');
   const held = heldOf(s, repo);
-  assert.deepEqual(held.map((e) => e.reason), ['Checkpoint every 2 tasks', 'Checkpoint every 2 tasks', 'Stage day1 closed']);
+  assert.deepEqual(held.map((e) => e.reason), ['Checkpoint every 2 tasks', 'Checkpoint every 2 tasks', 'Milestone reached: The first milestone']);
   assert.ok(held.every((e) => e.tag === approval.tag && e.approval === `runs/approvals/${files[0]}`), JSON.stringify(held));
   assert.match(held[0]!.detail, /^for approval: /);
   assert.ok(held.slice(1).every((e) => e.detail.startsWith(`behind ${approval.tag}`)));
@@ -856,7 +880,7 @@ scenario('a release that changes CI workflows waits for approval; later ones wai
   assert.deepEqual(readdirSync(approvals), []);
 
   // After the approval, releases resume from it: the next tag follows it, and every task is released once.
-  s.add([{ id: 'T-0005', stage: 'day2' }, { id: 'T-0006', stage: 'day2', blocked_by: ['T-0005'] }]);
+  s.add([{ id: 'T-0005', milestone: 'second' }, { id: 'T-0006', milestone: 'second', blocked_by: ['T-0005'] }]);
   assert.equal(await s.run(), EXIT.allDone);
   const releases = releasesOf(s, repo);
   assert.deepEqual(releases.map((r) => r.tasks), [['T-0001', 'T-0002'], ['T-0003', 'T-0004', 'T-0005', 'T-0006']]);
@@ -876,7 +900,7 @@ scenario('helix-loop release run says what holds a repo and releases it once the
   }, [{ id: 'HT-25', status: 'todo' }]);
   const origin = s.origin(repo);
   const originTags = () => execFileSync('git', ['tag', '--list'], { cwd: origin }).toString().trim().split('\n').filter(Boolean);
-  assert.equal(await s.run(), EXIT.allDone); // T-0001 is merged and pushed; its release is held at the stage close
+  assert.equal(await s.run(), EXIT.allDone); // T-0001 is merged and pushed; its release is held when its milestone is reached
 
   let out = s.cli('release', 'run', repo);
   assert.equal(out.code, 10, out.out);
@@ -991,7 +1015,7 @@ scenario('after every pass the dependency map shows each task\'s status and summ
   assert.ok(existsSync(logFile(s.root, s.task('T-0002').attempts[0]!.log)), 'the blocked attempt points at its compressed log');
 });
 
-scenario('plan commits carry the task files after each merge, and the dependency map only when a stage closes', async () => {
+scenario('plan commits carry the task files after each merge, and the dependency map only when a milestone is reached', async () => {
   const s = setup([{}, { blocked_by: ['T-0001'] }], {});
   // A control plane under git, like the real one, where Daniel is editing a plan document.
   const cp = (...args: string[]) => execFileSync('git', args, { cwd: s.root }).toString().trim();
@@ -1010,9 +1034,9 @@ scenario('plan commits carry the task files after each merge, and the dependency
   const first = commits.find((c) => c.subject.startsWith('plan: T-0001 done'))!;
   const closing = commits.find((c) => c.subject.startsWith('plan: T-0002 done'))!;
   assert.ok(first.files.includes('.helix/plan/tasks/T-0001.yaml') && !first.files.includes(map), JSON.stringify(first));
-  assert.match(closing.subject, /; stage day1 closed$/);
+  assert.match(closing.subject, /; milestone first reached$/);
   assert.ok(closing.files.includes('.helix/plan/tasks/T-0002.yaml') && closing.files.includes(map), JSON.stringify(closing));
-  // The snapshot shows the stage done; the loop never commits anything else under plan/.
+  // The snapshot shows the milestone's work done; the loop never commits anything else under plan/.
   const snapshot = JSON.parse(/<script type="application\/json" id="model">([\s\S]*?)<\/script>/.exec(cp('show', `HEAD:${map}`))![1]!) as MapModel;
   assert.deepEqual(['T-0001', 'T-0002'].map((id) => node(snapshot, id).status), ['done', 'done']);
   assert.equal(cp('status', '--porcelain', '--', '.helix/plan/notes.md'), 'M .helix/plan/notes.md');

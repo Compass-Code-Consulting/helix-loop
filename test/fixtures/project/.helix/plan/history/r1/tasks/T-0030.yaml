@@ -1,0 +1,14 @@
+id: T-0030
+repo: acme-website
+story: compare-plans
+area: site/compare
+title: "A table compares what each plan includes"
+reqs: [WEB-2]
+spec: ["§1"]
+acceptance:
+  - "e2e: [WEB-2] the comparison table has a row per feature and a column per plan"
+blocked_by: [T-0029, HT-2]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

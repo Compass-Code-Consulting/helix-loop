@@ -1,0 +1,18 @@
+id: T-0006
+repo: acme-app
+story: write-a-note
+area: notes/store
+title: "A member creates and edits a Markdown note in their workspace"
+reqs: [WS-1]
+spec: ["§1", "§2"]
+acceptance:
+  - "integration: [WS-1] notes.create stores the title and body, and notes.update keeps its id"
+blocked_by: [T-0002]
+estimate_passes: 1
+status: done
+claimed_by: null
+attempts:
+  - agent: claude
+    outcome: merged
+    at: "2026-10-26T10:00:00Z"
+    log: runs/logs/2026-10-26/T-1-claude-1.log

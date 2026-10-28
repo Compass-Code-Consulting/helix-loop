@@ -1,0 +1,18 @@
+id: T-0033
+repo: acme-docs
+story: learn-publishing
+area: docs/skeleton
+title: "The docs site builds and deploys its index"
+reqs: [SKL-1]
+spec: ["§15"]
+acceptance:
+  - "e2e: [SKL-1] the deployed docs answer GET / with the guide index"
+blocked_by: []
+estimate_passes: 0.5
+status: done
+claimed_by: null
+attempts:
+  - agent: claude
+    outcome: merged
+    at: "2026-10-25T12:00:00Z"
+    log: runs/logs/2026-10-25/T-1-claude-1.log

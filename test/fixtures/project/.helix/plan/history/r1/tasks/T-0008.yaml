@@ -1,0 +1,18 @@
+id: T-0008
+repo: acme-app
+story: find-notes
+area: notes/list
+title: "The workspace's notes are listed newest first"
+reqs: [NAV-1]
+spec: ["§19"]
+acceptance:
+  - "e2e: [NAV-1] the newest note is first in the list"
+blocked_by: [T-0006]
+estimate_passes: 0.5
+status: done
+claimed_by: null
+attempts:
+  - agent: codex
+    outcome: merged
+    at: "2026-10-26T13:00:00Z"
+    log: runs/logs/2026-10-26/T-1-codex-1.log

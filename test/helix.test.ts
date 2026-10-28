@@ -8,9 +8,8 @@ import { stringify } from 'yaml';
 import { type Config, configPath, loadConfig, monitorModel, monitorOf, paths } from '../src/config.ts';
 import { seedControlPlane } from '../src/dryrun.ts';
 import { loadPlan } from '../src/plan/store.ts';
-import { validateGraph } from '../src/plan/validate.ts';
-import { openStage } from '../src/sched/scheduler.ts';
-import type { HumanTask, Plan, Task } from '../src/types.ts';
+import { diffTaskSet } from '../src/plan/taskset.ts';
+import type { HumanTask, Task } from '../src/types.ts';
 import { buildBoard, finishMoved } from '../src/app/board.ts';
 import { readChanges, undoChange } from '../src/app/changes.ts';
 import { applyChangeSet, applyToText, checkConfig, ConfigEditError } from '../src/app/config.ts';
@@ -22,11 +21,11 @@ import { estimateLevels, monitorChanges, monitorShouldRun, simulateTurns } from 
 import { project } from '../src/app/projection.ts';
 import { startApp } from '../src/app/server.ts';
 import { stepsOf } from '../src/app/server.ts';
-import { diffTaskSet, initTaskSet, loadTaskSet } from '../src/app/taskset.ts';
 import { triage } from '../src/app/triage.ts';
 import type { Report } from '../src/app/state.ts';
 import type { LedgerEvent } from '../src/ledger.ts';
 import { FIXTURE } from './fixture.ts';
+import { planOf, storyOf, tasksetFile, writeStructure } from './plans.ts';
 
 // Helix Loop (spec: Helix Loop - App Spec 2026-10-27): the board and its projection, Home's groups, pilot mode,
 // incidents, config change sets, batch edits and undo, the TaskSet, and the endpoints that drive them, each
@@ -37,12 +36,11 @@ const DAY = 24 * HOUR;
 const NOW = Date.parse('2026-10-27T12:00:00Z');
 
 function task(t: Partial<Task> & { id: string }): Task {
-  return { repo: 'acme-app', stage: 'day1', area: `area-${t.id.toLowerCase()}`, title: `Helix test task ${t.id}`, reqs: ['PB-14'], spec: ['PB-14'], acceptance: [`unit: [PB-14] behaviour of ${t.id}`], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...t };
+  return { repo: 'acme-app', area: `area-${t.id.toLowerCase()}`, title: `Helix test task ${t.id}`, reqs: ['PB-14'], spec: ['PB-14'], acceptance: [`unit: [PB-14] behaviour of ${t.id}`], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...t, story: t.story ?? storyOf(t.repo ?? 'acme-app') };
 }
 function human(h: Partial<HumanTask> & { id: string }): HumanTask {
   return { title: `Helix test human step ${h.id}`, done_check: 'Daniel says it is done', lead_time_days: 1, agent_can_help: 'no', blocked_by: [], status: 'todo', ...h };
 }
-const planOf = (tasks: Task[], humans: HumanTask[] = []): Plan => ({ tasks: new Map(tasks.map((t) => [t.id, t])), human: new Map(humans.map((h) => [h.id, h])) });
 
 function controlPlane(tasks: Task[] = [], humans: HumanTask[] = [], git = false): string {
   const root = mkdtempSync(join(tmpdir(), 'helix-'));
@@ -50,6 +48,7 @@ function controlPlane(tasks: Task[] = [], humans: HumanTask[] = [], git = false)
   const p = paths(root);
   for (const t of tasks) writeFileSync(join(p.tasks, `${t.id}.yaml`), stringify(t));
   for (const h of humans) writeFileSync(join(p.human, `${h.id}.yaml`), stringify(h));
+  writeStructure(root);
   writeFileSync(configPath(root), `# The test loop's config.\n${stringify({ ...loadConfig(FIXTURE), root: undefined, push: false })}`);
   mkdirSync(p.runs, { recursive: true });
   if (git) {
@@ -64,28 +63,29 @@ const gitLog = (root: string, n = 1) => execFileSync('git', ['log', `-${n}`, '--
 
 // ---- the projection and the board ----
 
-test('the projection runs tasks as the loop would pick them: by rank, one pass per area, a stage once the earlier one is settled', () => {
+test('the projection runs tasks as the loop would pick them: by rank, one pass per area, a later milestone in any free slot; each milestone is dated by its last task', () => {
   const plan = planOf([
     task({ id: 'T-0001', area: 'a' }),
     task({ id: 'T-0002', area: 'a' }),
     task({ id: 'T-0003', area: 'b' }),
-    task({ id: 'T-0004', area: 'c', stage: 'day2' }),
+    task({ id: 'T-0004', area: 'c' }),
     task({ id: 'T-0005', area: 'd', blocked_by: ['HT-1'] }),
-  ], [human({ id: 'HT-1', lead_time_days: 2 })]);
+  ], [human({ id: 'HT-1', lead_time_days: 2 })], { 'T-0004': 'second' });
   const p = project({ plan, rank: ['T-0001', 'T-0002', 'T-0003', 'T-0004', 'T-0005'], now: NOW, passHours: 1, slots: 2, running: [] });
   const at = (id: string) => (p.tasks.get(id)!.start - NOW) / HOUR;
   assert.equal(at('T-0001'), 0);
   assert.equal(at('T-0003'), 0, 'another area runs beside it');
   assert.equal(at('T-0002'), 1, 'the same area waits for the first');
   assert.equal(at('T-0005'), 48, 'a task behind a person runs once their lead time is over');
-  assert.ok(at('T-0004') >= 2, 'day 2 opens once day 1 is settled: the task behind a person counts as settled');
-  assert.ok(at('T-0004') < 48);
+  assert.equal(at('T-0004'), 1, 'the later milestone takes the slot the first one has no work for: a priority, not a gate');
+  assert.equal((p.milestones.get('first')! - NOW) / HOUR, 49, 'the first milestone is reached with its last task, behind the person');
+  assert.equal((p.milestones.get('second')! - NOW) / HOUR, 2);
 });
 
 test('a task that needs Daniel is projected as handed back now, and costs the finish what its wait costs', () => {
   const plan = planOf([task({ id: 'T-0001', status: 'needs_human', attempts: [] }), task({ id: 'T-0002', blocked_by: ['T-0001'] })]);
   const config = loadConfig(FIXTURE);
-  const input = { plan, events: [] as LedgerEvent[], taskset: loadTaskSet(mkdtempSync(join(tmpdir(), 'helix-ts-')), plan), agents: [], running: [], config, now: NOW };
+  const input = { plan, events: [] as LedgerEvent[], agents: [], running: [], config, now: NOW };
   const board = buildBoard(input);
   assert.ok(board.projection.tasks.has('T-0002'), 'what waits behind it still gets a date');
   assert.equal(board.tasks.find((t) => t.id === 'T-0001')!.held, 1);
@@ -100,23 +100,23 @@ test('code complete leaves out human tasks\' lead times that project complete co
   const humans = [human({ id: 'HT-10', title: 'Apple Developer Program, after the D-U-N-S number', lead_time_days: 44 })];
   const plan = planOf(tasks, humans);
   const config = loadConfig(FIXTURE);
-  const board = buildBoard({ plan, events: [] as LedgerEvent[], taskset: loadTaskSet(mkdtempSync(join(tmpdir(), 'helix-ts-')), plan), agents: [], running: [], config, now: NOW });
-  assert.deepEqual(board.timelines, ['code', 'project'], 'without a TaskSet file, both');
+  const board = buildBoard({ plan, events: [] as LedgerEvent[], agents: [], running: [], config, now: NOW });
+  assert.deepEqual(board.timelines, ['code', 'project'], 'both, unless the TaskSet asks for one');
   assert.ok(board.finish - NOW >= 44 * 24 * HOUR, 'project complete waits for the account');
   assert.ok(board.codeFinish! - NOW < 24 * HOUR, `code complete is the build alone, not ${(board.codeFinish! - NOW) / HOUR} h`);
   assert.ok(board.codeFinish! < board.finish);
   // A launch step nothing waits on still ends the project, after the work it waits on, but not the code.
   const launch = planOf([task({ id: 'T-0001' })], [human({ id: 'HT-90', title: 'Submit the app for review', lead_time_days: 3, blocked_by: ['T-0001'] })]);
-  const after = buildBoard({ plan: launch, events: [] as LedgerEvent[], taskset: loadTaskSet(mkdtempSync(join(tmpdir(), 'helix-ts-')), launch), agents: [], running: [], config, now: NOW });
+  const after = buildBoard({ plan: launch, events: [] as LedgerEvent[], agents: [], running: [], config, now: NOW });
   assert.ok(after.finish - NOW >= 3 * 24 * HOUR, 'project complete waits for the review step');
   assert.ok(after.codeFinish! - NOW < 24 * HOUR, 'code complete does not');
   // Human tasks in a chain wait for each other: a review of an account that takes 10 days to open, itself 5 days.
   const chain = planOf([task({ id: 'T-0001', blocked_by: ['HT-2'] })], [human({ id: 'HT-1', lead_time_days: 10 }), human({ id: 'HT-2', lead_time_days: 5, blocked_by: ['HT-1'] })]);
-  const chained = buildBoard({ plan: chain, events: [] as LedgerEvent[], taskset: loadTaskSet(mkdtempSync(join(tmpdir(), 'helix-ts-')), chain), agents: [], running: [], config, now: NOW });
+  const chained = buildBoard({ plan: chain, events: [] as LedgerEvent[], agents: [], running: [], config, now: NOW });
   assert.ok(chained.tasks.find((t) => t.id === 'T-0001')!.start! - NOW >= 15 * 24 * HOUR, 'the builder task starts after the whole chain');
 
   const root = controlPlane(tasks, humans);
-  writeFileSync(paths(root).taskset, stringify({ version: 1, timelines: ['project'], lanes: { 'acme-app': { repo: 'acme-app', epics: { core: { title: 'The core' } } } } }));
+  writeFileSync(paths(root).taskset, stringify({ ...tasksetFile(tasks), timelines: ['project'] }));
   const app = await startApp({ root, port: 0 });
   try {
     const state = await (await fetch(`${app.url}/api/state`)).json();
@@ -130,45 +130,18 @@ test('code complete leaves out human tasks\' lead times that project complete co
   }
 });
 
-test('without plan/taskset.yaml, epics are derived per lane and feature, not per stage, and taskset init writes them down with the stages', () => {
-  const tasks = [task({ id: 'T-0001', feature: 'Publishing, team and settings' }), task({ id: 'T-0002', feature: 'Publishing, team and settings', stage: 'day2' }), task({ id: 'T-0003', feature: 'Foundation', stage: 'day0' })];
-  const root = controlPlane(tasks);
-  const plan = loadPlan(paths(root).tasks, paths(root).human);
-  assert.deepEqual(plan.stages, ['day0', 'day1', 'day2'], 'without a TaskSet, the stages the tasks name, in order');
-  const ts = loadTaskSet(root, plan);
-  assert.equal(ts.derived, true);
-  assert.deepEqual(ts.lanes[0]!.epics.map((e) => [e.key, e.title, e.tasks.length]), [['foundation', 'Foundation', 1], ['publishing-team-and-settings', 'Publishing, team and settings', 2]]);
-  const { file, changed } = initTaskSet(root, plan);
-  assert.equal(changed.length, 3);
-  assert.equal(changed.find((t) => t.id === 'T-0003')!.epic, 'foundation');
-  assert.deepEqual(Object.keys(file.lanes['acme-app']!.epics), ['foundation', 'publishing-team-and-settings']);
-  assert.deepEqual(file.stages, [{ key: 'day0', title: 'Day 0' }, { key: 'day1', title: 'Day 1' }, { key: 'day2', title: 'Day 2' }]);
-});
-
-test('stages are optional: a plan whose tasks name none has no stage gating, and a TaskSet declares their order and titles', () => {
-  const root = controlPlane([task({ id: 'T-0001', stage: undefined }), task({ id: 'T-0002', stage: undefined, blocked_by: ['T-0001'] })]);
-  let plan = loadPlan(paths(root).tasks, paths(root).human);
-  assert.deepEqual(plan.stages, []);
-  assert.equal(openStage(plan), undefined);
-  assert.deepEqual(validateGraph(plan), []);
-  writeFileSync(paths(root).taskset, stringify({ version: 1, stages: ['alpha', { key: 'beta-ready', title: 'Beta: ready for users' }], lanes: {} }));
-  plan = loadPlan(paths(root).tasks, paths(root).human);
-  assert.deepEqual(plan.stages, ['alpha', 'beta-ready']);
-  assert.deepEqual(plan.stageTitles, { alpha: 'Alpha', 'beta-ready': 'Beta: ready for users' });
-  const named = loadPlan(paths(controlPlane([task({ id: 'T-0003', stage: 'gamma' })])).tasks, paths(root).human);
-  assert.match(validateGraph({ ...named, stages: plan.stages }).map((p) => p.message).join(), /stage gamma, which the TaskSet doesn't declare/);
-});
-
 test('an imported TaskSet keeps merged, running and attempted tasks as they are, and removes only untouched ones', () => {
   const current = planOf([task({ id: 'T-0001', status: 'done' }), task({ id: 'T-0002' }), task({ id: 'T-0003', attempts: [{ agent: 'claude', outcome: 'gate_failed', at: 'x', log: 'l' }] })]);
   const incoming = planOf([task({ id: 'T-0001', title: 'Renamed in the import, but done already' }), task({ id: 'T-0004' })]);
-  const { diff, plan } = diffTaskSet(current, incoming, new Set(), { version: 1, lanes: { 'acme-app': { repo: 'acme-app', epics: { new: { title: 'New epic' } } } } });
+  incoming.taskset!.stories.set('new-story', { key: 'new-story', title: 'A new story', need: 'As a member, I want more, so that I do more.', feature: 'acme-app-feature', epic: 'acme-app-epic', lane: 'acme-app' });
+  const { diff, plan } = diffTaskSet(current, incoming);
   assert.deepEqual(diff.added, ['T-0004']);
   assert.deepEqual(diff.removed, ['T-0002']);
   assert.ok(diff.kept.includes('T-0001'));
   assert.equal(plan.tasks.get('T-0001')!.status, 'done');
   assert.ok(plan.tasks.has('T-0003'), 'an attempted task is never removed');
-  assert.deepEqual(diff.epicsAdded, ['acme-app/new']);
+  assert.deepEqual(diff.storiesAdded, ['new-story']);
+  assert.equal(plan.taskset, incoming.taskset, 'the plan takes the incoming TaskSet');
 });
 
 // ---- pilot mode ----
@@ -213,7 +186,7 @@ test('Home: human tasks that hold work, stopped tasks by why they stopped, each 
     task({ id: 'T-0004', status: 'parked' }),
   ], [human({ id: 'HT-1', lead_time_days: 5 })]);
   const config = loadConfig(FIXTURE);
-  const input = { plan, events: [pass('T-0001', '2026-10-27T10:00:00Z', 'the pass ran past its timeout', 'timeout')], taskset: loadTaskSet(mkdtempSync(join(tmpdir(), 'helix-ts-')), plan), agents: [], running: [], config, now: NOW };
+  const input = { plan, events: [pass('T-0001', '2026-10-27T10:00:00Z', 'the pass ran past its timeout', 'timeout')], agents: [], running: [], config, now: NOW };
   const board = buildBoard(input);
   const groups = triage({ plan, board, events: input.events, incidents: incidents({ plan, events: input.events, reports: [], stored: [], now: NOW }), approvals: [{ repo: 'acme-docs', tag: 'v1', paths: ['infra/x.tf'], since: 'v0', requestedAt: '' }], hitl: { records: [], ratings: new Map(), raised: [] }, config, dismissed: new Set(), now: NOW });
   const kinds = groups.map((g) => g.kind);

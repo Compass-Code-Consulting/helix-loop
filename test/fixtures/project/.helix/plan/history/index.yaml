@@ -1,0 +1,15 @@
+# Each revision of the TaskSet: when it became current, who made it and why. Superseded ones are kept in r<N>/.
+revisions:
+  - revision: 1
+    date: 2026-10-28T01:43:49.158Z
+    by: Sam
+    why: The TaskSet as first planned
+    tasks: 39
+    snapshot: history/r1/
+  - revision: 2
+    date: 2026-10-28T01:43:49.494Z
+    by: Sam
+    why: "Milestones planned: a walking skeleton, the thinnest path to a public page, then breadth"
+    tasks: 40
+    placeholders: 1
+    wiring: 1

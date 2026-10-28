@@ -1,0 +1,14 @@
+id: T-0032
+repo: acme-website
+story: start-workspace
+area: site/plan-choice
+title: "The sign-up link keeps the plan the visitor chose"
+reqs: [WEB-2]
+spec: ["§1"]
+acceptance:
+  - "e2e: [WEB-2] choosing Team then signing up starts a Team workspace"
+blocked_by: [T-0031]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

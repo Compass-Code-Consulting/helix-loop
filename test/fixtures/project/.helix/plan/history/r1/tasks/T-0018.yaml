@@ -1,0 +1,14 @@
+id: T-0018
+repo: acme-app
+story: jobs-idempotent
+area: platform/idempotency
+title: "Every job carries an idempotency key, so running it twice acts once"
+reqs: [PLT-4]
+spec: ["§10 Background jobs"]
+acceptance:
+  - "integration: [PLT-4] running the same job twice leaves one result"
+blocked_by: [T-0016]
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []

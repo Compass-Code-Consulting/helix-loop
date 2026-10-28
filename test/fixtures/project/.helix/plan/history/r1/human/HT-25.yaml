@@ -1,0 +1,7 @@
+id: HT-25
+title: "Approve the website's first pages before they go live"
+done_check: "The owner has read the home and pricing pages on staging and said so in this task's notes"
+lead_time_days: 1
+agent_can_help: no
+blocked_by: [T-0026, T-0030]
+status: todo

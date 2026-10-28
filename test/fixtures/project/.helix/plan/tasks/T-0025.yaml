@@ -1,0 +1,18 @@
+id: T-0025
+repo: acme-website
+story: learn-the-product
+area: site/skeleton
+title: "The website skeleton builds and deploys its home page"
+reqs: [SKL-1]
+spec: ["§15"]
+acceptance:
+  - "e2e: [SKL-1] the deployed website answers GET / with the home page"
+blocked_by: []
+estimate_passes: 1
+status: done
+claimed_by: null
+attempts:
+  - agent: codex
+    outcome: merged
+    at: "2026-10-25T10:00:00Z"
+    log: runs/logs/2026-10-25/T-1-codex-1.log

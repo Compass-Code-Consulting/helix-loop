@@ -1,0 +1,14 @@
+id: T-0011
+repo: acme-app
+story: see-teammates-notes
+area: notes/sharing
+title: "Members see every note their teammates write"
+reqs: [WS-2]
+spec: ["§2"]
+acceptance:
+  - "e2e: [WS-2] a note one member writes is in the other member's list"
+blocked_by: [T-0010, T-0006]
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []

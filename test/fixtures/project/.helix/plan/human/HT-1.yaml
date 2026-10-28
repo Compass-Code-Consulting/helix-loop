@@ -1,0 +1,17 @@
+id: HT-1
+title: "Open the email provider account and store its API key for sign-in codes"
+story: sign-in-with-code
+done_check: "The provider shows mail.acme.example verified, and the secret EMAIL_PROVIDER_API_KEY is set"
+lead_time_days: 2
+agent_can_help: partly
+handoff_prompt: |
+  You are the owner's agent. Never print, paste or log a secret value.
+  Steps:
+  1. With the owner watching, create the provider account on the owner's sign-in.
+  2. Verify the sending domain mail.acme.example with the DNS records the provider asks for.
+  3. Create a send-only API key and store it as EMAIL_PROVIDER_API_KEY in the deploy environment.
+  Report back: the domain's status and the secret's name, never its value.
+secrets:
+  - { name: EMAIL_PROVIDER_API_KEY, stored_in: "the deploy environment; source: the email provider's dashboard" }
+blocked_by: []
+status: done

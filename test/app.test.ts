@@ -23,6 +23,7 @@ import { loopStatus, mapModel, passesNow } from '../src/app/state.ts';
 import { ASSISTANT_TOOLS, RESOLVE_REQUEST, type HelixJob } from '../src/app/helix.ts';
 import { addComment, addMessage, addProposal, addReply, decide, resolveThread, thread, ThreadError, threadsOf, readEntries } from '../src/app/threads.ts';
 import { FIXTURE } from './fixture.ts';
+import { storyOf, writeStructure } from './plans.ts';
 
 // The loop app (spec: Mushy.LoopEngineering.LoopApp.2026-10-25.md): threads, the MCP endpoints, plan edits and
 // the server's guards, each against a temporary control plane.
@@ -33,10 +34,11 @@ function controlPlane(tasks: Partial<Task>[] = [], humans: (Partial<HumanTask> &
   const p = paths(root);
   tasks.forEach((t, i) => {
     const id = t.id ?? `T-${String(i + 1).padStart(4, '0')}`;
-    const full: Task = { id, repo: 'acme-app', stage: 'day1', area: `area-${id.toLowerCase()}`, title: `App test task ${id}`, reqs: ['PB-14'], spec: ['PB-14'], acceptance: [`unit: [PB-14] behaviour of ${id}`], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...t };
+    const full: Task = { id, repo: 'acme-app', story: storyOf(t.repo ?? 'acme-app'), area: `area-${id.toLowerCase()}`, title: `App test task ${id}`, reqs: ['PB-14'], spec: ['PB-14'], acceptance: [`unit: [PB-14] behaviour of ${id}`], blocked_by: [], estimate_passes: 1, status: 'ready', claimed_by: null, attempts: [], ...t };
     writeFileSync(join(p.tasks, `${id}.yaml`), stringify(full));
   });
   for (const h of humans) writeFileSync(join(p.human, `${h.id}.yaml`), stringify({ title: `App test human step ${h.id}`, done_check: 'Daniel says it is done', lead_time_days: 1, agent_can_help: 'no', blocked_by: [], status: 'todo', ...h }));
+  writeStructure(root);
   writeFileSync(configPath(root), stringify({ ...loadConfig(FIXTURE), root: undefined, push: false }));
   mkdirSync(p.runs, { recursive: true });
   return root;
@@ -204,7 +206,7 @@ test('an accepted edit is written, rendered and committed with a message that sa
   assert.match(human, /status: done/);
   assert.match(human, /handoff_prompt: \|\n {2}Line one\.\n {2}Line two\./, 'the block scalar is left as it was');
 
-  const created = await createTask(root, { repo: 'acme-docs', stage: 'day1', area: 'docs/new', title: 'A task the steward proposed and Daniel accepted', reqs: ['PB-14'], spec: ['PB-14'], acceptance: ['unit: [PB-14] the new docs page renders'], blocked_by: ['T-0001'], estimate_passes: 1 }, 'Plan: {id}: proposed (steward)');
+  const created = await createTask(root, { repo: 'acme-app', story: storyOf('acme-app'), area: 'docs/new', title: 'A task the steward proposed and Daniel accepted', reqs: ['PB-14'], spec: ['PB-14'], acceptance: ['unit: [PB-14] the new docs page renders'], blocked_by: ['T-0001'], estimate_passes: 1 }, 'Plan: {id}: proposed (steward)');
   assert.equal(created.value.id, 'T-0003');
   assert.equal(git('log', '-1', '--format=%s'), 'Plan: T-0003: proposed (steward)');
 });
@@ -247,12 +249,13 @@ test('the server answers only on 127.0.0.1, refuses changes without the launch t
     assert.equal(state.loop.running, false);
     assert.equal((await fetch(`${app.url}/view/map`)).headers.get('content-type'), 'text/html; charset=utf-8');
 
-    // A change to a task file reaches the page as one "changed" event naming the plan.
+    // A change to a task file reaches the page as a "changed" event naming the plan. Events about files written
+    // just before the app started (its config) may come first: macOS reports them late.
     const events = await fetch(`${app.url}/events`);
     const reader = events.body!.getReader();
     const seen = (async () => {
       let text = '';
-      while (!text.includes('event: changed')) text += new TextDecoder().decode((await reader.read()).value);
+      while (!/"what":\[[^\]]*"plan"/.test(text)) text += new TextDecoder().decode((await reader.read()).value);
       return text;
     })();
     await new Promise((r) => setTimeout(r, 300));

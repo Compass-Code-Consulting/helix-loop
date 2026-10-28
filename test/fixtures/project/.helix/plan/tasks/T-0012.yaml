@@ -1,0 +1,15 @@
+id: T-0012
+repo: acme-app
+story: publish-own-note
+area: publishing/publish
+title: "A member publishes a note they own as a page with its title and body"
+reqs: [PB-1, PB-14]
+spec: ["§11 Requirements"]
+acceptance:
+  - "e2e: [PB-1] the published page shows the note's title and body"
+  - "integration: [PB-14] publishing twice keeps one page at the same URL"
+blocked_by: [T-0006]
+estimate_passes: 1
+status: ready
+claimed_by: null
+attempts: []

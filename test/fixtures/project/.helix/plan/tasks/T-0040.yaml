@@ -1,0 +1,14 @@
+id: T-0040
+repo: acme-docs
+story: invite-guide
+area: docs/screens
+title: "The workspace guides carry current screenshots of the app"
+reqs: [DOC-2]
+spec: ["§2"]
+acceptance:
+  - "e2e: [DOC-2] every screenshot in the workspace guides is no older than the app's last release"
+blocked_by: [T-0039]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

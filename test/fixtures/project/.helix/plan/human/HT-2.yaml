@@ -1,0 +1,8 @@
+id: HT-2
+title: "Choose the plans and their prices for the pricing page"
+story: compare-plans
+done_check: "docs/plans.md in acme-website lists each plan, its price and what it includes"
+lead_time_days: 3
+agent_can_help: no
+blocked_by: []
+status: todo

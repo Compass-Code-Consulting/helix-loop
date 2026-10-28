@@ -1,0 +1,123 @@
+# The test project's Helix TaskSet: Acme Notes, in three lanes. Each task names its story; milestones.yaml orders the delivery.
+version: 2
+revision: 1
+timelines: [code, project]
+lanes:
+  app:
+    repo: acme-app
+    epics:
+      team-notes:
+        title: "Team notes"
+        outcome: "A small team writes notes together in one workspace and finds them again."
+        features:
+          app-shell:
+            title: "App shell and sign-in"
+            capability: "The app builds, deploys and lets a member sign in to their workspace."
+            stories:
+              sign-in-with-code:
+                title: "Sign in with an email code"
+                need: "As a member, I want to sign in with a code sent to my email, so that I need no password."
+              operator-health:
+                title: "Health check and structured logs"
+                need: "As an operator, I want a health check and structured logs, so that I can tell the service is up without reading anyone's notes."
+          writing-notes:
+            title: "Writing and finding notes"
+            capability: "Members write, edit, list and search the notes in their workspace."
+            stories:
+              write-a-note:
+                title: "Write and edit a note"
+                need: "As a member, I want to write a note in Markdown and edit it later, so that my team's knowledge lives in one place."
+              find-notes:
+                title: "Find the workspace's notes"
+                need: "As a member, I want the workspace's notes listed newest first with a search box, so that I find what my team wrote."
+              see-teammates-notes:
+                title: "See my teammates' notes"
+                need: "As a member, I want to see the notes my teammates write, so that we share one workspace."
+      public-pages:
+        title: "Public pages"
+        outcome: "A member publishes a note as a public page anyone can read, and takes it down again."
+        features:
+          publishing:
+            title: "Publish a note"
+            capability: "Publish a note as a read-only page with a URL that never changes, and unpublish it."
+            stories:
+              publish-own-note:
+                title: "Publish a note I own"
+                need: "As a member, I want to publish a note I own, so that people outside the workspace can read it."
+              unpublish-note:
+                title: "Take a page down"
+                need: "As a member, I want to unpublish a page, so that it is gone within a minute."
+          background-jobs:
+            title: "Reliable background jobs"
+            capability: "Jobs retry with backoff and never act twice."
+            stories:
+              jobs-retry:
+                title: "Jobs retry before they are reported"
+                need: "As an operator, I want a failing job retried with backoff before it is reported, so that a blip never needs me."
+              jobs-idempotent:
+                title: "Jobs act once"
+                need: "As a member, I want a job that runs twice to act once, so that my page is never published twice."
+          sharing:
+            title: "Share a page"
+            capability: "Copy a published page's link, and open it anywhere without signing in."
+            stories:
+              copy-link:
+                title: "Copy a page's link"
+                need: "As a member, I want to copy a published page's link from the note, so that I can send it to anyone."
+              open-shared-link:
+                title: "Open a shared link"
+                need: "As a reader, I want a shared link to open the page directly, so that I read it without an account."
+  website:
+    repo: acme-website
+    epics:
+      public-website:
+        title: "A website that brings teams in"
+        outcome: "Visitors understand Acme Notes and start their team's workspace."
+        features:
+          home-page:
+            title: "Home page"
+            capability: "The home page explains the product and links to sign-up."
+            stories:
+              learn-the-product:
+                title: "Learn what Acme Notes does"
+                need: "As a visitor, I want the home page to explain Acme Notes in a minute, so that I know whether it fits my team."
+              website-health:
+                title: "The website reports its release"
+                need: "As an operator, I want the website to report its version and log without personal data, so that I know which release is live."
+          pricing:
+            title: "Plans and sign-up"
+            capability: "Visitors compare the plans and start a workspace."
+            stories:
+              compare-plans:
+                title: "Compare plans"
+                need: "As a visitor, I want to compare the plans, so that I pick the right one for my team."
+              start-workspace:
+                title: "Start a workspace from the website"
+                need: "As a visitor, I want a sign-up button that starts my workspace, so that I can try it straight away."
+  docs:
+    repo: acme-docs
+    epics:
+      help-centre:
+        title: "Help that answers questions"
+        outcome: "Members find out how to publish, share and work in a workspace without asking support."
+        features:
+          publishing-guides:
+            title: "Publishing guides"
+            capability: "Guides to publishing, sharing and unpublishing a page."
+            stories:
+              learn-publishing:
+                title: "Learn to publish"
+                need: "As a member, I want a guide to publishing a note, so that I publish my first page without help."
+              learn-sharing:
+                title: "Learn to share and take down"
+                need: "As a member, I want a guide to sharing and unpublishing, so that I know who can see my page."
+          workspace-guides:
+            title: "Workspace guides"
+            capability: "Guides to writing, finding and sharing notes in a workspace."
+            stories:
+              learn-workspace:
+                title: "Learn the workspace"
+                need: "As a new member, I want a guide to the workspace, so that I find my team's notes on my first visit."
+              invite-guide:
+                title: "Learn to invite teammates"
+                need: "As a workspace owner, I want a guide to inviting teammates, so that my team joins quickly."

@@ -1,0 +1,14 @@
+id: T-0015
+repo: acme-app
+story: unpublish-note
+area: publishing/ui
+title: "An Unpublish button on the note takes its page down"
+reqs: [PB-2]
+spec: ["§11 Requirements"]
+acceptance:
+  - "e2e: [PB-2] Unpublish on a published note takes the page down and the button changes to Publish"
+blocked_by: [T-0014, T-0007]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

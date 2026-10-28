@@ -1,0 +1,15 @@
+id: T-0007
+repo: acme-app
+story: write-a-note
+area: notes/editor
+title: "The note editor saves as the member types and opens at its own URL"
+reqs: [WS-1, NAV-2]
+spec: ["§1", "§19"]
+acceptance:
+  - "e2e: [WS-1] text typed in the editor is there after a reload"
+  - "e2e: [NAV-2] /notes/:id opens the note directly"
+blocked_by: [T-0006, T-0003]
+estimate_passes: 1
+status: claimed
+claimed_by: claude
+attempts: []

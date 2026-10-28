@@ -1,0 +1,14 @@
+id: T-0037
+repo: acme-docs
+story: learn-workspace
+area: docs/workspace
+title: "A guide introduces the workspace and its notes"
+reqs: [DOC-2]
+spec: ["§2"]
+acceptance:
+  - "e2e: [DOC-2] the workspace guide is the index's first entry"
+blocked_by: [T-0033]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

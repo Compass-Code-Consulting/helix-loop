@@ -8,7 +8,7 @@ import type { HumanTask, Plan, Task } from '../src/types.ts';
 
 function task(id: string, over: Partial<Task> = {}): Task {
   return {
-    id, repo: 'acme-app', stage: 'day1', area: `area-${id}`, title: `Task ${id} title`, reqs: ['PB-14'],
+    id, repo: 'acme-app', story: 'acme-app-story', area: `area-${id}`, title: `Task ${id} title`, reqs: ['PB-14'],
     spec: ['§11 Requirements'], acceptance: [`unit: [PB-14] behaviour of ${id}`], blocked_by: [], estimate_passes: 1,
     status: 'ready', claimed_by: null, attempts: [], ...over,
   };

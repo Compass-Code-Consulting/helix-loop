@@ -1,0 +1,14 @@
+id: T-0036
+repo: acme-docs
+story: learn-sharing
+area: docs/unpublish
+title: "A guide explains taking a page down and how fast it goes"
+reqs: [DOC-1, PB-2]
+spec: ["§11 Requirements"]
+acceptance:
+  - "e2e: [DOC-1] the unpublish guide says a page is gone within a minute"
+blocked_by: [T-0033, T-0014]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

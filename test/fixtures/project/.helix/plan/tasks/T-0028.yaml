@@ -1,0 +1,14 @@
+id: T-0028
+repo: acme-website
+story: website-health
+area: site/logging
+title: "The website logs as structured JSON with no personal data"
+reqs: [OPS-2]
+spec: ["§24"]
+acceptance:
+  - "unit: [OPS-2] a sign-up click logs its page and never the visitor's address"
+blocked_by: [T-0025]
+estimate_passes: 0.5
+status: ready
+claimed_by: null
+attempts: []

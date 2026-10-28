@@ -46,7 +46,7 @@ test('a run ends with its pass, and once the runner stops, the process can exit 
     const runner = new E2ERunner('e2e:direct', 20 * 60_000, () => {});
     const url = await runner.start(0);
     const pass = runner.register(${JSON.stringify(dir)});
-    fetch(url + '/run', { method: 'POST', headers: { 'x-mushy-pass': pass }, body: '{}' }).then((r) => r.text()).catch(() => '');
+    fetch(url + '/run', { method: 'POST', headers: { 'x-helix-pass': pass }, body: '{}' }).then((r) => r.text()).catch(() => '');
     for (let i = 0; i < 100 && !existsSync(${JSON.stringify(pidFile)}); i++) await new Promise((r) => setTimeout(r, 100));
     const pid = Number(readFileSync(${JSON.stringify(pidFile)}, 'utf8'));
     runner.unregister(pass);
