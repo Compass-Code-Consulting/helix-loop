@@ -71,7 +71,8 @@ const approve = define({
   name: 'release approve',
   group: 'Releases',
   summary: 'Tag and push a release held for review, once its diff is read',
-  description: 'A release that changes a reviewed path (CI workflows, infrastructure: what runs with production\'s secrets) waits in .helix/runs/approvals/. `helix-loop releases` lists them with the command that shows the diff; this tags exactly the commit that was reviewed.',
+  description: `A release that changes a reviewed path (CI workflows, infrastructure: what runs with production's secrets) waits in .helix/runs/approvals/.
+\`helix-loop releases\` lists them with the command that shows the diff; this tags exactly the commit that was reviewed.`,
   args: [
     { name: 'repo', description: 'The repo' },
     { name: 'tag', description: 'The release tag, as `helix-loop releases` lists it' },

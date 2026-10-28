@@ -21,7 +21,12 @@ Commands act on the project around the current folder: the nearest folder up wit
 
 - **Start a project:** [`init`](#helix-loop-init), [`doctor`](#helix-loop-doctor), [`skill install`](#helix-loop-skill-install), [`skill`](#helix-loop-skill), [`skill pack`](#helix-loop-skill-pack), [`migrate`](#helix-loop-migrate)
 - **Spec and TaskSet:** [`spec index`](#helix-loop-spec-index), [`spec sections`](#helix-loop-spec-sections), [`validate`](#helix-loop-validate), [`plan render`](#helix-loop-plan-render), [`plan map`](#helix-loop-plan-map), [`taskset`](#helix-loop-taskset), [`taskset init`](#helix-loop-taskset-init), [`taskset import`](#helix-loop-taskset-import)
-- **The loop:** [`run`](#helix-loop-run), [`stop`](#helix-loop-stop), [`pause`](#helix-loop-pause), [`resume`](#helix-loop-resume), [`status`](#helix-loop-status), [`stats`](#helix-loop-stats), [`metrics`](#helix-loop-metrics)
+- **The loop:** [`run`](#helix-loop-run), [`stop`](#helix-loop-stop), [`pause`](#helix-loop-pause), [`resume`](#helix-loop-resume), [`status`](#helix-loop-status), [`stats`](#helix-loop-stats), [`metrics`](#helix-loop-metrics), [`pass stop`](#helix-loop-pass-stop), [`watch`](#helix-loop-watch), [`log`](#helix-loop-log)
+- **Tasks:** [`tasks`](#helix-loop-tasks), [`task`](#helix-loop-task), [`task hand-back`](#helix-loop-task-hand-back), [`task park`](#helix-loop-task-park), [`task note`](#helix-loop-task-note), [`task notes`](#helix-loop-task-notes), [`task dep add`](#helix-loop-task-dep-add), [`task dep remove`](#helix-loop-task-dep-remove)
+- **Human tasks:** [`human`](#helix-loop-human), [`human start`](#helix-loop-human-start), [`human done`](#helix-loop-human-done), [`human step`](#helix-loop-human-step), [`human snooze`](#helix-loop-human-snooze), [`human prompt`](#helix-loop-human-prompt)
+- **What waits on you:** [`inbox`](#helix-loop-inbox), [`incidents`](#helix-loop-incidents), [`incident`](#helix-loop-incident), [`fix accept`](#helix-loop-fix-accept), [`fix decline`](#helix-loop-fix-decline), [`fix dry`](#helix-loop-fix-dry), [`asks`](#helix-loop-asks), [`ask decide`](#helix-loop-ask-decide), [`answer`](#helix-loop-answer), [`changes`](#helix-loop-changes), [`undo`](#helix-loop-undo)
+- **Helix:** [`pilot`](#helix-loop-pilot), [`pilot active`](#helix-loop-pilot-active), [`pilot auto`](#helix-loop-pilot-auto), [`rules`](#helix-loop-rules), [`rule undo`](#helix-loop-rule-undo), [`monitor`](#helix-loop-monitor), [`monitor on`](#helix-loop-monitor-on), [`monitor off`](#helix-loop-monitor-off), [`monitor level`](#helix-loop-monitor-level), [`monitor cap`](#helix-loop-monitor-cap), [`helix agent`](#helix-loop-helix-agent), [`ask`](#helix-loop-ask)
+- **Settings:** [`config`](#helix-loop-config), [`config get`](#helix-loop-config-get), [`config set`](#helix-loop-config-set), [`config check`](#helix-loop-config-check), [`feedback`](#helix-loop-feedback), [`feedback set`](#helix-loop-feedback-set), [`secret set`](#helix-loop-secret-set), [`prompts`](#helix-loop-prompts), [`prompt show`](#helix-loop-prompt-show), [`prompt edit`](#helix-loop-prompt-edit), [`prompt reset`](#helix-loop-prompt-reset)
 - **Releases:** [`releases`](#helix-loop-releases), [`release run`](#helix-loop-release-run), [`release approve`](#helix-loop-release-approve)
 - **The app:** [`app`](#helix-loop-app)
 
@@ -37,7 +42,8 @@ helix-loop init [options]
 
 Asks for the product's name, who steers it, its time zone, the repositories to build and their gate commands, and the agents to use, then writes .helix/: config.yaml, the build prompt, and folders for the spec and the TaskSet.
 Each repository is cloned into .helix/repos/<name>, or started empty for the loop to build from scratch.
-It offers to install the Helix skill too. Everything it asks has an option, for scripts; --yes takes the defaults.
+It offers to install the Helix skill too.
+Everything it asks has an option, for scripts; --yes takes the defaults.
 
 | Option | What it does |
 | --- | --- |
@@ -131,7 +137,8 @@ helix-loop migrate [options]
 ```
 
 For a project that ran Helix Loop from inside it, before the tool stood alone: moves the spec, the TaskSet, the build prompt, the config and Helix's files into .helix/ with git mv, and the loop's runs, repos and worktrees after them (repairing the worktrees' links).
-The loop must be stopped. Without --apply it only says what it would do.
+The loop must be stopped.
+Without --apply it only says what it would do.
 
 | Option | What it does |
 | --- | --- |
@@ -204,7 +211,8 @@ Write the dependency map, a self-contained HTML Gantt chart
 helix-loop plan map
 ```
 
-Writes .helix/plan/DependencyMap.html: every task and human task against time, the critical path highlighted. It opens in any browser, with no app running; the app's Map is the live version.
+Writes .helix/plan/DependencyMap.html: every task and human task against time, the critical path highlighted.
+It opens in any browser, with no app running; the app's Map is the live version.
 
 ### helix-loop taskset
 
@@ -348,6 +356,1000 @@ helix-loop metrics
 Writes the metrics page as a new version in .helix/runs/metrics/ (open its index.html): progress and its projection, where the time goes, cost, and what fails.
 The loop writes one every metrics_every_passes passes on its own and keeps each as it was.
 
+### helix-loop pass stop
+
+Stop one task's pass, keeping its work; the task goes back to ready
+
+```
+helix-loop pass stop <task> [options]
+```
+
+Asks the loop to stop the pass that holds the task; the loop does it within seconds, keeping the work done so far for the next attempt.
+The stop is not counted as a failed attempt.
+--note goes into the task's notes for its next builder.
+
+| Argument | What it is |
+| --- | --- |
+| `task` | The task whose pass to stop |
+
+| Option | What it does |
+| --- | --- |
+| `--to <state>` | Where the task goes: ready (the default) or needs_human |
+| `--note <text>` | What its next builder should know |
+
+Examples:
+
+```sh
+# Stop it and point the next attempt the right way
+helix-loop pass stop T-0042 --note "Start from the shared helper"
+```
+
+### helix-loop watch
+
+Follow a pass as its builder works: its words, commands, edits and gate steps
+
+```
+helix-loop watch [task]
+```
+
+Prints a pass's activity as it happens, as Live shows it in the app, checking every two seconds, until the pass ends.
+With no task, follows every pass as they start and end, until you stop it (Ctrl-C).
+A task with no pass in flight shows its last attempt instead.
+
+| Argument | What it is |
+| --- | --- |
+| `task` | The task to follow (optional) |
+
+Examples:
+
+```sh
+# Follow T-0042's pass to its end
+helix-loop watch T-0042
+# Follow every pass
+helix-loop watch
+```
+
+### helix-loop log
+
+What a pass did, from its log; --gate for the gate's output, --raw for the file
+
+```
+helix-loop log <task> [options]
+```
+
+Prints one attempt's log as a readable list of what its builder did and how the gate went.
+By default the pass in flight, or else the last attempt; --attempt picks another.
+--gate prints only the end of the gate's output, where a failure shows; --raw prints the log as written.
+
+| Argument | What it is |
+| --- | --- |
+| `task` | The task |
+
+| Option | What it does |
+| --- | --- |
+| `--attempt <N>` | The attempt, numbered from 1 |
+| `--gate` | Only the end of the gate's output |
+| `--raw` | The log as written, line for line |
+
+Examples:
+
+```sh
+# Why the last attempt failed its gate
+helix-loop log T-0042 --gate
+# The first attempt, as written
+helix-loop log T-0042 --attempt 1 --raw | less
+```
+
+## Tasks
+
+### helix-loop tasks
+
+The tasks: the open ones by default, filtered by status, lane, epic or stage
+
+```
+helix-loop tasks [options]
+```
+
+Lists the builders' tasks, one line each: where it stands, its lane, its counted attempts and its title.
+"waiting" is a ready task behind work that isn't done; "needs you" stopped for a person.
+By default only open tasks show; --all adds the done ones.
+
+| Option | What it does |
+| --- | --- |
+| `--status <list>` | Only these states, comma-separated: ready, waiting, claimed, needs_human, parked, done |
+| `--lane <repo>` | Only this lane (repo) |
+| `--epic <key>` | Only this epic |
+| `--stage <stage>` | Only this stage |
+| `--ready` | Only tasks that can start now |
+| `--failing` | Only open tasks whose last attempt failed |
+| `--grep <text>` | Only tasks whose id, title or area holds this text |
+| `--all` | Done tasks too |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+Examples:
+
+```sh
+# The open tasks
+helix-loop tasks
+# What waits for you
+helix-loop tasks --status needs_human,parked
+# Failing tasks in one lane, as JSON
+helix-loop tasks --lane acme-app --failing --json
+```
+
+### helix-loop task
+
+Everything about one task: why it stopped, its attempts, notes and dependencies
+
+```
+helix-loop task <id> [options]
+```
+
+Shows one task: its state, lane, epic and stage, why it stopped, each attempt and how it ended, its notes, what it waits on and what waits on it, its commits once merged, and what it cost.
+A human task's id (HT-##) shows that task, as `helix-loop human show` does.
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The task, as T-#### |
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+Examples:
+
+```sh
+# Everything about T-0042
+helix-loop task T-0042
+```
+
+### helix-loop task hand-back
+
+Hand tasks back to the loop, with a note for their next builder
+
+```
+helix-loop task hand-back <id...> [options]
+```
+
+Sets each task back to ready, so the loop picks it up again, and adds the note to its notes.
+Several tasks go back as one commit, which `helix-loop undo` takes back.
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The tasks |
+
+| Option | What it does |
+| --- | --- |
+| `--note <text>` | What the next builder should know |
+
+Examples:
+
+```sh
+# Back to the loop, with a note
+helix-loop task hand-back T-0042 --note "Use the sandbox host"
+```
+
+### helix-loop task park
+
+Park tasks: the loop leaves them until they are handed back
+
+```
+helix-loop task park <id...> [options]
+```
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The tasks |
+
+| Option | What it does |
+| --- | --- |
+| `--note <text>` | Why, for whoever hands it back |
+
+Examples:
+
+```sh
+# Park one task
+helix-loop task park T-0042 --note "Wait for the new API"
+```
+
+### helix-loop task note
+
+Add a note for a task's next attempt
+
+```
+helix-loop task note <id> <text...>
+```
+
+Adds the note under the task's notes, which its next builder reads in its prompt.
+While the task is in a pass, the note waits and goes in when the pass ends.
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The task |
+| `text` | The note |
+
+Examples:
+
+```sh
+# A note for its next builder
+helix-loop task note T-0042 "The fixture lives in test/fixtures/notes.json"
+```
+
+### helix-loop task notes
+
+Show a task's notes, or replace or clear them
+
+```
+helix-loop task notes <id> [options]
+```
+
+With no option, prints the notes of a task or a human task.
+--set replaces them whole and --clear empties them, as one commit you can undo.
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The task or human task |
+
+| Option | What it does |
+| --- | --- |
+| `--set <text>` | Replace the notes with this |
+| `--clear` | Empty the notes |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop task dep add
+
+Make a task wait on another task or a human task
+
+```
+helix-loop task dep add <id> <on>
+```
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The task that waits |
+| `on` | What it waits on: T-#### or HT-## |
+
+Examples:
+
+```sh
+# T-0042 waits until HT-3 is done
+helix-loop task dep add T-0042 HT-3
+```
+
+### helix-loop task dep remove
+
+Stop a task waiting on another
+
+```
+helix-loop task dep remove <id> <on>
+```
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The task that waits |
+| `on` | What it no longer waits on |
+
+## Human tasks
+
+### helix-loop human
+
+Your human tasks, by the date each must start, with what each holds up
+
+```
+helix-loop human [id] [options]
+```
+
+Lists the open human tasks by start-by date: the latest each can start without the build waiting for it, given its lead time.
+Late ones come first; each shows how many builder tasks wait on it.
+With an id, shows that task, as `helix-loop human show` does.
+
+| Argument | What it is |
+| --- | --- |
+| `id` | A human task to show, as HT-## (optional) |
+
+| Option | What it does |
+| --- | --- |
+| `--all` | Done ones too |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+Examples:
+
+```sh
+# What you have to do, most urgent first
+helix-loop human
+# One of them, with its steps
+helix-loop human HT-3
+```
+
+### helix-loop human start
+
+Mark a human task in progress
+
+```
+helix-loop human start <id>
+```
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The human task |
+
+### helix-loop human done
+
+Mark a human task done, with the evidence, so the tasks waiting on it can run
+
+```
+helix-loop human done <id> [options]
+```
+
+Marks it done once its done check holds, with what shows it (an ID, a link; never a secret's value).
+The builder tasks waiting on it can then run.
+When the app runs with Helix's monitor on, the monitor then passes on what it provides to those tasks.
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The human task |
+
+| Option | What it does |
+| --- | --- |
+| `--evidence <text>` | What shows it done |
+| `-y, --yes` | Go ahead without asking first |
+
+Examples:
+
+```sh
+# Done, with evidence
+helix-loop human done HT-3 --evidence "Stripe account acct_123 approved"
+```
+
+### helix-loop human step
+
+Tick a step of a human task's checklist, or untick it with --undo
+
+```
+helix-loop human step <id> <n> [options]
+```
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The human task |
+| `n` | The step, numbered from 1 |
+
+| Option | What it does |
+| --- | --- |
+| `--undo` | Untick it |
+
+### helix-loop human snooze
+
+Snooze a human task until a date, or take the snooze off
+
+```
+helix-loop human snooze <id> <until>
+```
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The human task |
+| `until` | A date (2026-11-02), days from today (+3d), or off |
+
+Examples:
+
+```sh
+# Out of the way for two days
+helix-loop human snooze HT-3 +2d
+```
+
+### helix-loop human prompt
+
+Print a human task's handoff prompt alone, to give to an agent
+
+```
+helix-loop human prompt <id>
+```
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The human task |
+
+Examples:
+
+```sh
+# Hand the steps to Claude Code
+helix-loop human prompt HT-3 | claude
+```
+
+## What waits on you
+
+### helix-loop inbox
+
+What waits on you, grouped by cause as Home groups it, each with its command
+
+```
+helix-loop inbox [options]
+```
+
+Home, in the terminal: what waits on you, grouped by shared cause, the group that costs the finish most first.
+Each group shows how many builder tasks it holds up, its members, and the command that acts on it.
+The loop's low-impact notices come last, as a count; --all lists them.
+
+| Option | What it does |
+| --- | --- |
+| `--all` | List the notices too |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop incidents
+
+Failures with one cause, grouped, and the fixes Helix proposed
+
+```
+helix-loop incidents [options]
+```
+
+Lists the open incidents of the last week: builder feedback and gate failures with one cause, grouped exactly or by Helix.
+Each shows its fix when Helix proposed one; accept it with `helix-loop fix accept`.
+
+| Option | What it does |
+| --- | --- |
+| `--all` | Closed ones too: every task they held is done |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop incident
+
+One incident: its cause, the tasks it hit, its fix and the evidence
+
+```
+helix-loop incident <ref> [options]
+```
+
+| Argument | What it is |
+| --- | --- |
+| `ref` | The incident's key, its fix's id (F-3), or the start of its key |
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop fix accept
+
+Accept Helix's fix for an incident: its plan changes land as one commit
+
+```
+helix-loop fix accept <ref>
+```
+
+| Argument | What it is |
+| --- | --- |
+| `ref` | The fix's id (F-3), or its incident's key |
+
+Examples:
+
+```sh
+# Apply the fix
+helix-loop fix accept F-3
+```
+
+### helix-loop fix decline
+
+Decline Helix's fix for an incident
+
+```
+helix-loop fix decline <ref>
+```
+
+| Argument | What it is |
+| --- | --- |
+| `ref` | The fix's id, or its incident's key |
+
+### helix-loop fix dry
+
+Try a fix first, in a dry run of the plan with fake agents
+
+```
+helix-loop fix dry <ref> [options]
+```
+
+Starts a fresh dry run of the plan as it stands, with this fix applied, in .helix/runs/dry-run/: fake agents and throwaway repos, nothing real touched.
+It runs in the background, as `helix-loop run --dry-run --plan-changes` would; its output goes to .helix/runs/dry-run.log.
+
+| Argument | What it is |
+| --- | --- |
+| `ref` | The fix's id, or its incident's key |
+
+| Option | What it does |
+| --- | --- |
+| `--max-passes <N>` | Stop the dry run after N passes |
+
+### helix-loop asks
+
+The requests Helix raised for you to decide, each with its options
+
+```
+helix-loop asks [options]
+```
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop ask decide
+
+Decide a request Helix raised: the option you pick lands as one commit
+
+```
+helix-loop ask decide <id> <option> [options]
+```
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The request, as Q-# |
+| `option` | The option, numbered from 1 as `helix-loop asks` lists them |
+
+| Option | What it does |
+| --- | --- |
+| `-y, --yes` | Go ahead without asking first |
+
+Examples:
+
+```sh
+# Take the first option
+helix-loop ask decide Q-2 1
+```
+
+### helix-loop answer
+
+Answer once: one answer to every builder's question about the same thing
+
+```
+helix-loop answer <ref> <text...> [options]
+```
+
+Puts the answer in the notes of every task that asked, handing back those that stopped for it, as one commit.
+--spec also adds it to the spec's clarifications (spec/clarifications.md), for folding into the spec; --rule lets Helix answer the like itself from now on.
+
+| Argument | What it is |
+| --- | --- |
+| `ref` | The question's incident: its key (spec:PB-14) or its fix's id |
+| `text` | The answer |
+
+| Option | What it does |
+| --- | --- |
+| `--tasks <ids>` | Only these tasks, comma-separated |
+| `--spec` | Also add it to the spec's clarifications |
+| `--rule` | Let Helix answer questions like it itself |
+
+Examples:
+
+```sh
+# One answer for every task that asked
+helix-loop answer spec:PB-14 "An empty list shows the empty state, not an error."
+```
+
+### helix-loop changes
+
+The plan changes of the last day, by you and by Helix, each one you can undo
+
+```
+helix-loop changes [options]
+```
+
+| Option | What it does |
+| --- | --- |
+| `--all` | Older ones too, which can no longer be undone |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop undo
+
+Undo a plan change of the last day, as a new commit
+
+```
+helix-loop undo <id> [options]
+```
+
+Puts the tasks a change touched back as they were before it, as a new commit.
+Refused when a later change touched the same tasks (the loop's passes included), or one of them is in a pass.
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The change, as `helix-loop changes` lists it (C-12) |
+
+| Option | What it does |
+| --- | --- |
+| `-y, --yes` | Go ahead without asking first |
+
+## Helix
+
+### helix-loop pilot
+
+Pilot mode: who decides what the loop would ask you, at the level in force
+
+```
+helix-loop pilot [options]
+```
+
+Shows the mode (Active pilot: you are at your desk; Auto-pilot: Helix resolves what it can while you are away), its level, and what happens to each kind of request at that level.
+Releases and marking a human task done always wait for you, at every level.
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop pilot active
+
+Active pilot at a level: Helix brings you what the level asks
+
+```
+helix-loop pilot active [level]
+```
+
+| Argument | What it is |
+| --- | --- |
+| `level` | cautious (asks about everything), prudent, or intrepid (asks only about the big things) (optional) |
+
+### helix-loop pilot auto
+
+Auto-pilot at a level: Helix resolves what it can, and parks the rest
+
+```
+helix-loop pilot auto [level]
+```
+
+| Argument | What it is |
+| --- | --- |
+| `level` | intrepid (parks the big things for you) or yolo (decides everything but the floors) (optional) |
+
+### helix-loop rules
+
+What your ratings taught Helix to decide, or always to ask about
+
+```
+helix-loop rules [options]
+```
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop rule undo
+
+Take back a rule your ratings taught Helix
+
+```
+helix-loop rule undo <id>
+```
+
+| Argument | What it is |
+| --- | --- |
+| `id` | The rule, as R-# |
+
+### helix-loop monitor
+
+Helix's monitor: level, agent, cap, today's spend, and what each level costs
+
+```
+helix-loop monitor [options]
+```
+
+The monitor watches the loop from inside the app: it names and groups incidents, proposes fixes, and resolves what the pilot level lets it.
+Its turns draw on the builders' subscription, so it is off until you turn it on, and it stops for the day at its cap.
+The estimates are what each level would have spent over the last day of the loop.
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop monitor on
+
+Turn Helix's monitor on; it runs while the app does
+
+```
+helix-loop monitor on [options]
+```
+
+| Option | What it does |
+| --- | --- |
+| `--level <level>` | light, standard, thorough; the current one by default |
+| `-y, --yes` | Go ahead without asking first |
+
+### helix-loop monitor off
+
+Turn Helix's monitor off
+
+```
+helix-loop monitor off
+```
+
+### helix-loop monitor level
+
+Set how much Helix's monitor watches: light, standard or thorough
+
+```
+helix-loop monitor level <level>
+```
+
+light takes a turn only when something needs judgment, on a cheaper model; standard adds a turn every half hour while the loop runs, and one-line reads of the passes in flight; thorough looks after every pass, every quarter hour, on the plan model.
+`helix-loop monitor` shows what each would have cost over the last day.
+
+| Argument | What it is |
+| --- | --- |
+| `level` | light, standard, thorough |
+
+### helix-loop monitor cap
+
+Set the monitor's daily cap in dollars, or put back its level's own
+
+```
+helix-loop monitor cap <usd>
+```
+
+| Argument | What it is |
+| --- | --- |
+| `usd` | Dollars a day, from 0 to 500, or default for the level's own |
+
+Examples:
+
+```sh
+# At most $8 a day
+helix-loop monitor cap 8
+# Back to the level's cap
+helix-loop monitor cap default
+```
+
+### helix-loop helix agent
+
+Pick the agent Helix's assistant or monitor runs on, on this machine
+
+```
+helix-loop helix agent <role> <agent>
+```
+
+Helix runs as Claude Code or Codex, headless; its assistant and its monitor can run on different ones.
+The agent must be installed, signed in (or given a Helix API key in the app), and working: this checks with one tiny request.
+The choice is this machine's, in .helix/app.yaml, as in the app's Settings › Helix.
+
+| Argument | What it is |
+| --- | --- |
+| `role` | assistant or monitor |
+| `agent` | claude or codex |
+
+### helix-loop ask
+
+Ask Helix's assistant a question about the loop, and print its answer
+
+```
+helix-loop ask <question...> [options]
+```
+
+Starts a conversation with Helix, as Ask Helix does in the app, and waits for its answer (a turn takes a minute or two).
+Helix reads the plan, the spec and the logs through the app, so this uses the app running for the project, or starts one here for as long as the question takes.
+The conversation stays in the app's Helix tab, where you can go on with it.
+
+| Argument | What it is |
+| --- | --- |
+| `question` | What to ask |
+
+| Option | What it does |
+| --- | --- |
+| `--about <ids>` | Tasks or human tasks it is about, comma-separated |
+
+Examples:
+
+```sh
+# A question, answered in the terminal
+helix-loop ask "Why does T-0042 keep failing its gate?"
+# About a selection, as on Home
+helix-loop ask --about T-0042,T-0043 "Should these be one task?"
+```
+
+## Settings
+
+### helix-loop config
+
+The settings the app offers: each key, its value, and what it does
+
+```
+helix-loop config [options]
+```
+
+Lists the loop's settings that Settings › Loop controls offers, by group, with their values in the units the app uses.
+Change them with `helix-loop config set`; the loop reads them at the start of its next round.
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop config get
+
+One setting's value
+
+```
+helix-loop config get <key> [options]
+```
+
+| Argument | What it is |
+| --- | --- |
+| `key` | The setting, as `helix-loop config` lists it, or a path like pilot.mode |
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop config set
+
+Change settings as one checked commit, the config's comments kept
+
+```
+helix-loop config set <key=value...> [options]
+```
+
+Writes each key=value into .helix/config.yaml in place, keeping its comments, loads it as the loop would to check it, and commits it as one change.
+Values take the units `helix-loop config` shows: 80 for 80%, on or off, lists in commas, model:effort.
+--dry-run tries the change set in a fresh dry run of the plan instead (fake agents, nothing real touched).
+
+| Argument | What it is |
+| --- | --- |
+| `key=value` | The settings to change; or one key and its value |
+
+| Option | What it does |
+| --- | --- |
+| `--dry-run` | Try it in a dry run instead |
+| `-y, --yes` | Go ahead without asking first |
+
+Examples:
+
+```sh
+# Two settings, one commit
+helix-loop config set limits.max_attempts=4 agents.codex.slots=3
+# One setting, as key and value
+helix-loop config set agents.codex.models.build gpt-6.1-sol:xhigh
+# Try it first
+helix-loop config set limits.gate_timeout_minutes=40 --dry-run
+```
+
+### helix-loop config check
+
+Check the config loads as the loop loads it, with a change set if given
+
+```
+helix-loop config check [key=value...]
+```
+
+| Argument | What it is |
+| --- | --- |
+| `key=value` | Settings to check as if changed (optional) |
+
+### helix-loop feedback
+
+Where each kind of builder feedback goes: your inbox, Helix, or nowhere, and when
+
+```
+helix-loop feedback [options]
+```
+
+Builders report what stops them (a spec question, a missing secret, a flaky test); the loop records gate failures.
+Each kind's rule says where it goes (inbox, helix, off), after how many (first, task:N times on one task, tasks:N on N tasks), and whether the pass stops at once (pause) or a notification goes out (notify).
+Rules can differ per lane.
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop feedback set
+
+Change one field of a kind of feedback's rule, for every lane or one
+
+```
+helix-loop feedback set <kind> <field> <value> [options]
+```
+
+| Argument | What it is |
+| --- | --- |
+| `kind` | spec_question, gate_failure, flaky_test, blocked_on_human, credential_missing, scope_grew, conflict, environment |
+| `field` | send_to, after, pause or notify |
+| `value` | inbox, helix or off; first, task:N or tasks:N; on or off |
+
+| Option | What it does |
+| --- | --- |
+| `--lane <repo>` | Only for this lane |
+
+Examples:
+
+```sh
+# Bring a flaky test once it hits three tasks
+helix-loop feedback set flaky_test after tasks:3
+```
+
+### helix-loop secret set
+
+Save a secret builders need, and hand back the tasks that stopped for it
+
+```
+helix-loop secret set <NAME> [options]
+```
+
+Reads the value from standard input without showing it (type or paste it, or pipe it in), and saves it where the app's "Add the secret" does: the macOS keychain as "Helix Loop: NAME", or with --github as a secret of that repo, through gh.
+The value is never printed, logged or written to a file.
+The tasks that stopped for it then go back to the loop, as one commit.
+
+| Argument | What it is |
+| --- | --- |
+| `NAME` | The secret's name, upper case: STRIPE_TEST_KEY |
+
+| Option | What it does |
+| --- | --- |
+| `--github <repo>` | Save it as a GitHub secret of this repo instead |
+| `--env <name>` | With --github: a deployment environment, like production |
+| `--hand-back <ids>` | The tasks to hand back, comma-separated (by default those that stopped for it) |
+| `-y, --yes` | Go ahead without asking first |
+
+Examples:
+
+```sh
+# Type it in; it goes to the keychain
+helix-loop secret set STRIPE_TEST_KEY
+# From the clipboard, to GitHub
+pbpaste | helix-loop secret set STRIPE_KEY --github acme-app --env production --yes
+```
+
+### helix-loop prompts
+
+Helix's prompts: one per role and pilot level, and whether you edited it
+
+```
+helix-loop prompts [options]
+```
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop prompt show
+
+Print one of Helix's prompts as it runs now
+
+```
+helix-loop prompt show <name> [options]
+```
+
+| Argument | What it is |
+| --- | --- |
+| `name` | The prompt, as `helix-loop prompts` lists it |
+
+| Option | What it does |
+| --- | --- |
+| `--json` | Machine-readable output, for commands that list or show something. |
+
+### helix-loop prompt edit
+
+Edit one of Helix's prompts in your editor; it wins until reset
+
+```
+helix-loop prompt edit <name> [options]
+```
+
+Opens the project's copy of the prompt (.helix/helix/prompts/<name>.local.md) in $VISUAL or $EDITOR, and commits it when you close the editor.
+An edit the same as the preset goes back to the preset.
+Prompts carry judgment only: what Helix may do is its tools' business, so no edit widens it.
+--file takes the text from a file instead of an editor.
+
+| Argument | What it is |
+| --- | --- |
+| `name` | The prompt |
+
+| Option | What it does |
+| --- | --- |
+| `--file <path>` | Take the text from this file |
+
+### helix-loop prompt reset
+
+Put one of Helix's prompts back to its preset
+
+```
+helix-loop prompt reset <name>
+```
+
+| Argument | What it is |
+| --- | --- |
+| `name` | The prompt |
+
 ## Releases
 
 ### helix-loop releases
@@ -386,7 +1388,8 @@ Tag and push a release held for review, once its diff is read
 helix-loop release approve <repo> <tag>
 ```
 
-A release that changes a reviewed path (CI workflows, infrastructure: what runs with production's secrets) waits in .helix/runs/approvals/. `helix-loop releases` lists them with the command that shows the diff; this tags exactly the commit that was reviewed.
+A release that changes a reviewed path (CI workflows, infrastructure: what runs with production's secrets) waits in .helix/runs/approvals/.
+`helix-loop releases` lists them with the command that shows the diff; this tags exactly the commit that was reviewed.
 
 | Argument | What it is |
 | --- | --- |
@@ -404,7 +1407,8 @@ helix-loop app [options]
 ```
 
 Serves the app on http://127.0.0.1 (never another interface) and the MCP endpoints builders report to and Helix works through.
-It runs until you stop it (Ctrl-C). The loop runs on its own: either can restart without the other.
+It runs until you stop it (Ctrl-C).
+The loop runs on its own: either can restart without the other.
 
 | Option | What it does |
 | --- | --- |

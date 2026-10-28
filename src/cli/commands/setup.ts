@@ -134,7 +134,8 @@ const init = define({
   summary: 'Start a Helix Loop project in this folder: the .helix/ folder, its config and its repos',
   description: `Asks for the product's name, who steers it, its time zone, the repositories to build and their gate commands, and the agents to use, then writes .helix/: config.yaml, the build prompt, and folders for the spec and the TaskSet.
 Each repository is cloned into .helix/repos/<name>, or started empty for the loop to build from scratch.
-It offers to install the Helix skill too. Everything it asks has an option, for scripts; --yes takes the defaults.`,
+It offers to install the Helix skill too.
+Everything it asks has an option, for scripts; --yes takes the defaults.`,
   project: false,
   options: {
     name: { type: 'string', value: 'name', description: "The product's name (default: this folder's)" },
@@ -296,7 +297,8 @@ const migrate = define({
   group: 'Start a project',
   summary: 'Move a control plane from before .helix/ (spec/, plan/, harness/config.yaml, runs/) into .helix/',
   description: `For a project that ran Helix Loop from inside it, before the tool stood alone: moves the spec, the TaskSet, the build prompt, the config and Helix's files into .helix/ with git mv, and the loop's runs, repos and worktrees after them (repairing the worktrees' links).
-The loop must be stopped. Without --apply it only says what it would do.`,
+The loop must be stopped.
+Without --apply it only says what it would do.`,
   options: {
     apply: { type: 'boolean', description: 'Do it' },
     name: { type: 'string', value: 'name', description: "The product's name, for the config's new project block" },

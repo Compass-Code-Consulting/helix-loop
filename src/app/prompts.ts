@@ -64,7 +64,7 @@ export const monitorPromptName = (pilot: PilotConfig) => {
   return c === 'intrepid_auto' ? 'monitor.auto-intrepid' : c === 'yolo' ? 'monitor.auto-yolo' : `monitor.active-${c}`;
 };
 
-export async function savePrompt(root: string, name: string, text: string): Promise<PromptInfo> {
+export async function savePrompt(root: string, name: string, text: string, where = 'in Helix Loop'): Promise<PromptInfo> {
   const p = readPrompt(root, name);
   if (!p) throw new Error(`no prompt ${name}`);
   const t = text.trim();
@@ -76,17 +76,17 @@ export async function savePrompt(root: string, name: string, text: string): Prom
     mkdirSync(promptsDir(root), { recursive: true });
     atomicWrite(local, `${t}\n`);
   }
-  if (existsSync(join(root, '.git'))) await commit(root, [relative(root, local)], `Helix: ${name} prompt edited (${ownerOf(root)}, in Helix Loop)`).catch(() => false);
+  if (existsSync(join(root, '.git'))) await commit(root, [relative(root, local)], `Helix: ${name} prompt edited (${ownerOf(root)}, ${where})`).catch(() => false);
   return readPrompt(root, name)!;
 }
 
-export async function resetPrompt(root: string, name: string): Promise<PromptInfo> {
+export async function resetPrompt(root: string, name: string, where = 'in Helix Loop'): Promise<PromptInfo> {
   const p = readPrompt(root, name);
   if (!p) throw new Error(`no prompt ${name}`);
   const local = join(promptsDir(root), `${name}.local.md`);
   if (existsSync(local)) {
     rmSync(local);
-    if (existsSync(join(root, '.git'))) await commit(root, [relative(root, local)], `Helix: ${name} prompt reset to its preset (${ownerOf(root)}, in Helix Loop)`).catch(() => false);
+    if (existsSync(join(root, '.git'))) await commit(root, [relative(root, local)], `Helix: ${name} prompt reset to its preset (${ownerOf(root)}, ${where})`).catch(() => false);
   }
   return readPrompt(root, name)!;
 }

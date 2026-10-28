@@ -630,3 +630,10 @@ test('gate: a runner that reports each step when it ends gives exact step times,
   }
   assert.equal(pageAtFailure(dir), 'test-results/a-first/error-context.md:\n# Page snapshot\n- heading "a-first"', 'the first failure, by time');
 });
+
+// Tests start apps and loops on the fixture project: its agents must never be the real CLIs, whose health
+// probe and Helix turns would spend a subscription.
+test('the test project names no real agent CLI', () => {
+  const config = loadConfig(FIXTURE);
+  for (const a of ['claude', 'codex'] as const) assert.match(config.agents[a].command, /^helix-test-no-real-/);
+});

@@ -166,13 +166,13 @@ export function checkConfig(root: string, text: string): Config {
 export const configFile = (root: string) => configPath(root);
 
 // Applies a change set to a root's config. In git it is committed, saying which keys changed.
-export async function applyChangeSet(root: string, changes: ChangeSet[], by = ownerOf(root)): Promise<{ committed: boolean; text: string }> {
+export async function applyChangeSet(root: string, changes: ChangeSet[], by = ownerOf(root), where = 'in Helix Loop'): Promise<{ committed: boolean; text: string }> {
   if (!changes.length) throw new ConfigEditError('nothing to apply');
   const file = configFile(root);
   const text = applyToText(readFileSync(file, 'utf8'), changes);
   checkConfig(root, text);
   atomicWrite(file, text);
-  const committed = existsSync(join(root, '.git')) ? await commit(root, [relative(root, file)], `Config: ${changes.map((c) => c.key).join(', ')} (${by}, in Helix Loop)`) : false;
+  const committed = existsSync(join(root, '.git')) ? await commit(root, [relative(root, file)], `Config: ${changes.map((c) => c.key).join(', ')} (${by}, ${where})`) : false;
   return { committed, text };
 }
 

@@ -31,7 +31,7 @@ agents:
     # Paced so the subscription's weekly window ends at this share used (agents/quota.ts paceSlots). the owner's
     # own Claude use and the loop engineer's share the window, so Claude keeps more back than Codex.
     weekly_target: 0.85
-    command: claude
+    command: helix-test-no-real-claude   # never the real CLI: tests must not spend a subscription
     # Claude Max 20x. Opus 5.5 for every role; effort differs by role.
     models:
       build: { model: claude-opus-5-5, effort: high }
@@ -42,7 +42,7 @@ agents:
     enabled: true
     slots: 2
     weekly_target: 0.9
-    command: codex
+    command: helix-test-no-real-codex
     # ChatGPT Pro. gpt-6.1-sol is Codex's coding workhorse; gpt-6-astra its frontier model.
     models:
       build: { model: gpt-6.1-sol, effort: high }

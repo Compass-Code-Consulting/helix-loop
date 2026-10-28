@@ -61,7 +61,7 @@ export function recordChange(root: string, c: Omit<Change, 'id' | 'at'>): Change
   return change;
 }
 
-export async function undoChange(root: string, id: string, now = Date.now()): Promise<{ commit?: string }> {
+export async function undoChange(root: string, id: string, now = Date.now(), who: { by: string; where: string } = { by: ownerOf(root), where: 'in Helix Loop' }): Promise<{ commit?: string }> {
   const file = paths(root).changes;
   const c = readChanges(file).find((x) => x.id === id);
   if (!c) throw new PlanEditError(`no change ${id}`);
@@ -79,7 +79,7 @@ export async function undoChange(root: string, id: string, now = Date.now()): Pr
     if (before === undefined) rmSync(join(root, rel), { force: true });
     else atomicWrite(join(root, rel), before);
   }
-  const r = await afterEdit(root, c.files.map((f) => join(root, f)), `Plan: undo ${c.what} (${ownerOf(root)}, in Helix Loop)`);
+  const r = await afterEdit(root, c.files.map((f) => join(root, f)), `Plan: undo ${c.what} (${who.by}, ${who.where})`);
   append(file, { type: 'undone', id, at: new Date(now).toISOString(), commit: r.commit });
   return { commit: r.commit };
 }
